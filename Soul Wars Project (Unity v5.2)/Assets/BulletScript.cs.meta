@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: f2d74082639c4ba4da4463bb7601d5ae
+timeCreated: 1480901754
+licenseType: Free
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences:
+  - home: {fileID: 148994, guid: ae2b3297908510a40877fc0c74388724, type: 2}
+  - health_change_canvas: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
