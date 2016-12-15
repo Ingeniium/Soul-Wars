@@ -52,6 +52,7 @@
      <Compile Include="Assets\HPbar.cs" />
      <Compile Include="Assets\HealthDefence.cs" />
      <Compile Include="Assets\HomingScript.cs" />
+     <Compile Include="Assets\ItemImage.cs" />
      <Compile Include="Assets\MenuDisplay.cs" />
      <Compile Include="Assets\PlayerController.cs" />
      <Compile Include="Assets\PlayerFollow.cs" />
