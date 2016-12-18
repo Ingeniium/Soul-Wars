@@ -55,17 +55,7 @@ public class AIController : MonoBehaviour {
            ptr.position = Vector3.MoveTowards(ptr.position, ttr.position, .1f);
            if (gun.next_time < Time.time)
            {
-               gun.bullet = Instantiate(gun.Bullet, gun.barrel_end.position, gun.barrel_end.rotation) as GameObject;
-               gun.bullet.layer = 14;
-               gun.bullet.GetComponent<BulletScript>().home.layer = 12;
-               gun.bullet.GetComponent<Renderer>().material.color = Color.red;
-               gun.bullet.AddComponent<Rigidbody>();
-               gun.bullet.GetComponent<Rigidbody>().useGravity = false;
-               gun.bullet.GetComponent<BulletScript>().damage = gun.damage;
-               gun.bullet.GetComponent<BulletScript>().home_radius = gun.home_radius;
-               gun.bullet.GetComponent<Rigidbody>().AddForce(gun.barrel_end.forward, ForceMode.Impulse);//works
-               gun.next_time = Time.time + gun.reload_time;
-
+               gun.Shoot();
            }
        }
    }

@@ -29,15 +29,7 @@ public class PlayerController : MonoBehaviour {
         }
         else if (Input.GetMouseButtonDown(0) && gun.next_time < Time.time)
         {
-            gun.bullet = Instantiate(gun.Bullet, gun.barrel_end.position, gun.barrel_end.rotation) as GameObject;
-            gun.bullet.GetComponent<Renderer>().material.color = Color.cyan;
-            gun.bullet.AddComponent<Rigidbody>();
-            gun.bullet.GetComponent<Rigidbody>().useGravity = false;
-            gun.bullet.GetComponent<BulletScript>().damage = gun.damage;
-            gun.bullet.GetComponent<BulletScript>().home_radius = gun.home_radius;
-            gun.bullet.GetComponent<BulletScript>().home.layer = 10;
-            gun.bullet.GetComponent<Rigidbody>().AddForce(gun.barrel_end.forward, ForceMode.Impulse);//works
-            gun.next_time = Time.time + gun.reload_time;
+            gun.Shoot();
         }
         if(switching)
         {
@@ -87,4 +79,5 @@ public class PlayerController : MonoBehaviour {
 		tr.Translate (moveHorizontal*speed, 0, moveVertical*-speed,Space.World);
        
    }
+
 }

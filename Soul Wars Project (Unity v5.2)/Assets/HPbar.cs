@@ -11,7 +11,15 @@ public class HPbar : MonoBehaviour {
 	
 	void LateUpdate ()
     {
-        transform.position = Object.transform.position + offset;
+        if (Object)
+        {
+            transform.position = Object.transform.position + offset;
+        }
+        else
+        {
+            Destroy(Object);
+        }
+
 	}
 	
 	
