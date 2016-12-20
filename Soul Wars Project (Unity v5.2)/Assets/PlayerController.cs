@@ -4,9 +4,9 @@ using System.Collections;
 public class PlayerController : MonoBehaviour {
 	public GameObject Shield;
     public GameObject Gun;
+    public Gun gun;
     public float speed = .1f;
     private Transform str;
-    private Gun gun;
     private float moveHorizontal;
     private float moveVertical;
 	private Rigidbody rb;

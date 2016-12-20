@@ -14,7 +14,7 @@ public class AIController : MonoBehaviour {
     public float dodge_delay;
     public float dodge_cooldown;
     private Vector3 vec;
-    public float reaction_delay;
+    public float reaction_delay;    
     [HideInInspector]
     public Transform gtr;
     public Collider enemy_attack_detection;
@@ -101,6 +101,8 @@ public class AIController : MonoBehaviour {
       enemy_attack_detection.enabled = true;
       enemy_attack_detection.isTrigger = true;
     }
+
+    
    
 }
 

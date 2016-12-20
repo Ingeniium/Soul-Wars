@@ -33,7 +33,10 @@ public class HealthDefence : MonoBehaviour {
                 regeneration = false;
                 if (shield)
                 {
-                    shield_collider.enabled = true;
+                    if (shield_collider)
+                    {
+                        shield_collider.enabled = true;
+                    }
                     gameObject.GetComponent<Renderer>().material.color = Original_Color;
                     StopCoroutine(Regeneration());
                 }
@@ -42,12 +45,19 @@ public class HealthDefence : MonoBehaviour {
             {
                 if (shield == false)
                 {
+                    if (has_drops)
+                    {
+                        GetComponentInChildren<AIController>().gun.DropItem(ref gun_drop_chance);
+                    }
                     Destroy(health_bar_show.gameObject);
                     Destroy(gameObject);
                 }
                 else
                 {
-                    shield_collider.enabled = false;
+                    if (shield_collider)
+                    {
+                        shield_collider.enabled = false;
+                    }
                     _HP = 0;
                     hp_string.text = "<b>" + _HP + "</b>";
                     regeneration = true;
@@ -68,6 +78,8 @@ public class HealthDefence : MonoBehaviour {
     public Text hp_string;
     public RectTransform hp_bar;
     public float maxWidth;
+    public bool has_drops;
+    public double gun_drop_chance;
 	// Use this for initialization
 	void Awake () 
     {
