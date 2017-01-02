@@ -2,8 +2,7 @@
 using System.Collections.Generic;
 
 public class Inventory : MonoBehaviour {
-    public List<GameObject> inventory_items;
-    public uint size = 0;
+    private List<GameObject> inventory_items;
     private uint maximum = 10;
 	// Use this for initialization
 	void Start () 
@@ -12,12 +11,15 @@ public class Inventory : MonoBehaviour {
 	}
     public void InsertItem(ref GameObject item)
     {
-        if (size < maximum)
+        if (inventory_items.Count < maximum + 1)
         {
-            size++;
             inventory_items.Add(item);
             item.transform.parent = transform;
         }
+    }
+    public void RemoveItem(ref GameObject item)
+    {
+        inventory_items.Remove(item);
     }
 
 }

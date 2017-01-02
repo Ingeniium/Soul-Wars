@@ -7,8 +7,9 @@ public class PlayerFollow : MonoBehaviour
     private Transform tr;
     private Vector3 offset;
     private Camera camera;
-    Ray ray;
-    RaycastHit hit;
+    private float next_time = 0;
+    private Ray ray;
+    public RaycastHit hit;
     void Start()
     {
         offset = transform.position - Player.transform.position;
@@ -24,7 +25,6 @@ public class PlayerFollow : MonoBehaviour
             if (Physics.Raycast(ray, out hit))
             {
                 tr.LookAt(new Vector3(hit.point.x, 10.3f, hit.point.z));
-
             }
         }
     }
@@ -34,5 +34,6 @@ public class PlayerFollow : MonoBehaviour
         {
             transform.position = Player.transform.position + offset;
         }
+       
     }
 }

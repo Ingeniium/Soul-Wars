@@ -2,6 +2,7 @@
 using UnityEngine.UI;
 using UnityEditor;
 using System.Collections;
+using System;
 
 public class ItemImage : MonoBehaviour {
     private Image this_pic;
@@ -15,7 +16,11 @@ public class ItemImage : MonoBehaviour {
             {
                 this_pic = GetComponent<Image>();
                 Texture2D tex = AssetPreview.GetAssetPreview(value) as Texture2D;
-                preview = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(.5f, .5f));
+                try
+                {
+                    preview = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(.5f, .5f));
+                }
+                catch (NullReferenceException exception) { preview = null; }
                 this_pic.sprite = preview;
             }
         }
@@ -30,7 +35,6 @@ public class ItemImage : MonoBehaviour {
             if (value is Gun)
             {
                 _item_script = value as Gun;
-                print("Gun");
             }
             else
             {
@@ -41,7 +45,7 @@ public class ItemImage : MonoBehaviour {
     private Item _item_script;
     public Canvas item_description_canvas;
     private Canvas item_descritption_canvas_show;
-    private bool in_inventory = true;
+    public bool option_showing = false;
 	
 	
     void OnMouseEnter()
@@ -50,27 +54,25 @@ public class ItemImage : MonoBehaviour {
        item_descritption_canvas_show.transform.parent = transform;
        item_descritption_canvas_show.GetComponentInChildren<Text>().text = item_script.ToString();
     }
-
+    //Mouse events can't evaluate more than on button,therefore use two events for detection.
     void OnMouseDown()
     {
-        if (Input.GetMouseButtonDown(0) && in_inventory)
+        if (Input.GetMouseButton(0))
         {
-            GameObject weapons_bar = GameObject.FindGameObjectWithTag("Weapons");
-            transform.parent.parent = weapons_bar.transform;
-            transform.parent.gameObject.GetComponent<RectTransform>().anchoredPosition = new Vector2(-29f,-250) ;
-            PlayerController Player = GameObject.FindGameObjectWithTag("Player").GetComponent<PlayerController>();
-            GameObject prev_Gun = Player.Gun;
-            Color color = Player.gun.color;
-            Player.Gun = Instantiate(Item,prev_Gun.transform.position, prev_Gun.transform.rotation) as GameObject;
-            Player.Gun.transform.parent = Player.gameObject.transform;
-            Destroy(prev_Gun);
-            Player.gun = item_script as Gun;
-            Player.gun.color = color;
-            Player.gun.layer = 13;
-            Player.gun.home_layer = 10;
-            Player.gun.barrel_end = Player.Gun.GetComponentInChildren<Transform>();
-            in_inventory = false;
+            if (item_script.in_inventory)
+            {
+                item_script.PrepareItemForUse();
+            }
         }
+    }
+    void OnMouseOver()
+    {
+         if (Input.GetMouseButton(1) && option_showing == false)
+          {
+                item_script.Options();
+                option_showing = true;
+          }
+              
     }
 
     void OnMouseExit()
@@ -79,6 +81,7 @@ public class ItemImage : MonoBehaviour {
         {
             Destroy(item_descritption_canvas_show.gameObject);
         }
+       
     }
    
 
