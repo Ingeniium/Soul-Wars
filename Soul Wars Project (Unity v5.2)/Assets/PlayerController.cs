@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 
 public class PlayerController : MonoBehaviour {
+    private Vector3 total_move;
 	public GameObject Shield;
     public GameObject Gun;
     public Gun gun;//The Equipped weapon that the player currently wields
@@ -69,7 +70,7 @@ public class PlayerController : MonoBehaviour {
             _main_weapon_index = value;
         }
     }
-    public float speed = .1f;
+    public float speed = 30f;
     private Transform str;
     private float moveHorizontal;
     private float moveVertical;
@@ -80,7 +81,7 @@ public class PlayerController : MonoBehaviour {
     private float turn = 0;
     public Canvas cooldown_canvas;
     private Canvas cooldown_canvas_show;
-    public PlayerFollow Play;
+    public bool equip_action = true;
 	void Start () 
     {
 		rb = GetComponent<Rigidbody>();
@@ -92,7 +93,7 @@ public class PlayerController : MonoBehaviour {
         gun._item_image = Instantiate(gun.item_image,new Vector3(-2.55f,0,-3.75f), gun.item_image.transform.rotation) as GameObject;
         Item.CopyComponent<Item>(gun, gun._item_image);
         gun._item_image.GetComponentInChildren<ItemImage>().item_script = gun._item_image.GetComponent<Item>();
-        gun._item_image.GetComponentInChildren<ItemImage>().Item = gun.asset_reference;
+        gun._item_image.GetComponentInChildren<ItemImage>().Item_ = gun.asset_reference;
         gun._item_image.GetComponentInChildren<BoxCollider>().center = Vector2.zero;
         GameObject weapons_bar = GameObject.FindGameObjectWithTag("Weapons");
         gun._item_image.transform.SetParent(weapons_bar.transform);
@@ -101,7 +102,7 @@ public class PlayerController : MonoBehaviour {
 	}
 	void Update() 
     {
-        if (Play.hit.collider && Play.hit.collider.gameObject.layer != 7)
+        if (equip_action)
         {
             if (Input.GetMouseButtonDown(1) && switching != true)
             {
@@ -145,6 +146,8 @@ public class PlayerController : MonoBehaviour {
                 }
 
             }
+        }
+        //else { equip_action = true; }
 
             if (switching)
             {
@@ -183,17 +186,17 @@ public class PlayerController : MonoBehaviour {
 
 
             }
-        }
+        
 	}
 	
 	// Update is called once per frame
 	void FixedUpdate ()
     {
-        if(rb.velocity != Vector3.zero){rb.velocity = Vector3.zero;}
 		moveHorizontal = Input.GetAxis ("Horizontal");
 		moveVertical = Input.GetAxis ("Vertical");
-		tr.Translate (moveHorizontal*speed, 0, moveVertical*-speed,Space.World);
-   }
+        total_move = new Vector3(moveHorizontal,0,-1*moveVertical);
+        rb.AddForce(total_move * speed);
+    }
 
     IEnumerator Cooldown(Canvas cooldown,Gun arg_gun)
     {

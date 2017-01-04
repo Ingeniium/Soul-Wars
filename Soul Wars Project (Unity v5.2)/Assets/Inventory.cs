@@ -14,6 +14,8 @@ public class Inventory : MonoBehaviour {
         if (inventory_items.Count < maximum + 1)
         {
             inventory_items.Add(item);
+            ItemImage image = item.GetComponentInChildren<ItemImage>();
+            image.item_script.in_inventory = true;
             item.transform.parent = transform;
         }
     }

@@ -6,7 +6,7 @@ using System;
 
 public class ItemImage : MonoBehaviour {
     private Image this_pic;
-    public GameObject Item
+    public GameObject Item_
     {
         get { return _Item; }
         set
@@ -42,7 +42,7 @@ public class ItemImage : MonoBehaviour {
             }
         }                       
     }
-    private Item _item_script;
+    public Item _item_script;
     public Canvas item_description_canvas;
     private Canvas item_descritption_canvas_show;
     public bool option_showing = false;
@@ -67,6 +67,7 @@ public class ItemImage : MonoBehaviour {
     }
     void OnMouseOver()
     {
+        Item.Player.equip_action = false;
          if (Input.GetMouseButton(1) && option_showing == false)
           {
                 item_script.Options();
@@ -77,6 +78,7 @@ public class ItemImage : MonoBehaviour {
 
     void OnMouseExit()
     {
+        Item.Player.equip_action = true;
         if (item_descritption_canvas_show)
         {
             Destroy(item_descritption_canvas_show.gameObject);

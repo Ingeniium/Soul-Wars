@@ -15,11 +15,13 @@ public class Options : MonoBehaviour {
     void OnMouseOver()
     {
         hover = true;
+        Item.Player.equip_action = false;
     }
 
     void OnMouseExit()
     {
         hover = false;
+        Item.Player.equip_action = true;
     }
 
     void Update()
@@ -27,6 +29,7 @@ public class Options : MonoBehaviour {
         if ((Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)) && hover == false)
         {
             image.option_showing = false;
+            Item.Player.equip_action = true;
             Destroy(gameObject);
         }        
     }

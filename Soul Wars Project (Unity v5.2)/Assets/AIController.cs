@@ -89,12 +89,15 @@ public class AIController : MonoBehaviour {
             Shield.transform.localPosition = new Vector3(.87f, .37f, -.071f);
             gtr.localPosition = new Vector3(.09f, 0, .80f);
         }
-        else if(next_dodge < Time.time && trig != null)
+        else if(next_dodge < Time.time)
         {
-            next_dodge = Time.time + dodge_cooldown;
-            yield return new WaitForSeconds(dodge_delay);
-            vec = Quaternion.AngleAxis(90, trig.gameObject.transform.up) * trig.gameObject.transform.forward;
-            prb.AddForce(vec * 10, ForceMode.Impulse);
+                next_dodge = Time.time + dodge_cooldown;
+                yield return new WaitForSeconds(dodge_delay);
+                if (trig != null)
+                {
+                    vec = Quaternion.AngleAxis(90, trig.gameObject.transform.up) * trig.gameObject.transform.forward;
+                }
+                prb.AddForce(vec * 10, ForceMode.Impulse);
         }
 
      }
