@@ -91,8 +91,7 @@ public class PlayerController : MonoBehaviour {
         gun.current_reference = Gun;
         //Giving the gun its own item image object,and setting it to be the 1st equipped weapon
         gun._item_image = Instantiate(gun.item_image,new Vector3(-2.55f,0,-3.75f), gun.item_image.transform.rotation) as GameObject;
-        Item.CopyComponent<Item>(gun, gun._item_image);
-        gun._item_image.GetComponentInChildren<ItemImage>().item_script = gun._item_image.GetComponent<Item>();
+        gun._item_image.GetComponentInChildren<ItemImage>().item_script = gun;
         gun._item_image.GetComponentInChildren<ItemImage>().Item_ = gun.asset_reference;
         gun._item_image.GetComponentInChildren<BoxCollider>().center = Vector2.zero;
         GameObject weapons_bar = GameObject.FindGameObjectWithTag("Weapons");

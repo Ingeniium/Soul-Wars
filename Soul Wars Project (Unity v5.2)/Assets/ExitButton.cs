@@ -13,6 +13,6 @@ public class ExitButton : MonoBehaviour {
 
     void HideMenu()
     {
-        transform.parent.parent = null;
+        transform.parent.SetParent(null);
     }
 }

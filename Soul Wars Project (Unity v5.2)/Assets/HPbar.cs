@@ -17,7 +17,7 @@ public class HPbar : MonoBehaviour {
         }
         else
         {
-            Destroy(Object);
+            Destroy(gameObject);
         }
 
 	}

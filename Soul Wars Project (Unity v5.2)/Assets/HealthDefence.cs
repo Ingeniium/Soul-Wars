@@ -68,6 +68,7 @@ public class HealthDefence : MonoBehaviour {
         }
     }
     public int defence;
+    public double crit_resistance = 0;
     public bool shield;
     public float scale_factor;
     public float sec_till_regen;
@@ -79,6 +80,8 @@ public class HealthDefence : MonoBehaviour {
     public RectTransform hp_bar;
     public float maxWidth;
     public bool has_drops;
+    public bool has_exp = true;
+    public int exp_rate = 1;
     public double gun_drop_chance;
 	// Use this for initialization
 	void Awake () 
