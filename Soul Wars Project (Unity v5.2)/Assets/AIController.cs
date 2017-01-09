@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-public class AIController : MonoBehaviour {
+public partial class AIController : MonoBehaviour {
     private Rigidbody prb;
     public Transform ptr;
     public GameObject Shield;
