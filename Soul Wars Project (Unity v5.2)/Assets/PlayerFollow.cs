@@ -3,7 +3,7 @@ using System.Collections;
 
 public class PlayerFollow : MonoBehaviour
 {
-    public GameObject Player;
+    public static GameObject Player;
     private Transform tr;
     private Vector3 offset;
     private Camera camera;
@@ -12,6 +12,7 @@ public class PlayerFollow : MonoBehaviour
     public RaycastHit hit;
     void Start()
     {
+        Player = GameObject.FindGameObjectWithTag("Player");
         offset = transform.position - Player.transform.position;
         camera = GetComponent<Camera>();
         tr = Player.GetComponent<Transform>();

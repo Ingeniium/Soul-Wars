@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 public partial class AIController : MonoBehaviour {
     private Rigidbody prb;
@@ -7,9 +8,9 @@ public partial class AIController : MonoBehaviour {
     public GameObject Shield;
     public GameObject Gun;
     private GameObject Target;
-    private Transform ttr;
     private bool target_focus = true;
     private Collider trig;
+    private List<Collider> obstacles = new List<Collider>();
     private float next_dodge = 0;
     public float dodge_delay;
     public float dodge_cooldown;
@@ -19,8 +20,38 @@ public partial class AIController : MonoBehaviour {
     public Transform gtr;
     public Collider enemy_attack_detection;
     public Gun gun;
+    private objective obj = 0;
+    public float minimal_distance = 1f;
 
-	// Use this for initialization
+    private enum objective
+    {
+            ATTACK_ALLY_UNIT = 0,
+            ATTACK_ALLY_BASE = 1,
+            GUARD_LOCATION = 2
+    }
+
+    void SetTarget()
+    {
+        switch(obj)
+        {
+            case objective.ATTACK_ALLY_UNIT :
+                if(Item.Player != null)
+                {
+                    Target = Item.Player.gameObject;
+                }
+                else
+                {
+                    obj = objective.ATTACK_ALLY_BASE;
+                    SetTarget();
+                }
+                break;
+            case objective.ATTACK_ALLY_BASE :
+                break;
+            case objective.GUARD_LOCATION :
+                break;
+        }
+    }
+
 	void Start ()
     {
       prb = GetComponentInParent<Rigidbody>();
@@ -32,31 +63,142 @@ public partial class AIController : MonoBehaviour {
 
    void OnTriggerEnter(Collider col)
     {
-        trig = col;
-        StartCoroutine(Evasion());
-        enemy_attack_detection.enabled = false;
-        enemy_attack_detection.isTrigger = false;                
+        /*If there's a player controlled unit or obstacle/wall pieces
+         within radius of collider,simply move away,maintaining minimal distance*/
+        if (col.gameObject.layer == 9)
+        {
+            //obstacles.Add(col);
+            prb.AddForce(AvoidObstacles(col),ForceMode.Impulse);
+        }
+        else
+        {
+            trig = col;
+            StartCoroutine(Evasion());
+            enemy_attack_detection.enabled = false;
+            enemy_attack_detection.isTrigger = false;
+        }  
     }
-	
-	// Update is called once per frame
+
+   void OnTriggerExit(Collider col)
+   {
+       if (col.gameObject.layer == 9)
+       {
+           obstacles.Remove(col);
+       }
+   }
+
    void Update()
    {
-       if (Target == null)
-       {
-           Target = GameObject.FindGameObjectWithTag("Player");
-           if (Target != null)
+       prb.AddForce(Vector3.up * 25);
+       if (obstacles.Count > 0)
            {
-               ttr = Target.GetComponent<Transform>();
+               Vector3 dir = Vector3.zero;
+               foreach (Collider o in obstacles)
+               {
+                   try
+                   {
+                       dir += AvoidObstacles(o);
+                   }
+                   catch (System.Exception e)
+                   {
+                       dir += Vector3.zero;
+                   }
+               }
+               prb.AddForce(dir);
+           }
+       prb.AddForce(Intercept());
+       FireWhenInRange();
+   }
+
+   Vector3 Charge()
+   {
+       try
+       {
+           Vector3 dir = (Target.transform.position - ptr.transform.position);
+           if (target_focus && dir.magnitude > minimal_distance)
+           {
+               ptr.LookAt(Target.transform);
+               dir = Vector3.Normalize(dir);
+               return (dir * 10);
+           }
+           else
+           {
+               return Vector3.zero;
            }
        }
-       if (target_focus && ttr != null)
+       catch (System.Exception e)
        {
-           ptr.LookAt(ttr);
-           ptr.position = Vector3.MoveTowards(ptr.position, ttr.position, .1f);
-           if (gun.next_time < Time.time)
+           SetTarget();
+           return Vector3.zero;
+       }
+   }
+
+   Vector3 Intercept()
+   {
+       try
+       {
+           Vector3 dif = (Target.transform.position - ptr.transform.position);
+           if (target_focus)
+           {
+              
+               Vector3 proj = Target.GetComponent<Rigidbody>().velocity;
+               ptr.LookAt(Target.transform);
+               if (proj.magnitude > 1)
+               {
+                   Vector3 dir = Vector3.Project(dif, proj); 
+                   return dir * 10;
+               }
+               else if (dif.magnitude > minimal_distance)
+               {
+                   return Vector3.zero;
+               }
+               else
+               {
+                   return dif.normalized * 10;
+               }
+           }
+           else
+           {
+               return Vector3.zero;
+           }
+       }
+       catch (System.Exception e)
+       {
+           SetTarget();
+           return Vector3.zero;
+       }
+   }
+
+
+   Vector3 AvoidObstacles(Collider col)
+   {      
+      Vector3  dir = transform.position - col.gameObject.transform.position;
+      dir = Quaternion.AngleAxis(90, ptr.up) * dir;
+      float num = 5 - dir.magnitude;
+      dir = dir.normalized * num;
+      return dir;
+   }
+
+   void WildlyFire()
+   {
+       if (gun.next_time < Time.time)
+       {
+           gun.Shoot();
+       }
+   }
+
+   void FireWhenInRange()
+   {
+       try
+       {
+           if (gun.next_time < Time.time && gun.range <= Vector3.Distance(ptr.position, Target.transform.position))
            {
                gun.Shoot();
            }
+       }
+       catch (System.Exception e)
+       {
+           SetTarget();
        }
    }
 

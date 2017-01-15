@@ -26,7 +26,7 @@ public class BulletScript : MonoBehaviour {
             //Pass values to homing device
             homer.GetComponent<SphereCollider>().radius = home_radius;
             homer.GetComponent<HomingScript>().home_speed = home_speed;
-            Destroy(gameObject, 8.0f);
+            Destroy(gameObject, 3.0f);
         }
 	}
 
@@ -76,7 +76,7 @@ public class BulletScript : MonoBehaviour {
                 }
                 //Note that whether the bullet crit or not changes the color of the damage numbers and block indication
                 health_change_show = Instantiate(health_change_canvas, hit.gameObject.transform.position + new Vector3(0, 0, 1), Quaternion.Euler(90, 0, 0)) as GameObject;
-                if (!Target.shield)
+                if (Target.type != HealthDefence.Type.Shield)
                 {
                     health_change_show.GetComponentInChildren<Text>().text = "-" + d;
                     if (crit)

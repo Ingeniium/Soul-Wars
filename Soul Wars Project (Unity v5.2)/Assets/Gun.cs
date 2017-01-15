@@ -13,6 +13,8 @@ public abstract class Gun : Item {
 	public float home_radius;
     public bool homes = true;//whether the bullets will have homing capabilities
 	public int damage = 2;
+    public float projectile_speed;
+    public float range;
     public double crit_chance = .1f;
 	public Transform barrel_end;//Where bullets actually SPAWN from
     public Color color;//color assigned to the BULLETS
@@ -56,7 +58,7 @@ public abstract class Gun : Item {
     {
         bullet = Instantiate(Bullet, barrel_end.position, gameObject.transform.rotation) as GameObject;
         ReadyWeaponForFire(ref bullet);
-        bullet.GetComponent<Rigidbody>().AddForce(barrel_end.forward, ForceMode.Impulse);
+        bullet.GetComponent<Rigidbody>().AddForce(barrel_end.forward * projectile_speed, ForceMode.Impulse);
     }
    
     protected void ReadyWeaponForFire(ref GameObject weapon_fire)

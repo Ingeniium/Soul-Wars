@@ -31,7 +31,7 @@ public class HealthDefence : MonoBehaviour {
             {
                 _HP = maxHP;
                 regeneration = false;
-                if (shield)
+                if (type == Type.Shield)
                 {
                     if (shield_collider)
                     {
@@ -43,17 +43,19 @@ public class HealthDefence : MonoBehaviour {
             }
             else if (value <= 0)//Not on collision enter to account for DoT
             {
-                if (shield == false)
+                switch(type)
                 {
+                    case Type.Unit :
                     if (has_drops)
                     {
                         GetComponentInChildren<AIController>().gun.DropItem(ref gun_drop_chance);
                     }
-                    Destroy(health_bar_show.gameObject);
-                    Destroy(gameObject);
-                }
-                else
-                {
+                    StartCoroutine(SpawnManager.WaitForRespawn(this));
+                    //Destroy(health_bar_show.gameObject);
+                    //Destroy(gameObject,.25f);
+                    break;
+                    
+                    case Type.Shield :
                     if (shield_collider)
                     {
                         shield_collider.enabled = false;
@@ -63,13 +65,40 @@ public class HealthDefence : MonoBehaviour {
                     regeneration = true;
                     gameObject.GetComponent<Renderer>().material.color = Color.red;
                     StartCoroutine(Regeneration());
+                    break;
+
+                    case Type.Spawn_Point :
+                    if (gameObject.layer == 9)
+                    {
+                        gameObject.layer = 8;
+                        gameObject.GetComponent<Renderer>().material.color = Color.red;
+                        SpawnManager s = GetComponent<SpawnManager>();
+                        s.stand.GetComponent<Renderer>().material.color = Color.red;
+                        s.stand.layer = 8;
+                        SpawnManager.EnemySpawnPoints.Add(s);
+                        SpawnManager.AllySpawnPoints.Remove(s);
+                    }
+                    else
+                    {
+                        gameObject.layer = 9;
+                        SpawnManager s = GetComponent<SpawnManager>();
+                        gameObject.GetComponent<Renderer>().material.color = new Color32(52,95,221,225);//Light Blue
+                        s.stand.GetComponent<Renderer>().material.color = new Color32(52, 95, 221,225);
+                        s.stand.layer = 9;
+                        SpawnManager.AllySpawnPoints.Add(s);
+                        SpawnManager.EnemySpawnPoints.Remove(s);
+                    }
+                    _HP = maxHP;
+                    break;
                 }
             }
+            
+            }
         }
-    }
+        
+    
     public int defence;
     public double crit_resistance = 0;
-    public bool shield;
     public float scale_factor;
     public float sec_till_regen;
     public Collider shield_collider;
@@ -83,10 +112,17 @@ public class HealthDefence : MonoBehaviour {
     public bool has_exp = true;
     public int exp_rate = 1;
     public double gun_drop_chance;
+    public Type type = Type.Unit;
+    public enum Type
+    {
+        Unit = 0,
+        Shield = 1,
+        Spawn_Point = 2
+    }
 	// Use this for initialization
 	void Awake () 
     {
-        if (shield == true)
+        if (type == Type.Shield)
         {
             shield_collider = GetComponent<BoxCollider>();
             transform.localScale = new Vector3(transform.localScale.x,transform.localScale.y*scale_factor,transform.localScale.z*scale_factor);
