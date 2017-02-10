@@ -1,14 +1,24 @@
 ﻿using UnityEngine;
+using System;
 using System.Collections;
+using System.Collections.Generic;
 
 public class Strike : Gun {
     private readonly static string[] gun_ability_names = new string[3] { "Marksman", "Sniper", "Drone" };
-    private static Gun_Abilities[] Gun_Mods = new Gun_Abilities[3];//This class's pool of gun_abilities
+    private readonly static string[] gun_name_addons = new string[3] { "Marksmanship",null,null };
+    /*This class's pool of gun_abilities.Use of a static container of static methods requiring explicit this
+     pointers are used for onetime,pre-Awake() initialization of delegates*/
+    private static List<Gun_Abilities> Gun_Mods = new List<Gun_Abilities>()//This class's pool of gun_abilities
+    {
+        {Marksman},
+        null,
+        null
+    };
    
     /*Ability that grants extra crit chance based on how far the bullet
      deviates from its "original" path.Less deviation means more crit,the 
      maximum amount being +30%*/
-    private IEnumerator Marksman(BulletScript script)
+    private static IEnumerator Marksman(Gun gun,BulletScript script)
     {
         script.coroutines_running++;
         Vector3 start_pos = script.transform.position;//Get its original position
@@ -51,13 +61,28 @@ public class Strike : Gun {
         return Gun_Mods[index];
     }
 
-    protected override void SetBaseGunAbilities()
-    {
-        Gun_Mods[0] = Marksman;
-    }
+    protected override void SetGunNameAddons(int index)     {
+        if (index < 4 || index > 12)
+        {
+            suffixes.Add(gun_name_addons[index]);
+        }
+        else
+        {
+            prefixes.Add(gun_name_addons[index]);
+        }    }
 
     protected override bool AreGunLevelUpButtonsAssignedForClass()
     {
         return (GunTable.buttons[0].method == Marksman);
-    }
+    }
+
+    protected override string GunDesc()
+    {
+        return "Launches a powerful arrow.";
+    }
+
+    protected override string GetBaseName()
+    {
+        return "Strike";
+    }
 }

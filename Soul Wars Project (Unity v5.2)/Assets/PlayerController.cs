@@ -3,7 +3,7 @@ using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
 
-public class PlayerController : MonoBehaviour {
+public class PlayerController : GenericController {
     private Vector3 total_move;
 	public GameObject Shield;
     public GameObject Gun;
@@ -107,7 +107,7 @@ public class PlayerController : MonoBehaviour {
             {
                 switching = true;
             }
-            else if (Input.GetMouseButtonDown(0) && gun.next_time < Time.time)
+            else if (Input.GetMouseButtonDown(0) && gun.HasReloaded())
             {
                 cooldown_canvas_show = Instantiate(cooldown_canvas, gun._item_image.transform.position + new Vector3(.25f, 0, 0), gun._item_image.transform.rotation) as Canvas;
                 cooldown_canvas_show.transform.SetParent(gun._item_image.transform);
@@ -199,12 +199,20 @@ public class PlayerController : MonoBehaviour {
 
     IEnumerator Cooldown(Canvas cooldown,Gun arg_gun)
     {
+
         int seconds = (int)arg_gun.reload_time;
         Text cooldown_text = cooldown.GetComponentInChildren<Text>();
         cooldown_text.color = Color.yellow;
-        cooldown_text.text = seconds.ToString();
+        if (seconds > 0)
+        {
+            cooldown_text.text = seconds.ToString();
+        }
+        else
+        {
+            cooldown_text.text = arg_gun.reload_time.ToString();
+        }
         yield return new WaitForSeconds(arg_gun.reload_time - (float)seconds);
-        while (arg_gun.next_time > Time.time)
+        while (!arg_gun.HasReloaded())
         {
             --seconds;
             yield return new WaitForSeconds(1);

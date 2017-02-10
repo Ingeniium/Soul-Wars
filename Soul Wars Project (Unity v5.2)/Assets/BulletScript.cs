@@ -2,12 +2,15 @@
 using System.Collections;
 using UnityEngine.UI;
 public class BulletScript : MonoBehaviour {
-	public int damage;
+	public int upper_bound_damage;
+    public int lower_bound_damage;
+    static System.Random rand = new System.Random();
 	public GameObject home;
     private GameObject homer;
 	public float home_radius;
     public float home_speed;
     public double crit_chance;
+    public float knockback_power;
     public Gun gun_reference;
     public bool has_collided = false;
     public bool legit_target = false;
@@ -42,10 +45,7 @@ public class BulletScript : MonoBehaviour {
             {
                 Destroy(health_change_show.gameObject);
             }
-            if (gun_reference)
-            {
-                gun_reference.StopAllCoroutines();
-            }
+            StopAllCoroutines();
             Destroy(gameObject);//Always destroy the object upon any detectable impact upon an exception           
         }
         
@@ -66,9 +66,9 @@ public class BulletScript : MonoBehaviour {
             {
                 yield return new WaitForFixedUpdate();
             }
+            int damage = rand.Next(lower_bound_damage, upper_bound_damage);
                 int d = (damage - Target.defence);
                 bool crit = false;
-                System.Random rand = new System.Random();
                 if ((crit_chance - Target.crit_resistance) >= rand.NextDouble() + .001)//bullets with a crit chance of 0 shouldn't be able to land a crit
                 {
                     crit = true;
@@ -104,7 +104,16 @@ public class BulletScript : MonoBehaviour {
                 {
                     gun_reference.experience += d * Target.exp_rate;
                 }
-                Target.HP -= d;
+                if (Target.type == HealthDefence.Type.Unit && Target.HP - d > 0)
+                {
+                    float knockback = knockback_power - Target.knockback_resistance;
+                    if (knockback > 0)
+                    {
+                        Target.rb.AddForce(new Vector3(transform.forward.x, 0, transform.forward.z) * knockback, ForceMode.Impulse);
+                        Target.StartCoroutine(Stun(Target, knockback));
+                    }
+                }
+                Target.HP -= d;           
                 Destroy(health_change_show, 1f);
                 Destroy(gameObject);
             
@@ -114,13 +123,20 @@ public class BulletScript : MonoBehaviour {
         {
             /*Before destruction,Stop all coroutines(the gun_abilities operating on this instance)
              to prevent exceptions from those coroutines*/
-            if (gun_reference)
-            {
-                gun_reference.StopAllCoroutines();
-            }
+            StopAllCoroutines();
             Destroy(gameObject);//Destroy object immediately if null
         }
     }
+
+    IEnumerator Stun(HealthDefence Target,float knockback)
+    {
+        Target.Controller.enabled = false;
+        yield return new WaitForSeconds(knockback / 10);
+        Target.Controller.enabled = true;
+        Target.standing_power -= knockback;
+    }
+
+    
 
    
 }

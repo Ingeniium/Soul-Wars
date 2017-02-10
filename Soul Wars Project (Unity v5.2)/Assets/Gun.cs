@@ -2,17 +2,20 @@
 using UnityEditor;
 using UnityEngine.UI;
 using System.Collections;
+using System.Collections.Generic;
 
 public abstract class Gun : Item {
     private static GameObject GunLevelUp;//Reference to the table used for getting gun abilities
 	public GameObject Bullet;
 	protected GameObject bullet;
     public float reload_time;//How long it takes to fire each shot
-	public float next_time;//Next firing time
+	private float next_time;//Next firing time
     public float home_speed;//Angular turning speed of the bullet
 	public float home_radius;
     public bool homes = true;//whether the bullets will have homing capabilities
-	public int damage = 2;
+	public int lower_bound_damage = 7;
+    public int upper_bound_damage = 15;
+    public float knockback_power;//How much knockback force and knockback stun is done 
     public float projectile_speed;
     public float range;
     public double crit_chance = .1f;
@@ -51,8 +54,16 @@ public abstract class Gun : Item {
     public uint points = 0;//points to spend on abilities unlocked by gun level ups
     protected Canvas level_up_indication;
     protected bool[] claimed_gun_ability = new bool[3]{false,false,false};//For determining which abilities have already been chosen
-    protected delegate IEnumerator Gun_Abilities(BulletScript script);
+    protected delegate IEnumerator Gun_Abilities(Gun gun,BulletScript script);
     protected Gun_Abilities Claimed_Gun_Mods;//Abilities which have already been chosen
+    /*Below are added to names of weapons as a result of getting abilities*/
+    protected List<string> prefixes = new List<string>();
+    protected List<string> suffixes = new List<string>();
+
+    public bool HasReloaded()
+    {
+        return (Time.time > next_time);       
+    }
     
     public virtual void Shoot()
     {
@@ -68,8 +79,10 @@ public abstract class Gun : Item {
         BulletScript script = weapon_fire.GetComponent<BulletScript>();
         //Pass values on to bullet
         script.crit_chance = crit_chance;
-        script.damage = damage;
+        script.upper_bound_damage = upper_bound_damage;
+        script.lower_bound_damage = lower_bound_damage;
         script.gameObject.layer = layer;
+        script.knockback_power = knockback_power;
         if (homes)//Only pass these values if bullet does indeed have homing ability
         {
             script.home.layer = home_layer;
@@ -81,14 +94,43 @@ public abstract class Gun : Item {
         next_time = Time.time + reload_time;
         if (Claimed_Gun_Mods != null)//Apply chosen gun_abilities to each bullet
         {
-            foreach (Gun_Abilities g in Claimed_Gun_Mods.GetInvocationList()) { StartCoroutine(g(script)); }
+            foreach (Gun_Abilities g in Claimed_Gun_Mods.GetInvocationList()) { script.StartCoroutine(g(this,script)); }
         }
 
     }
 
+    protected abstract string GunDesc();
+
+    protected string GetName()
+    {
+        string phrase = "";
+        if (prefixes.Count > 0)
+        {
+            foreach (string s in prefixes)
+            {
+                phrase += s + " ";
+            }
+        }
+
+        phrase += GetBaseName() + " ";
+
+        if (suffixes.Count > 0)
+        {
+            phrase += "of ";
+            foreach (string s in suffixes)
+            {
+                phrase += s + " ";
+            }
+        }
+
+        return phrase;
+    }
+
+    protected abstract string GetBaseName();
+
     public override string ToString()
     {
-        return string.Format(name + "Launches a powerful arrow.\n Homing : {0} Damage : {1} \n Reload Time : {2}", home_radius, damage, reload_time);                
+        return string.Format(GetName() + "\n" + GunDesc() + "\n" + " Homing : {0} " + "\n" + " Damage : {1} - {2}" + " \n" + " Reload Time : {3}", home_radius, lower_bound_damage, upper_bound_damage, reload_time);                
     }
 
     public override void PrepareItemForUse()
@@ -305,7 +347,7 @@ public abstract class Gun : Item {
             }
             if (gun_for_consideration.AreGunLevelUpButtonsAssignedForClass() == false)
             {
-                for (int i = 0; i < buttons.Length - 1; i++)//Exclued "x" button
+                for (int i = 0; i < buttons.Length - 1; i++)//Exclude "x" button
                 {
                     int temp = i;
                     buttons[temp].method = gun_for_consideration.ClassGunMods(temp);                                    
@@ -330,11 +372,12 @@ public abstract class Gun : Item {
         
         void OnMouseDown()
         {
-            if (GunTable.gun_for_consideration.points > 0 && button.enabled && method != null)
+            if (GunTable.gun_for_consideration.points > 0 && button.interactable && method != null)
             {
                 /*Add delegate to gun abilities*/
                 --GunTable.gun_for_consideration.points;
                 GunTable.gun_for_consideration.Claimed_Gun_Mods += method;
+                GunTable.gun_for_consideration.SetGunNameAddons(index);
                 GunTable.gun_for_consideration.claimed_gun_ability[index] = true;
                 /*Switch colors of text and button to show it has been taken*/
                 ColorBlock cb = button.colors;
@@ -350,18 +393,20 @@ public abstract class Gun : Item {
         }
     }
 
-    protected abstract Gun_Abilities ClassGunMods(int index);//For getting a derived classes Gun_ability delegates
-    protected abstract string ClassGunAbilityNames(int index);//For getting a derived classes Gun_ability string names     
-
+    protected abstract Gun_Abilities ClassGunMods(int index);//For getting a derived class's Gun_ability delegates
+    protected abstract string ClassGunAbilityNames(int index);//For getting a derived class's Gun_ability string names 
+    protected abstract void SetGunNameAddons(int index);//For getting a derived class's prefixes/suffixes
     
     /*Functions below are virtual as to allow derived classes their own static variables for keeping track of assignment*/
     protected abstract bool AreGunLevelUpButtonsAssignedForClass();
-    /*Function below is for setting up complete list of gun_ability delegates
-     ,for nonstatic ones can't be assigned compile time*/
-    protected abstract void SetBaseGunAbilities();
 
     protected void Start()
     {
+        unit_reference = GetComponent<GenericController>();
+        if (!unit_reference)
+        {
+            unit_reference = GetComponentInParent<GenericController>();
+        }
         if (Player == null)
         {
             Player = GameObject.FindGameObjectWithTag("Player").GetComponent<PlayerController>();
@@ -373,12 +418,7 @@ public abstract class Gun : Item {
             weapons_bar = GameObject.FindGameObjectWithTag("Weapons");
             GunLevelUp = GameObject.FindGameObjectWithTag("GunLevelUp");
             GunTable.InitGunTable();
-        }
-        if (ClassGunMods(0) == null)
-        {
-            SetBaseGunAbilities();
-        }
-       
+        }      
     }
     
     

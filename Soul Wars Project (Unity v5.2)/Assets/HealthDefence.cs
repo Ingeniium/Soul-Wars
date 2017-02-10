@@ -41,8 +41,12 @@ public class HealthDefence : MonoBehaviour {
                     StopCoroutine(Regeneration());
                 }
             }
-            else if (value <= 0)//Not on collision enter to account for DoT
+            else if (value <= 0)
             {
+                if (Controller != Item.Player)
+                {
+                    Destroy(health_bar_show.gameObject);
+                }
                 switch(type)
                 {
                     case Type.Unit :
@@ -51,8 +55,6 @@ public class HealthDefence : MonoBehaviour {
                         GetComponentInChildren<AIController>().gun.DropItem(ref gun_drop_chance);
                     }
                     StartCoroutine(SpawnManager.WaitForRespawn(this));
-                    //Destroy(health_bar_show.gameObject);
-                    //Destroy(gameObject,.25f);
                     break;
                     
                     case Type.Shield :
@@ -99,6 +101,24 @@ public class HealthDefence : MonoBehaviour {
     
     public int defence;
     public double crit_resistance = 0;
+    public float knockback_resistance = 2.5f;
+    public float standing_power
+    {
+        get { return _standing_power; }
+        set
+        {
+            _standing_power = value;
+            if (_standing_power <= 0)
+            {
+                _standing_power = max_standing_power;
+                StartCoroutine(SpawnManager.Blink(gameObject, .75f));
+            }
+        }
+    }
+    private float _standing_power;
+    public float max_standing_power = 10;
+    public Rigidbody rb;
+    public GenericController Controller;
     public float scale_factor;
     public float sec_till_regen;
     public Collider shield_collider;
@@ -127,6 +147,14 @@ public class HealthDefence : MonoBehaviour {
             shield_collider = GetComponent<BoxCollider>();
             transform.localScale = new Vector3(transform.localScale.x,transform.localScale.y*scale_factor,transform.localScale.z*scale_factor);
         }
+        else if (type == Type.Unit)
+        {
+            Controller = GetComponentInChildren<GenericController>();
+            if (Controller == null)
+            {
+                Controller = GetComponent<GenericController>();
+            }
+        }
         _HP = maxHP;
         if (hp_string)
         {
@@ -138,6 +166,12 @@ public class HealthDefence : MonoBehaviour {
         }
         Original_Color = gameObject.GetComponent<Renderer>().material.color;
 	}
+
+    void Start()
+    {
+        rb = GetComponent<Rigidbody>();
+        _standing_power = max_standing_power;
+    }
 	
 	
 	

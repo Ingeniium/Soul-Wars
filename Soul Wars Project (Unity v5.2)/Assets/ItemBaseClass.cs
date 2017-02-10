@@ -17,6 +17,7 @@ public abstract class Item : MonoBehaviour
         return copy as T;
     }
     public static PlayerController Player;//Reference to the Player
+    protected GenericController unit_reference;
     protected static Inventory inv;//Reference to the Inventory obj
     protected static GameObject weapons_bar;//Reference to the weapons bar
     protected static Transform main_bar_tr;//Reference to the transform of the Player Bar Canvas
@@ -31,22 +32,26 @@ public abstract class Item : MonoBehaviour
     public GameObject asset_reference;//Reference to the prefab for instantiating/destruction at runtime
     public GameObject current_reference;//Reference to the current object script works for
     protected int index;//Index for equipment
+    protected static System.Random rand = new System.Random();
     public void DropItem(ref double chance)
     {
-        System.Random rand= new System.Random();
         if (rand.NextDouble() <= chance)
         {
-            gameObject.layer = 0;
-            transform.parent = null;//For it to detach from enemy and not be destroyed
-            gameObject.AddComponent<Rigidbody>();//For it to drop on ground
-            gameObject.AddComponent<BoxCollider>();//For it to stay on ground
+            GameObject item = Instantiate(current_reference, current_reference.transform.position, current_reference.transform.rotation) as GameObject;
+            Item script = item.GetComponent<Item>();
+            script.unit_reference = null;
+            item.layer = 0;
+            item.transform.parent = null;//For it to detach from enemy and not be destroyed
+            item.AddComponent<Rigidbody>();//For it to drop on ground
+            item.AddComponent<BoxCollider>();//For it to stay on ground
             /*Indication for players to know it's dropped*/
-            drop_canvas_show = Instantiate(drop_canvas, transform.position + new Vector3(0,0,.5f), drop_canvas.transform.rotation) as Canvas;
-            drop_canvas_show.GetComponentInChildren<Text>().text = name;
-            Destroy(drop_canvas_show.gameObject, 1f);
+            script.drop_canvas_show = Instantiate(drop_canvas, transform.position + new Vector3(0,0,.5f), drop_canvas.transform.rotation) as Canvas;
+            script.drop_canvas_show.GetComponentInChildren<Text>().text = name;
+            Destroy(script.drop_canvas_show.gameObject, 1f);
             //for code checking state
-            dropped = true;
-            index = -1;
+            script.dropped = true;
+            script.index = -1;
+            chance = 0;
         }
     }
     protected void DropItem()//Overload for when when a player decides to drop item
@@ -54,6 +59,7 @@ public abstract class Item : MonoBehaviour
         GameObject item = null;
         dropped = true;
         index = -1;
+        unit_reference = null;
         /*If respective gameobject exists, drop that instead of creating another instance
          and copying the script to it*/
         if (current_reference)
@@ -83,6 +89,7 @@ public abstract class Item : MonoBehaviour
     protected void RetrieveItem()//Used for picking items off ground
     {
         //Create and set a respective item image object
+        unit_reference = Player;
        _item_image = Instantiate(item_image, item_image.transform.position, item_image.transform.rotation) as GameObject;
        CopyComponent<Item>(this,_item_image);//This is done due to the destruction of the actual gameobject;
        _item_image.GetComponentInChildren<ItemImage>().item_script = _item_image.GetComponent<Item>();

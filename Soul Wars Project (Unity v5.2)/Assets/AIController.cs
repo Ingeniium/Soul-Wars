@@ -1,8 +1,9 @@
 ﻿using UnityEngine;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 
-public partial class AIController : MonoBehaviour {
+public partial class AIController : GenericController {
     private Rigidbody prb;
     public Transform ptr;
     public GameObject Shield;
@@ -20,55 +21,79 @@ public partial class AIController : MonoBehaviour {
     public Transform gtr;
     public Collider enemy_attack_detection;
     public Gun gun;
-    private objective obj = 0;
     public float minimal_distance = 1f;
+    private bool guarding = false;
+    private static UniversalCommunicator TeamController = new UniversalCommunicator();
+    private FunctionChooser attack_func_chances = new FunctionChooser();
 
-    private enum objective
+    private static Dictionary<int, Func<AIController, Vector3>> MovementFuncs = new Dictionary<int, Func<AIController, Vector3>>()
     {
-            ATTACK_ALLY_UNIT = 0,
-            ATTACK_ALLY_BASE = 1,
-            GUARD_LOCATION = 2
+        {0,Charge},
+        {1,MaintainDistance},
+        {2,Intercept},
+        {3,AvoidConfrontation}           
+    };
+    private static Dictionary<int, Func<AIController, bool>> AttackFuncs = new Dictionary<int, Func<AIController, bool>>()
+    {
+        {0,WildyFire},
+        {1,FireWhenInRange},
+        {2,GuardFire},
+        {3,HaltFire}
+    };
+
+    private int attack_func_index = 0;
+    private int movement_func_index = 0;
+    private static System.Random rand = new System.Random();
+    private ObjectiveState State;
+    private bool ally_in_range = false;
+
+    void Awake()
+    {
+        
+        enemy_attack_detection = GetComponent<Collider>();
     }
 
-    void SetTarget()
+    void Start()
     {
-        switch(obj)
+        TeamController.Units.Add(this);
+        if (!TeamController.set)
         {
-            case objective.ATTACK_ALLY_UNIT :
-                if(Item.Player != null)
-                {
-                    Target = Item.Player.gameObject;
-                }
-                else
-                {
-                    obj = objective.ATTACK_ALLY_BASE;
-                    SetTarget();
-                }
-                break;
-            case objective.ATTACK_ALLY_BASE :
-                break;
-            case objective.GUARD_LOCATION :
-                break;
+            TeamController.Start(new List<GroupCommunicator>()
+            {
+                new Conquer()
+            });
+            TeamController.set = true;
+        }
+        prb = GetComponentInParent<Rigidbody>();
+        //GetCOmponent In parent apparently isn't working for transform
+        gtr = Gun.GetComponent<Transform>();
+        gun = Gun.GetComponent<Gun>();
+    }
+
+    void FixedUpdate()
+    {
+        if (!State.standby)
+        {
+            prb.AddForce(Vector3.up * 10);
+            prb.AddForce(MovementFuncs[movement_func_index](this));
+            if (!guarding && AttackFuncs[attack_func_index](this))
+            {
+                gun.Shoot();
+            }
         }
     }
 
-	void Start ()
+    void OnTriggerEnter(Collider col)
     {
-      prb = GetComponentInParent<Rigidbody>();
-        //GetCOmponent In parent apparently isn't working for transform
-      enemy_attack_detection = GetComponent<Collider>();
-      gtr = Gun.GetComponent<Transform>();
-      gun = Gun.GetComponent<Gun>();
-    }
-
-   void OnTriggerEnter(Collider col)
-    {
-        /*If there's a player controlled unit or obstacle/wall pieces
-         within radius of collider,simply move away,maintaining minimal distance*/
         if (col.gameObject.layer == 9)
         {
-            //obstacles.Add(col);
-            prb.AddForce(AvoidObstacles(col),ForceMode.Impulse);
+            prb.AddForce(AvoidObstacles(col), ForceMode.Impulse);
+            ally_in_range = true;
+            if (State.RespondtoAllyUnit != null)
+            {
+                State.immediate_responding = true;
+                State.RespondtoAllyUnit(col);
+            }
         }
         else
         {
@@ -76,46 +101,152 @@ public partial class AIController : MonoBehaviour {
             StartCoroutine(Evasion());
             enemy_attack_detection.enabled = false;
             enemy_attack_detection.isTrigger = false;
-        }  
+        }
     }
 
-   void OnTriggerExit(Collider col)
-   {
-       if (col.gameObject.layer == 9)
-       {
-           obstacles.Remove(col);
-       }
-   }
+    static Vector3 Charge(AIController AI)
+    {
+        return AI.Charge();
+    }
 
-   void Update()
-   {
-       prb.AddForce(Vector3.up * 25);
-       if (obstacles.Count > 0)
-           {
-               Vector3 dir = Vector3.zero;
-               foreach (Collider o in obstacles)
-               {
-                   try
-                   {
-                       dir += AvoidObstacles(o);
-                   }
-                   catch (System.Exception e)
-                   {
-                       dir += Vector3.zero;
-                   }
-               }
-               prb.AddForce(dir);
-           }
-       prb.AddForce(Intercept());
-       FireWhenInRange();
-   }
+    static Vector3 MaintainDistance(AIController AI)
+    {
+        return AI.MaintainDistance();
+    }
+
+    static Vector3 Intercept(AIController AI)
+    {
+        return AI.Intercept();
+    }
+
+    static Vector3 AvoidConfrontation(AIController AI)
+    {
+        return AI.AvoidConfrontation();
+    }
+
+    static bool WildyFire(AIController AI)
+    {
+        return AI.WildlyFire();
+    }
+
+    static bool FireWhenInRange(AIController AI)
+    {
+        return AI.FireWhenInRange();
+    }
+
+    static bool GuardFire(AIController AI)
+    {
+        return AI.GuardFire();
+    }
+
+    static bool HaltFire(AIController AI)
+    {
+        return AI.HaltFire();
+    }
+
+    private struct ValueGroup//Unity doesn't support Tuple
+    {
+        public int index;
+        public float value;
+        public ValueGroup(int i, float v)
+        {
+            index = i;
+            value = v;
+        }
+    }
+
+
+    private class FunctionChooser
+    {
+        public FunctionChance[] possibilities = new FunctionChance[4]
+        {
+            new FunctionChance(0,.25),
+            new FunctionChance(.25,.50),
+            new FunctionChance(.50,.75),
+            new FunctionChance(.75,1)
+        };
+
+        public int Roll(System.Random r)
+        {
+            double num = r.NextDouble();
+            for (int i = 0; i < possibilities.Length; i++)
+            {
+                if (num < possibilities[i].upper_bound && num > possibilities[i].lower_bound)
+                {
+                    return i;
+                }
+            }
+            return 0;
+        }
+
+        public void ModifyChances(int index, double num)
+        {
+            List<ValueGroup> values = new List<ValueGroup>();
+            for (int i = 0; i < possibilities.Length; i++)
+            {
+                values.Add(new ValueGroup(i, possibilities[i].success_rate));
+            }
+            values.Sort(delegate(ValueGroup lhs, ValueGroup rhs)
+            {
+                if (lhs.value < rhs.value)
+                {
+                    return -1;
+                }
+                else
+                {
+                    return 1;
+                }
+            });
+            if (values[0].index < index)
+            {
+                possibilities[index].lower_bound -= num;
+                for (int i = index; i > values[0].index; i--)
+                {
+                    possibilities[i].upper_bound -= num;
+                    possibilities[i].lower_bound -= num;
+                }
+                possibilities[values[0].index].upper_bound -= num;
+            }
+            else if(values[0].index > index)
+            {
+                possibilities[index].lower_bound += num;
+                for (int i = values[0].index; i > index; i--)
+                {
+                    possibilities[i].upper_bound += num;
+                    possibilities[i].lower_bound += num;
+                }
+                possibilities[values[0].index].lower_bound -= num;
+            }
+        }
+    }
+
+    private struct FunctionChance
+    {
+        public double lower_bound;
+        public double upper_bound;
+        public float success_rate;
+
+        public FunctionChance(double l, double u)
+        {
+            lower_bound = l;
+            upper_bound = u;
+            success_rate = 1;
+        }
+    }
+
 
    Vector3 Charge()
    {
        try
        {
            Vector3 dir = (Target.transform.position - ptr.transform.position);
-           if (target_focus && dir.magnitude > minimal_distance)
+           if ((State.immediate_responding && State.EndAllyUnitResponse()) || State.ShouldFindNewTarget())
+           {
+              State.immediate_responding = false;
+              State.SetTarget();
+              return Vector3.zero;
+           }
+           else if (target_focus && dir.magnitude > minimal_distance)
            {
                ptr.LookAt(Target.transform);
                dir = Vector3.Normalize(dir);
@@ -128,7 +259,7 @@ public partial class AIController : MonoBehaviour {
        }
        catch (System.Exception e)
        {
-           SetTarget();
+           State.SetTarget();
            return Vector3.zero;
        }
    }
@@ -137,38 +268,85 @@ public partial class AIController : MonoBehaviour {
    {
        try
        {
-           Vector3 dif = (Target.transform.position - ptr.transform.position);
-           if (target_focus)
-           {
-              
-               Vector3 proj = Target.GetComponent<Rigidbody>().velocity;
-               ptr.LookAt(Target.transform);
-               if (proj.magnitude > 1)
+
+               if ((State.immediate_responding && State.EndAllyUnitResponse()) || State.ShouldFindNewTarget())
                {
-                   Vector3 dir = Vector3.Project(dif, proj); 
-                   return dir * 10;
-               }
-               else if (dif.magnitude > minimal_distance)
-               {
+                   State.immediate_responding = false;
+                   State.SetTarget();
                    return Vector3.zero;
+               }
+               else if (target_focus)
+               {
+                   Vector3 dif = (Target.transform.position - ptr.transform.position);
+                   Vector3 proj = Target.GetComponent<Rigidbody>().velocity;
+                   ptr.LookAt(Target.transform);
+                   if (proj.magnitude > 1)
+                   {
+                       Vector3 dir = Vector3.Project(dif, proj);
+                       return dir * 10;
+                   }
+                   else if (dif.magnitude < minimal_distance)
+                   {
+                       return Vector3.zero;
+                   }
+                   else
+                   {
+                       return dif.normalized * 10;
+                   }
                }
                else
                {
-                   return dif.normalized * 10;
+                   return Vector3.zero;
                }
            }
-           else
-           {
-               return Vector3.zero;
-           }
-       }
+       
        catch (System.Exception e)
        {
-           SetTarget();
+           State.SetTarget();
            return Vector3.zero;
        }
    }
 
+   Vector3 AvoidConfrontation()
+   {
+       return Intercept() * -1;
+   }
+
+   Vector3 MaintainDistance()
+   {
+       try
+       {
+           if ((State.immediate_responding && State.EndAllyUnitResponse()) || State.ShouldFindNewTarget())
+           {
+               State.immediate_responding = false;
+               State.SetTarget();
+               return Vector3.zero;
+           }
+           else
+           {
+               Vector3 dir = Target.transform.position - ptr.position;
+               if (target_focus && dir.magnitude < gun.range)
+               {
+                   ptr.LookAt(Target.transform);
+                   return dir.normalized * 10;
+               }
+               else
+               {
+                   return Vector3.zero;
+               }
+           }
+       }
+       catch (System.Exception e)
+       {
+           State.SetTarget();
+           return Vector3.zero;
+       }
+   }
+
+   Vector3 Wait()
+   {
+       return Vector3.zero;
+   }
 
    Vector3 AvoidObstacles(Collider col)
    {      
@@ -179,26 +357,77 @@ public partial class AIController : MonoBehaviour {
       return dir;
    }
 
-   void WildlyFire()
+   
+
+   bool WildlyFire()
    {
-       if (gun.next_time < Time.time)
-       {
-           gun.Shoot();
-       }
+       return gun.HasReloaded();
    }
 
-   void FireWhenInRange()
+   bool FireWhenInRange()
    {
        try
        {
-           if (gun.next_time < Time.time && gun.range <= Vector3.Distance(ptr.position, Target.transform.position))
+           if (gun.HasReloaded() && gun.range > Vector3.Distance(ptr.position, Target.transform.position))
            {
-               gun.Shoot();
+               return true;
+           }
+           else
+           {
+               return false;
            }
        }
        catch (System.Exception e)
        {
-           SetTarget();
+           State.SetTarget();
+           return false;
+       }
+   }
+
+   bool GuardFire()
+   {
+       try
+       {
+           if (gun.HasReloaded() && Vector3.Distance(ptr.position, Target.transform.position) < gun.range - (1.5 * minimal_distance))
+           {
+               return true;
+           }
+           else
+           {
+               return false;
+           }
+       }
+       catch (System.Exception e)
+       {
+           State.SetTarget();
+           return false;
+       }
+   }
+
+   bool HaltFire()
+   {
+       try
+       {
+           if (gun.HasReloaded())
+           {
+               Vector3 proj = Target.GetComponent<Rigidbody>().velocity;
+               if (proj.magnitude > 1)
+               {
+                   Vector3 dif = (Target.transform.position - ptr.transform.position);
+                   Vector3 dir = Vector3.Project(dif, proj);
+                   ptr.LookAt(dir);
+               }
+               return true;               
+           }
+           else
+           {
+               return false;
+           }
+       }
+       catch (System.Exception e)
+       {
+           State.SetTarget();
+           return false;
        }
    }
 
