@@ -48,6 +48,8 @@
      <Compile Include="Assets\AIController.cs" />
      <Compile Include="Assets\BulletScript.cs" />
      <Compile Include="Assets\ExitButton.cs" />
+     <Compile Include="Assets\GenericControllerBaseClass.cs" />
+     <Compile Include="Assets\GroupCommunicator.cs" />
      <Compile Include="Assets\Gun.cs" />
      <Compile Include="Assets\HPbar.cs" />
      <Compile Include="Assets\HealthDefence.cs" />
@@ -63,12 +65,19 @@
      <Compile Include="Assets\State.cs" />
      <Compile Include="Assets\Strike.cs" />
      <Compile Include="Assets\UIInputRestricter.cs" />
+     <Compile Include="Assets\UniversalCommunicator.cs" />
      <Compile Include="Assets\WeaponHolder.cs" />
+ <Reference Include="UnityEngine.Advertisements">
+ <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/Advertisements/UnityEngine.Advertisements.dll</HintPath>
+ </Reference>
  <Reference Include="UnityEngine.UI">
  <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/GUISystem/UnityEngine.UI.dll</HintPath>
  </Reference>
  <Reference Include="UnityEngine.Networking">
  <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/Networking/UnityEngine.Networking.dll</HintPath>
+ </Reference>
+ <Reference Include="UnityEngine.Analytics">
+ <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/UnityAnalytics/UnityEngine.Analytics.dll</HintPath>
  </Reference>
  <Reference Include="Mono.Cecil">
  <HintPath>C:/Program Files/Unity/Editor/Data/Managed/Mono.Cecil.dll</HintPath>
