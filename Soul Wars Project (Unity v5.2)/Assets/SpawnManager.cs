@@ -33,13 +33,18 @@ public class SpawnManager : MonoBehaviour {
         if (killed.gameObject.layer == 9)
         {
             PlayerFollow.Player = null;
+            RespawnInterface.Instance.respawning = true;
             yield return new WaitForSeconds(ally_respawn_time);
             while (AllySpawnPoints.Count < 1)
             {
                yield return new WaitForEndOfFrame();
             }
+            while (RespawnInterface.Instance.respawning)
+            {
+                yield return new WaitForEndOfFrame();
+            }
             killed.HP = killed.maxHP;
-            killed.transform.position = AllySpawnPoints[0].transform.position + AllySpawnPoints[0].spawn_direction;
+            killed.transform.position = AllySpawnPoints[RespawnInterface.Instance.spawn_index].transform.position + AllySpawnPoints[RespawnInterface.Instance.spawn_index].spawn_direction;
             PlayerFollow.Player = killed.gameObject;
         }
         else

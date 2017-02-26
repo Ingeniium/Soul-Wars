@@ -3,11 +3,17 @@ using UnityEditor;
 using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
+using System.Xml;
+using System.Xml.Schema;
+using System.Xml.Linq;
+using System.Linq;
+using System;
 
-public abstract class Gun : Item {
+public abstract partial class Gun : Item {
     private static GameObject GunLevelUp;//Reference to the table used for getting gun abilities
 	public GameObject Bullet;
-	protected GameObject bullet;
+	public GameObject bullet;
     public float reload_time;//How long it takes to fire each shot
 	private float next_time;//Next firing time
     public float home_speed;//Angular turning speed of the bullet
@@ -53,12 +59,15 @@ public abstract class Gun : Item {
     private int _experience = 0;
     public uint points = 0;//points to spend on abilities unlocked by gun level ups
     protected Canvas level_up_indication;
-    protected bool[] claimed_gun_ability = new bool[3]{false,false,false};//For determining which abilities have already been chosen
+    protected List<int> claimed_gun_ability = new List<int>();//For determining which abilities have already been chosen
     protected delegate IEnumerator Gun_Abilities(Gun gun,BulletScript script);
     protected Gun_Abilities Claimed_Gun_Mods;//Abilities which have already been chosen
     /*Below are added to names of weapons as a result of getting abilities*/
     protected List<string> prefixes = new List<string>();
     protected List<string> suffixes = new List<string>();
+    protected string last_suffix = "";
+   
+
 
     public bool HasReloaded()
     {
@@ -83,13 +92,11 @@ public abstract class Gun : Item {
         script.lower_bound_damage = lower_bound_damage;
         script.gameObject.layer = layer;
         script.knockback_power = knockback_power;
-        if (homes)//Only pass these values if bullet does indeed have homing ability
-        {
-            script.home.layer = home_layer;
-            script.home_speed = home_speed;
-            script.home_radius = home_radius;
-            script.homes = true;
-        }
+        /*Homing script values passed for homing toggle*/
+        script.home.layer = home_layer;
+        script.home_speed = home_speed;
+        script.home_radius = home_radius;
+        script.homes = homes;
         script.gun_reference = this;//For gaining exp 
         next_time = Time.time + reload_time;
         if (Claimed_Gun_Mods != null)//Apply chosen gun_abilities to each bullet
@@ -99,7 +106,7 @@ public abstract class Gun : Item {
 
     }
 
-    protected abstract string GunDesc();
+    protected abstract string GunDesc();//Description is based on derived type
 
     protected string GetName()
     {
@@ -123,14 +130,14 @@ public abstract class Gun : Item {
             }
         }
 
+        phrase += last_suffix;
+
         return phrase;
     }
 
-    protected abstract string GetBaseName();
-
     public override string ToString()
     {
-        return string.Format(GetName() + "\n" + GunDesc() + "\n" + " Homing : {0} " + "\n" + " Damage : {1} - {2}" + " \n" + " Reload Time : {3}", home_radius, lower_bound_damage, upper_bound_damage, reload_time);                
+        return string.Format(GetName() + "\n" + GunDesc() + "\n" + "Level : {0}" + "\n" + "Experience : {1}/{2} " + "\n" + "Level Up Points : {3}" + "\n" + " Homing : {4} " + "\n" + " Damage : {5} - {6}" + " \n" + " Reload Time : {7}",level,experience,next_lvl,points, home_radius, lower_bound_damage, upper_bound_damage, reload_time);                
     }
 
     public override void PrepareItemForUse()
@@ -219,8 +226,11 @@ public abstract class Gun : Item {
         }
         
         buttons[buttons.Length - 2].onClick.AddListener(delegate 
-        { 
-            DropItem();
+        {
+            if (Player.equipped_weapons.Count > 1)//Can't drop a weapon if its the only one you have
+            {
+                DropItem();
+            }
             _item_image.GetComponentInChildren<ItemImage>().option_showing = false;
             Item.Player.equip_action = true;
             if (item_options_show)
@@ -250,15 +260,11 @@ public abstract class Gun : Item {
 
     protected void EquipAtSlot(int Index)
     {
-            if (index > -1 && index < Player.equipped_weapons.Count)
+            if (!Player.equipped_weapons[Index] && index != 1)//equipped weapons cant be assigned to an empty slot
             {
-                if(Player.equipped_weapons[index] != null)//Make sure the that the previous slot is empty
-                {
-                    Player.equipped_weapons[index] = null;
-                }
+                 return;
             }
-            index = Index;
-            if (Player.equipped_weapons[Index])//if there's already equipped gun in slot
+            else if (Player.equipped_weapons[Index])//if there's already equipped gun in slot
             {
                 Player.equipped_weapons[Index].index = -1;//Secondhand indicator that it isn't equipped by a player
                 inv.InsertItem(ref Player.equipped_weapons[Index]._item_image);//Put item in inventory
@@ -267,6 +273,8 @@ public abstract class Gun : Item {
                 Player.equipped_weapons[Index]._item_image.GetComponentInChildren<ItemImage>().item_script = Player.equipped_weapons[Index]._item_image.GetComponent<Gun>();
                 Destroy(Player.equipped_weapons[Index].current_reference);
             }
+            Player.equipped_weapons[index] = null;
+            index = Index;
             if (Index == Player.main_weapon_index)//Set it up to be main gun if the index is equivalent to the current equipped gun
             {
                 Player.gun = this;
@@ -276,122 +284,53 @@ public abstract class Gun : Item {
             Player.equipped_weapons[Index] = this;
      }
 
-    protected void BringUpLevelUpTable()
+    public override XElement RecordValuesToSaveFile()
     {
-        GunTable.gun_for_consideration = this;
-        GunLevelUp.transform.SetParent(main_bar_tr);
-        GunLevelUp.transform.localPosition = Vector3.zero;
+        XElement element = new XElement(GetBaseName());
+        element.SetAttributeValue("Index",index);
+        XElement value_setter = new XElement("Level",level.ToString());
+        element.Add(value_setter);
+        value_setter = new XElement("Points",points.ToString());
+        element.Add(value_setter);
+        if (claimed_gun_ability.Count != 0)
+        {
+            value_setter = new XElement("MethodIndex");
+            foreach (int i in claimed_gun_ability)
+            {
+                value_setter.Add(new XElement("Index", i.ToString()));
+            }
+            element.Add(value_setter);
+        }
+        return element;
     }
 
-    protected static class GunTable
+    public override void RecordValuesFromSaveFile(XElement element)
     {
-        public static GunTableButton[] buttons;
-        public static Gun gun_for_consideration
+        XElement value_retriever;
+        if (element.Descendants("Level").Any())
         {
-            get { return _gun_for_consideration;}
-            set
+            value_retriever = element.Element("Level") as XElement;
+            level = Int32.Parse(value_retriever.Value);
+        }
+        if (element.Descendants("Points").Any())
+        {
+            value_retriever = element.Element("Points") as XElement;
+            points = UInt32.Parse(value_retriever.Value);
+        }
+        if (element.Descendants("MethodIndex").Any())
+        {
+            int num;
+            foreach (XElement e in element.Elements("MethodIndex"))
             {
-                _gun_for_consideration = value;
-                SetGunTable();
+                num = Int32.Parse(e.Value);
+                SetGunNameAddons(num);
+                Claimed_Gun_Mods += ClassGunMods(num);
+                claimed_gun_ability.Add(num);
             }
         }
-        private static Gun _gun_for_consideration;
-
-        public static void InitGunTable()//For giving gameobject buttons a private class instance of GunTableButton
-        {
-            Button[] b = Gun.GunLevelUp.GetComponentsInChildren<Button>();
-            for (int i = 0; i < b.Length - 1; i++)
-            {
-                b[i].gameObject.AddComponent<GunTableButton>();
-            }
-            buttons = Gun.GunLevelUp.GetComponentsInChildren<GunTableButton>();
-            
-            for(int i = 0;i < buttons.Length;i++)//Sets up GunTable Info
-            {
-                buttons[i].button = b[i];
-                buttons[i].index = i;
-            }
-        }
-
-        public static void SetGunTable()
-        {
-            foreach (GunTableButton g in buttons)
-            {
-                //Copy the names of the abilities to the strings of the buttons.
-                g.GetComponentInChildren<Text>().text = gun_for_consideration.ClassGunAbilityNames(g.index);
-                /*For each row(composed of 3 buttons),if the level is too low,disable the 
-                next row of buttons,turning them grey.*/
-                if (g.index > 3 * gun_for_consideration.level - 1)
-                {
-                    ColorBlock cb = g.button.colors;
-                    cb.disabledColor = Color.grey;
-                    g.button.colors = cb;
-                    g.button.interactable = false;
-                }
-                /*Otherwise,check for whether it was already clamied.If so,
-                disable that specific button,switching colors with it and its
-                associated string*/
-                else if (gun_for_consideration.claimed_gun_ability[g.index] == true)
-                {
-                    ColorBlock cb = g.button.colors;
-                    cb.disabledColor = Color.yellow;
-                    g.button.colors = cb;
-                    g.button.interactable = false;
-                }
-                /*If neither of the conditions are true then proceed to
-                make sure that the buttons is active */
-                else if (g.button.interactable == false)
-                {
-                    g.button.interactable = true;
-                }
-            }
-            if (gun_for_consideration.AreGunLevelUpButtonsAssignedForClass() == false)
-            {
-                for (int i = 0; i < buttons.Length - 1; i++)//Exclude "x" button
-                {
-                    int temp = i;
-                    buttons[temp].method = gun_for_consideration.ClassGunMods(temp);                                    
-                }
-            }
-            if (gun_for_consideration.points == 0 && gun_for_consideration.level_up_indication)
-            {//Destroy indication when there's no points
-                Destroy(gun_for_consideration.level_up_indication.gameObject);
-            }
-
-
-        }
-
+        SetBaseStats();
     }
-
-
-    protected class GunTableButton : MonoBehaviour
-    {
-        public Button button;
-        public Gun_Abilities method;
-        public int index;
-        
-        void OnMouseDown()
-        {
-            if (GunTable.gun_for_consideration.points > 0 && button.interactable && method != null)
-            {
-                /*Add delegate to gun abilities*/
-                --GunTable.gun_for_consideration.points;
-                GunTable.gun_for_consideration.Claimed_Gun_Mods += method;
-                GunTable.gun_for_consideration.SetGunNameAddons(index);
-                GunTable.gun_for_consideration.claimed_gun_ability[index] = true;
-                /*Switch colors of text and button to show it has been taken*/
-                ColorBlock cb = button.colors;
-                cb.disabledColor = Color.yellow;
-                button.colors = cb;
-                button.GetComponentInChildren<Text>().color = Color.red;
-                button.interactable = false;
-                if (GunTable.gun_for_consideration.points == 0 && GunTable.gun_for_consideration.level_up_indication)
-                {
-                    Destroy(GunTable.gun_for_consideration.level_up_indication.gameObject);
-                }
-            }
-        }
-    }
+    
 
     protected abstract Gun_Abilities ClassGunMods(int index);//For getting a derived class's Gun_ability delegates
     protected abstract string ClassGunAbilityNames(int index);//For getting a derived class's Gun_ability string names 

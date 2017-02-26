@@ -84,5 +84,26 @@ public class Strike : Gun {
     protected override string GetBaseName()
     {
         return "Strike";
-    }
+    }
+
+    protected override void SetBaseStats()
+    {
+        upper_bound_damage = 15;
+        lower_bound_damage = 7;
+        asset_reference = Resources.Load("Strike") as GameObject;
+        layer = 13;
+        home_layer = 10;
+        color = new Color(43, 179, 234);
+        range = 5;
+        projectile_speed = 5;
+        knockback_power = 5;
+        crit_chance = .1;
+        reload_time = .5f;
+        home_speed = 5f;
+        home_radius = 1.5f;
+        homes = true;
+        drop_canvas = Resources.Load("Drop Item Name Box") as Canvas;
+        item_options = Resources.Load("WeaponOptions") as Canvas;
+        Bullet = Resources.Load("Bullet") as GameObject;
+    }
 }

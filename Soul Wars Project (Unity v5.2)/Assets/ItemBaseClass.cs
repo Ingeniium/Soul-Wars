@@ -3,7 +3,9 @@ using UnityEngine;
 using UnityEditor;
 using UnityEngine.UI;
 using System.Collections;
-public abstract class Item : MonoBehaviour
+using System.Xml.Linq;
+using System.Linq;
+public abstract class Item : MonoBehaviour,IRecordable
 {
     public static T CopyComponent<T>(T original, GameObject destination) where T : Component
     {
@@ -16,10 +18,11 @@ public abstract class Item : MonoBehaviour
         }
         return copy as T;
     }
+    public bool set = false;
     public static PlayerController Player;//Reference to the Player
     protected GenericController unit_reference;
-    protected static Inventory inv;//Reference to the Inventory obj
-    protected static GameObject weapons_bar;//Reference to the weapons bar
+    public static Inventory inv;//Reference to the Inventory obj
+    public static GameObject weapons_bar;//Reference to the weapons bar
     protected static Transform main_bar_tr;//Reference to the transform of the Player Bar Canvas
     public Canvas drop_canvas;
     protected Canvas drop_canvas_show;//Canvas for showing the name of dropped items upon mouse hovering
@@ -33,6 +36,12 @@ public abstract class Item : MonoBehaviour
     public GameObject current_reference;//Reference to the current object script works for
     protected int index;//Index for equipment
     protected static System.Random rand = new System.Random();
+
+    protected virtual string GetBaseName()
+    {
+        return ToString();
+    }
+
     public void DropItem(ref double chance)
     {
         if (rand.NextDouble() <= chance)
@@ -46,7 +55,7 @@ public abstract class Item : MonoBehaviour
             item.AddComponent<BoxCollider>();//For it to stay on ground
             /*Indication for players to know it's dropped*/
             script.drop_canvas_show = Instantiate(drop_canvas, transform.position + new Vector3(0,0,.5f), drop_canvas.transform.rotation) as Canvas;
-            script.drop_canvas_show.GetComponentInChildren<Text>().text = name;
+            script.drop_canvas_show.GetComponentInChildren<Text>().text = GetBaseName();
             Destroy(script.drop_canvas_show.gameObject, 1f);
             //for code checking state
             script.dropped = true;
@@ -137,6 +146,10 @@ public abstract class Item : MonoBehaviour
             Destroy(drop_canvas_show.gameObject);
         }
     }
+
+    public abstract XElement RecordValuesToSaveFile();
+    public abstract void RecordValuesFromSaveFile(XElement element);
+    protected abstract void SetBaseStats();
     
 }
 
