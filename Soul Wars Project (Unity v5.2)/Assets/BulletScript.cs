@@ -1,12 +1,14 @@
 ﻿using UnityEngine;
 using System.Collections;
 using UnityEngine.UI;
-public class BulletScript : MonoBehaviour {
+using UnityEngine.Networking;
+
+public class BulletScript : NetworkBehaviour {
 	public int upper_bound_damage;
     public int lower_bound_damage;
     static System.Random rand = new System.Random();
 	public GameObject home;
-    private GameObject homer;
+    public GameObject homer;
 	public float home_radius;
     public float home_speed;
     public double crit_chance;
@@ -20,18 +22,33 @@ public class BulletScript : MonoBehaviour {
     public GameObject health_change_canvas;
     private GameObject health_change_show;
 	// Use this for initialization
+
 	void Start () 
     {
-        if (homes)
+        /*homer = Instantiate(home, transform.position, Quaternion.identity) as GameObject;
+        homer.transform.parent = gameObject.transform;
+        /*Pass values to homing device,even if homing is currently disabled for midway homing toggle
+        homer.GetComponent<SphereCollider>().radius = home_radius;
+        homer.GetComponent<HomingScript>().home_speed = home_speed;
+        if (!homes)
         {
-            homer = Instantiate(home, transform.position, Quaternion.identity) as GameObject;
-            homer.transform.parent = gameObject.transform;
-            //Pass values to homing device
-            homer.GetComponent<SphereCollider>().radius = home_radius;
-            homer.GetComponent<HomingScript>().home_speed = home_speed;
-            Destroy(gameObject, 3.0f);
-        }
+            homer.GetComponent<HomingScript>().enabled = true;
+        }*/
+        Item.Player.CmdSpawnHomingDevice(transform.position, transform.rotation);
+        Destroy(gameObject, 3.0f);
 	}
+
+    public void InitHomingDevice(NetworkInstanceId ID)
+    {
+        homer = ClientScene.FindLocalObject(ID);
+        homer.transform.parent = transform;
+        homer.GetComponent<SphereCollider>().radius = home_radius;
+         homer.GetComponent<HomingScript>().home_speed = home_speed;
+        if (!homes)
+        {
+            homer.GetComponent<HomingScript>().enabled = true;
+        }
+    }
 
 	void OnCollisionEnter (Collision hit) 
     {

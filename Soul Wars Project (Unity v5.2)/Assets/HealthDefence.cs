@@ -14,7 +14,7 @@ public class HealthDefence : MonoBehaviour {
             _HP = value;
             if (health_bar_show == null)
             {
-                health_bar_show = Instantiate(health_bar, transform.position + new Vector3(0, 1, 1), health_bar.transform.rotation) as Canvas;
+                health_bar_show = Instantiate(health_bar, transform.position + new Vector3(0, 1, 1), health_bar.transform.rotation) as GameObject;
                 health_bar_show.GetComponent<HPbar>().Object = gameObject;
                 health_bar_show.GetComponent<HPbar>().offset = health_bar_show.transform.position - gameObject.transform.position;
                 hp_string = health_bar_show.GetComponentInChildren<Text>();
@@ -123,8 +123,8 @@ public class HealthDefence : MonoBehaviour {
     public float sec_till_regen;
     public Collider shield_collider;
     public bool regeneration = false;
-    public Canvas health_bar;
-    public Canvas health_bar_show;
+    public GameObject health_bar;
+    public GameObject health_bar_show;
     public Text hp_string;
     public RectTransform hp_bar;
     public float maxWidth;
@@ -147,15 +147,14 @@ public class HealthDefence : MonoBehaviour {
             shield_collider = GetComponent<BoxCollider>();
             transform.localScale = new Vector3(transform.localScale.x,transform.localScale.y*scale_factor,transform.localScale.z*scale_factor);
         }
-        else if (type == Type.Unit)
-        {
-            Controller = GetComponentInChildren<GenericController>();
-            if (Controller == null)
-            {
-                Controller = GetComponent<GenericController>();
-            }
-        }
         _HP = maxHP;
+        Original_Color = gameObject.GetComponent<Renderer>().material.color;
+	}
+
+    void Start()
+    {
+        rb = GetComponent<Rigidbody>();
+        _standing_power = max_standing_power;
         if (hp_string)
         {
             hp_string.text = "<b>" + HP + "</b>";
@@ -164,13 +163,6 @@ public class HealthDefence : MonoBehaviour {
         {
             maxWidth = hp_bar.rect.width;
         }
-        Original_Color = gameObject.GetComponent<Renderer>().material.color;
-	}
-
-    void Start()
-    {
-        rb = GetComponent<Rigidbody>();
-        _standing_power = max_standing_power;
     }
 	
 	

@@ -1,5 +1,5 @@
 ﻿using UnityEngine;
-using UnityEditor;
+using UnityEngine.Networking;
 using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
@@ -74,12 +74,22 @@ public abstract partial class Gun : Item {
         return (Time.time > next_time);       
     }
     
+
     public virtual void Shoot()
     {
         bullet = Instantiate(Bullet, barrel_end.position, gameObject.transform.rotation) as GameObject;
         ReadyWeaponForFire(ref bullet);
         bullet.GetComponent<Rigidbody>().AddForce(barrel_end.forward * projectile_speed, ForceMode.Impulse);
     }
+
+    public virtual void Shoot(NetworkInstanceId ID)
+    {
+        GameObject obj = ClientScene.FindLocalObject(ID);
+        ReadyWeaponForFire(ref obj);
+        obj.GetComponent<Rigidbody>().AddForce(barrel_end.forward * projectile_speed, ForceMode.Impulse);
+        bullet = obj;
+    }
+
    
     protected void ReadyWeaponForFire(ref GameObject weapon_fire)
     {
@@ -150,8 +160,7 @@ public abstract partial class Gun : Item {
         }
         if (in_inventory)
         {
-                _item_image.transform.parent = weapons_bar.transform;
-                _item_image.transform.gameObject.GetComponent<RectTransform>().anchoredPosition = new Vector2(-29f, 230);
+               _item_image.transform.SetParent(weapons_bar.transform);     
                 GameObject Gun = Instantiate(asset_reference, prev_Gun.transform.position, prev_Gun.transform.rotation) as GameObject;
                 Gun.transform.SetParent(Player.gameObject.transform);
                 CopyComponent<Gun>(this, Gun);
@@ -163,7 +172,10 @@ public abstract partial class Gun : Item {
                 gun.home_layer = 10;
                 gun.barrel_end = Gun.GetComponentInChildren<Transform>();
                 gun.in_inventory = false;
-                inv.RemoveItem(ref _item_image);
+                if (inv)
+                {
+                    inv.RemoveItem(ref _item_image);
+                }
             
             int i = Player.equipped_weapons.IndexOf(null);
             /*If there isn't an empty slot within equipped weapons, assign the newly instanced gun
