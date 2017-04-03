@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.Networking;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -6,12 +7,10 @@ using System.Collections.Generic;
 public partial class AIController : GenericController {
     private Rigidbody prb;
     public Transform ptr;
-    public GameObject Shield;
-    public GameObject Gun;
-    private GameObject Target;
+    private HealthDefence Target;
     private bool target_focus = true;
     private Collider trig;
-    private List<Collider> obstacles = new List<Collider>();
+    private List<Collider> bullet_colliders = new List<Collider>();
     private float next_dodge = 0;
     public float dodge_delay;
     public float dodge_cooldown;
@@ -19,12 +18,13 @@ public partial class AIController : GenericController {
     public float reaction_delay;    
     [HideInInspector]
     public Transform gtr;
-    public Collider enemy_attack_detection;
+    public SphereCollider enemy_attack_detection;
     public Gun gun;
     public float minimal_distance = 1f;
     private bool guarding = false;
     private static UniversalCommunicator TeamController = new UniversalCommunicator();
     private FunctionChooser attack_func_chances = new FunctionChooser();
+    private Vector3 move_dir;
 
     private static Dictionary<int, Func<AIController, Vector3>> MovementFuncs = new Dictionary<int, Func<AIController, Vector3>>()
     {
@@ -40,9 +40,30 @@ public partial class AIController : GenericController {
         {2,GuardFire},
         {3,HaltFire}
     };
+    private static Dictionary<int, Func<AIController,IEnumerator>> EvasionFuncs = new Dictionary<int, Func<AIController,IEnumerator>>()
+    {
+        {0,Block},
+        {1,SideStep}
+    };
 
+    private ValueGroup[] HateList = new ValueGroup[20]
+    {
+        new ValueGroup(0,-1), new ValueGroup(0,-1), 
+        new ValueGroup(0,-1), new ValueGroup(0,-1), 
+        new ValueGroup(0,-1), new ValueGroup(0,-1), 
+        new ValueGroup(0,-1), new ValueGroup(0,-1), 
+        new ValueGroup(0,-1), new ValueGroup(0,-1),
+        
+        new ValueGroup(0,-1), new ValueGroup(0,-1), 
+        new ValueGroup(0,-1), new ValueGroup(0,-1), 
+        new ValueGroup(0,-1), new ValueGroup(0,-1), 
+        new ValueGroup(0,-1), new ValueGroup(0,-1), 
+        new ValueGroup(0,-1), new ValueGroup(0,-1)   
+    };
+    
     private int attack_func_index = 0;
     private int movement_func_index = 0;
+    private int evasion_func_index = 1;
     private static System.Random rand = new System.Random();
     private ObjectiveState State;
     private bool ally_in_range = false;
@@ -50,7 +71,8 @@ public partial class AIController : GenericController {
     void Awake()
     {
         
-        enemy_attack_detection = GetComponent<Collider>();
+        enemy_attack_detection = GetComponent<SphereCollider>();
+        GetComponentInParent<HealthDefence>().Controller = this;
     }
 
     void Start()
@@ -60,7 +82,7 @@ public partial class AIController : GenericController {
         {
             TeamController.Start(new List<GroupCommunicator>()
             {
-                new Conquer()
+                //new Conquer()
             });
             TeamController.set = true;
         }
@@ -72,36 +94,78 @@ public partial class AIController : GenericController {
 
     void FixedUpdate()
     {
-        if (!State.standby)
-        {
+        
+            State.AffirmTarget(Target);
             prb.AddForce(Vector3.up * 10);
-            prb.AddForce(MovementFuncs[movement_func_index](this));
+            move_dir = MovementFuncs[movement_func_index](this);
+            prb.AddForce(move_dir.normalized * 10);
             if (!guarding && AttackFuncs[attack_func_index](this))
             {
                 gun.Shoot();
             }
-        }
+        
     }
 
     void OnTriggerEnter(Collider col)
     {
+        /*If a player or spawn point was detected within aggro radius,
+         react based on State instructions*/
         if (col.gameObject.layer == 9)
         {
-            prb.AddForce(AvoidObstacles(col), ForceMode.Impulse);
-            ally_in_range = true;
-            if (State.RespondtoAllyUnit != null)
-            {
-                State.immediate_responding = true;
-                State.RespondtoAllyUnit(col);
-            }
+            State.UnitAggroReaction(col);
         }
+        /*If bullet,prepare to evade*/
         else
         {
-            trig = col;
-            StartCoroutine(Evasion());
-            enemy_attack_detection.enabled = false;
-            enemy_attack_detection.isTrigger = false;
+            bullet_colliders.Add(col);
+            trig = GetClosestBullet();
+            EvasionFuncs[evasion_func_index](this);
         }
+    }
+
+    void OnTriggerExit(Collider col)
+    {
+        if (col.gameObject.layer != 9)
+        {
+            bullet_colliders.Remove(col);
+        }
+    }
+
+    Collider GetClosestBullet()
+    {
+        List<ValueGroup> distances = new List<ValueGroup>();   
+        /*using foreach in this place casues an invalid operation exception when a collider DOES need to be destroyed,as 
+         due to the destruction itself*/
+        for (int i = 0; i < bullet_colliders.Count; i++)
+        {
+            if (bullet_colliders[i] == null)
+            {
+                bullet_colliders.RemoveAt(i);
+            }
+        }       
+        for(int i = 0;i < bullet_colliders.Count;i++)
+        {
+            try
+            {
+                distances.Add(new ValueGroup(i, Vector3.Distance(ptr.position, bullet_colliders[i].gameObject.transform.position)));
+            }
+            catch (System.Exception e)
+            {
+                distances.RemoveAt(i);
+            }
+        }     
+        distances.Sort(delegate(ValueGroup lhs, ValueGroup rhs)
+        {
+            if (lhs.value > rhs.value)
+            {
+                return 1;
+            }
+            else
+            {
+                return -1;
+            }
+        });
+        return bullet_colliders[distances[0].index];      
     }
 
     static Vector3 Charge(AIController AI)
@@ -144,6 +208,18 @@ public partial class AIController : GenericController {
         return AI.HaltFire();
     }
 
+    static IEnumerator Block(AIController AI)
+    {
+         AI.StartCoroutine(AI.Block());
+         yield return null;
+    }
+
+    static IEnumerator SideStep(AIController AI)
+    {
+        AI.StartCoroutine(AI.SideStep());
+        yield return null;
+    }
+
     private struct ValueGroup//Unity doesn't support Tuple
     {
         public int index;
@@ -153,6 +229,120 @@ public partial class AIController : GenericController {
             index = i;
             value = v;
         }
+    }
+
+    public void UpdateAggro(int damage = 0, NetworkInstanceId player_id = new NetworkInstanceId(),bool account_attack_dist = true)
+    {
+        try
+        {
+            if (damage != 0)
+            {
+                float dist_multiplier = 1;
+                Transform playertr = ClientScene.FindLocalObject(player_id).transform;
+                if (account_attack_dist)
+                {
+                    /*The closer the player is to the enemy the more threat generated from
+                     the respective attack done by the player*/
+                    float dist_ratio = enemy_attack_detection.radius /
+                        Vector3.Distance(Target.transform.position, ptr.position);
+                    /*The distance only has 25% bearing on the threat,however.*/
+                    dist_multiplier = .75f + .25f * (dist_ratio);
+                }
+                /*If the player is not currently on the enemy's hatelist...
+                 (netIds are used as ValueGroup indeces)*/
+                if (!Array.Exists(HateList, delegate(ValueGroup g)
+                {
+                    return (g.index == (int)(player_id.Value));
+                }))
+                {
+                    /*Find the first empty slot to store threat info 
+                     in*/
+                    int index = Array.FindIndex(HateList, delegate(ValueGroup g)
+                    {
+                        return (g.value == -1);
+                    });
+                    HateList[index] = new ValueGroup((int)player_id.Value, dist_multiplier * (float)damage);
+                }
+                else
+                {
+                    /*If the player is in the aggro list,then simply add to the threat 
+                     data stored into it*/
+                    int index = Array.FindIndex(HateList, delegate(ValueGroup g)
+                    {
+                        return (g.index == (int)player_id.Value);
+                    });
+                    HateList[index].value += (float)damage * dist_multiplier;
+                }
+            }
+            /*There needs to be a .2 times more threat to move up one place.
+             This is to prevent rapid switching of targets constantly w/o huge 
+             damage changes.*/
+            Array.Sort(HateList, delegate(ValueGroup lhs, ValueGroup rhs)
+            {
+                if (lhs.value * 1.2f > rhs.value)
+                {
+                    return -1;
+                }
+                else if (lhs.value < .8f * rhs.value)
+                {
+                    return 1;
+                }
+                else
+                {
+                    return 0;
+                }
+            });
+            if (HateList[0].value != -1)
+            {
+                /*Assign target to one with most threat.The Gameobject's
+                 existence is checked in event that a player disconnects.*/
+                GameObject g = ClientScene.FindLocalObject(new NetworkInstanceId((uint)HateList[0].index));
+                if (g == null)
+                {
+                    RemoveAggro(new NetworkInstanceId((uint)HateList[0].index));
+                }
+                else
+                {
+                    Target = g.GetComponent<HealthDefence>();
+                }
+            }
+        }
+        catch (System.Exception e)
+        {
+            int index = 
+            Array.FindIndex(HateList, delegate(ValueGroup g)
+            {
+                return (g.index == (int)(player_id.Value));
+            });
+            if(index != -1)
+            {
+                HateList[index] = new ValueGroup(-1,-1);
+                UpdateAggro();
+            }
+        }
+
+
+    }
+
+    /*For removing info about captured spawn points or killed players
+     from the HateList*/
+    void RemoveAggro(NetworkInstanceId ID)
+    {
+        int index = Array.FindIndex(HateList, delegate(ValueGroup v)
+        {
+            return (v.index == (int)(ID.Value));
+        });
+        HateList[index] = new ValueGroup(-1, -1);
+        UpdateAggro();
+    }
+
+    void ClearHateList()
+    {
+        for (int i = 0; i < 20; i++)
+        {
+            HateList[i] = new ValueGroup(-1, -1);
+        }
+        State.ResetHateList();
     }
 
 
@@ -240,17 +430,11 @@ public partial class AIController : GenericController {
        try
        {
            Vector3 dir = (Target.transform.position - ptr.transform.position);
-           if ((State.immediate_responding && State.EndAllyUnitResponse()) || State.ShouldFindNewTarget())
-           {
-              State.immediate_responding = false;
-              State.SetTarget();
-              return Vector3.zero;
-           }
-           else if (target_focus && dir.magnitude > minimal_distance)
+           if (target_focus && dir.magnitude > minimal_distance)
            {
                ptr.LookAt(Target.transform);
                dir = Vector3.Normalize(dir);
-               return (dir * 10);
+               return dir;
            }
            else
            {
@@ -259,7 +443,6 @@ public partial class AIController : GenericController {
        }
        catch (System.Exception e)
        {
-           State.SetTarget();
            return Vector3.zero;
        }
    }
@@ -268,14 +451,7 @@ public partial class AIController : GenericController {
    {
        try
        {
-
-               if ((State.immediate_responding && State.EndAllyUnitResponse()) || State.ShouldFindNewTarget())
-               {
-                   State.immediate_responding = false;
-                   State.SetTarget();
-                   return Vector3.zero;
-               }
-               else if (target_focus)
+               if (target_focus)
                {
                    Vector3 dif = (Target.transform.position - ptr.transform.position);
                    Vector3 proj = Target.GetComponent<Rigidbody>().velocity;
@@ -283,7 +459,7 @@ public partial class AIController : GenericController {
                    if (proj.magnitude > 1)
                    {
                        Vector3 dir = Vector3.Project(dif, proj);
-                       return dir * 10;
+                       return dir;
                    }
                    else if (dif.magnitude < minimal_distance)
                    {
@@ -291,7 +467,7 @@ public partial class AIController : GenericController {
                    }
                    else
                    {
-                       return dif.normalized * 10;
+                       return dif.normalized;
                    }
                }
                else
@@ -302,7 +478,6 @@ public partial class AIController : GenericController {
        
        catch (System.Exception e)
        {
-           State.SetTarget();
            return Vector3.zero;
        }
    }
@@ -316,29 +491,20 @@ public partial class AIController : GenericController {
    {
        try
        {
-           if ((State.immediate_responding && State.EndAllyUnitResponse()) || State.ShouldFindNewTarget())
-           {
-               State.immediate_responding = false;
-               State.SetTarget();
-               return Vector3.zero;
-           }
-           else
-           {
+          
                Vector3 dir = Target.transform.position - ptr.position;
                if (target_focus && dir.magnitude < gun.range)
                {
                    ptr.LookAt(Target.transform);
-                   return dir.normalized * 10;
+                   return dir.normalized;
                }
                else
                {
                    return Vector3.zero;
                }
-           }
        }
        catch (System.Exception e)
        {
-           State.SetTarget();
            return Vector3.zero;
        }
    }
@@ -346,15 +512,6 @@ public partial class AIController : GenericController {
    Vector3 Wait()
    {
        return Vector3.zero;
-   }
-
-   Vector3 AvoidObstacles(Collider col)
-   {      
-      Vector3  dir = transform.position - col.gameObject.transform.position;
-      dir = Quaternion.AngleAxis(90, ptr.up) * dir;
-      float num = 5 - dir.magnitude;
-      dir = dir.normalized * num;
-      return dir;
    }
 
    
@@ -379,7 +536,6 @@ public partial class AIController : GenericController {
        }
        catch (System.Exception e)
        {
-           State.SetTarget();
            return false;
        }
    }
@@ -399,7 +555,6 @@ public partial class AIController : GenericController {
        }
        catch (System.Exception e)
        {
-           State.SetTarget();
            return false;
        }
    }
@@ -426,8 +581,40 @@ public partial class AIController : GenericController {
        }
        catch (System.Exception e)
        {
-           State.SetTarget();
            return false;
+       }
+   }
+
+   IEnumerator Block()
+   {
+       yield return new WaitForSeconds(reaction_delay);
+       if (trig)
+       {
+           target_focus = false; 
+           ptr.LookAt(trig.gameObject.transform);        
+           StartShieldBlocking();
+           yield return new WaitForSeconds(reaction_delay / 2);
+           target_focus = true;
+           EndShieldBlocking();
+       }
+   }
+
+   IEnumerator SideStep()
+   {
+       yield return new WaitForSeconds(reaction_delay / 2);
+       int sign = rand.Next(1);
+       while (trig)
+       {
+           yield return new WaitForFixedUpdate();
+           Vector3 dif =  trig.gameObject.transform.position - ptr.position;
+           if (sign == 0)
+           {
+               move_dir += Quaternion.AngleAxis(90, Vector3.up) * dif.normalized;
+           }
+           else
+           {
+               move_dir += Quaternion.AngleAxis(-90, Vector3.up) * dif.normalized;
+           }
        }
    }
 

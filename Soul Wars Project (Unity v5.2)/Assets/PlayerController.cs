@@ -3,12 +3,14 @@ using UnityEngine.Networking;
 using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 
 public class PlayerController : GenericController {
     public int player_index;
     private Vector3 total_move;
     public Gun gun;//The Equipped weapon that the player currently wields
     public List<Gun> equipped_weapons = new List<Gun>();
+    public static List<uint> PlayerIDList = new List<uint>();
     public int max_weapon_num
     {
         get { return _max_weapon_num; }
@@ -77,6 +79,7 @@ public class PlayerController : GenericController {
     private Camera cam_show;
     public bool equip_action = true;
     public Canvas hpbar;
+    public Canvas hpbar_show;
     public HealthDefence HP;
 
     void Awake()
@@ -90,10 +93,9 @@ public class PlayerController : GenericController {
             }
             HP = GetComponent<HealthDefence>();
             HP.Controller = this;
-            Canvas hpbar_show = Instantiate(hpbar) as Canvas;
+            hpbar_show = Instantiate(hpbar) as Canvas;
             hpbar_show.worldCamera = cam_show;
-           
-       
+            PlayerIDList.Add(netId.Value);
     }
 
 
@@ -109,27 +111,30 @@ public class PlayerController : GenericController {
             shield_collider = Shield.GetComponent<BoxCollider>();
             rb = GetComponent<Rigidbody>();
             tr = GetComponent<Transform>();
+            tr.position = SpawnManager.AllySpawnPoints[0].transform.position + SpawnManager.AllySpawnPoints[0].spawn_direction;
             gun = Gun.GetComponent<Gun>();
-            if (!gun.set)
-            {
-                gun.current_reference = Gun;
-                //Giving the gun its own item image object,and setting it to be the 1st equipped weapon
-                gun._item_image = Instantiate(gun.item_image, Vector3.zero, gun.item_image.transform.rotation) as GameObject;
-                gun._item_image.GetComponentInChildren<ItemImage>().item_script = gun;
-                gun._item_image.GetComponentInChildren<RectTransform>().sizeDelta *= 2;
-                //  gun._item_image.transform.parent = GameObject.FindGameObjectWithTag("Weapons").transform;
-            }
             equipped_weapons.Add(gun);
             max_weapon_num = 2;
-            HP.health_bar_show = GameObject.FindGameObjectWithTag("HealthBar") as GameObject;
+            HP.health_bar_show = hpbar_show.GetComponentsInChildren<Slider>()[1].gameObject as GameObject;
             HP.hp_string = HP.health_bar_show.GetComponentInChildren<Text>();
             HP.hp_bar = HP.health_bar_show.GetComponentInChildren<Slider>().GetComponent<RectTransform
                 >();
             HealthDefence SP = Shield.GetComponent<HealthDefence>();
-            SP.health_bar_show = GameObject.FindGameObjectWithTag("ShieldBar") as GameObject;
+            SP.health_bar_show = hpbar_show.GetComponentsInChildren<Slider>()[3].gameObject as GameObject;
             SP.hp_string = SP.health_bar_show.GetComponentInChildren<Text>();
             SP.hp_bar = SP.health_bar_show.GetComponentInChildren<Slider>().GetComponent<RectTransform
                 >();
+            gun.client_user = this;
+            if (!gun.set)
+            {
+                gun.current_reference = Gun;
+                //Giving the gun its own item image object,and setting it to be the 1st equipped weapon
+                gun._item_image = Instantiate(gun.item_image, gun.weapons_bar.transform.position, gun.item_image.transform.rotation) as GameObject;
+                gun._item_image.GetComponentInChildren<ItemImage>().item_script = gun;
+                gun._item_image.GetComponentInChildren<RectTransform>().sizeDelta *= 2;
+                gun._item_image.transform.parent = gun.weapons_bar.transform;
+
+            }  
         }
         
 	}
@@ -150,10 +155,24 @@ public class PlayerController : GenericController {
         RpcSendHomingDeviceId(h.GetComponent<NetworkIdentity>().netId);
     }
 
+    [Command]
+    public void CmdDestroyObjectOnServer(NetworkInstanceId ID)
+    {
+        GameObject g = NetworkServer.FindLocalObject(ID);
+        NetworkServer.Destroy(g);
+    }
+
     [ClientRpc]
     void RpcSendHomingDeviceId(NetworkInstanceId ID)
     {
-        gun.bullet.GetComponent<BulletScript>().InitHomingDevice(ID);
+        try
+        {
+            gun.bullet.GetComponent<BulletScript>().InitHomingDevice(ID);
+        }
+        catch (System.Exception e)
+        {
+            return;
+        }
     }
 
     [ClientRpc]
@@ -164,11 +183,58 @@ public class PlayerController : GenericController {
                 gun.Shoot(ID);
             }
             catch (System.NullReferenceException e)
-            { 
-               
+            {
+                Debug.Log(gun != null);
             }
           
     }
+
+    [Command]
+    public void CmdActivateFuncOnServer(NetworkInstanceId ID,string class_string,string arg_func_string,string[] args,string arg_class_string)
+    {
+        RpcActivateFuncOnAllClients(ID, class_string, arg_func_string,args,arg_class_string);
+    }
+
+    [ClientRpc]
+    public void RpcActivateFuncOnAllClients(NetworkInstanceId ID, string class_string, string arg_func_string,string[] args,string arg_class_string)
+    {
+        GameObject g = ClientScene.FindLocalObject(ID);
+        System.Type t = System.Type.GetType(class_string);
+        Component c = g.GetComponent(t);
+        MethodInfo m = t.GetMethod(arg_func_string);
+        object[] array = null;
+        switch (arg_class_string)
+        {
+            case "int":
+                {
+                    array = new object[args.Length];
+                    int i = 0;
+                    foreach (string s in args)
+                    {
+                        array[i] = System.Int32.Parse(s);
+                        i++;
+                    }
+                    break;
+                }
+            case "float":
+                {
+                    array = new object[args.Length];
+                    int i = 0;
+                    foreach (string s in args)
+                    {
+                        array[i] = System.Single.Parse(s);
+                        i++;
+                    }
+                    break;
+                }
+            case null :
+                break;            
+        }
+       // System.Convert.ChangeType(args, arg_type); - Doesn't work
+        m.Invoke(c,array);
+    }
+
+    
    
 	void Update() 
     {

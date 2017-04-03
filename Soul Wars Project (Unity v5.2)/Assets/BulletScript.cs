@@ -25,25 +25,34 @@ public class BulletScript : NetworkBehaviour {
 
 	void Start () 
     {
-        /*homer = Instantiate(home, transform.position, Quaternion.identity) as GameObject;
-        homer.transform.parent = gameObject.transform;
-        /*Pass values to homing device,even if homing is currently disabled for midway homing toggle
-        homer.GetComponent<SphereCollider>().radius = home_radius;
-        homer.GetComponent<HomingScript>().home_speed = home_speed;
-        if (!homes)
-        {
-            homer.GetComponent<HomingScript>().enabled = true;
-        }*/
-        Item.Player.CmdSpawnHomingDevice(transform.position, transform.rotation);
-        Destroy(gameObject, 3.0f);
+        StartCoroutine(WaitForGunReference());
 	}
+
+    IEnumerator WaitForGunReference()
+    {
+        while (!gun_reference)
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        gun_reference.client_user.CmdSpawnHomingDevice(transform.position, transform.rotation);
+        StartCoroutine(WaitForNetworkDestruction());
+    }
+
+    IEnumerator WaitForNetworkDestruction()
+    {
+        yield return new WaitForSeconds(3f);
+        gun_reference.client_user.CmdDestroyObjectOnServer(netId);
+    }
 
     public void InitHomingDevice(NetworkInstanceId ID)
     {
         homer = ClientScene.FindLocalObject(ID);
         homer.transform.parent = transform;
         homer.GetComponent<SphereCollider>().radius = home_radius;
-         homer.GetComponent<HomingScript>().home_speed = home_speed;
+        HomingScript script = homer.GetComponent<HomingScript>();
+        script.home_speed = home_speed;
+        script.prb = GetComponent<Rigidbody>();
+        script.ptr = transform;
         if (!homes)
         {
             homer.GetComponent<HomingScript>().enabled = true;
@@ -63,7 +72,7 @@ public class BulletScript : NetworkBehaviour {
                 Destroy(health_change_show.gameObject);
             }
             StopAllCoroutines();
-            Destroy(gameObject);//Always destroy the object upon any detectable impact upon an exception           
+            gun_reference.client_user.CmdDestroyObjectOnServer(netId);//Always destroy the object upon any detectable impact upon an exception           
         }
         
     }
@@ -130,9 +139,14 @@ public class BulletScript : NetworkBehaviour {
                         Target.StartCoroutine(Stun(Target, knockback));
                     }
                 }
-                Target.HP -= d;           
+                AIController AI = Target.Controller as AIController;
+                if (AI != null)
+                {
+                    AI.UpdateAggro(d, gun_reference.client_user.netId);
+                }
+                gun_reference.client_user.CmdActivateFuncOnServer(Target.netId, "HealthDefence", "ChangeHP",new string[]{(-d).ToString()},"int");
                 Destroy(health_change_show, 1f);
-                Destroy(gameObject);
+                gun_reference.client_user.CmdDestroyObjectOnServer(netId);
             
 
         }
@@ -141,7 +155,7 @@ public class BulletScript : NetworkBehaviour {
             /*Before destruction,Stop all coroutines(the gun_abilities operating on this instance)
              to prevent exceptions from those coroutines*/
             StopAllCoroutines();
-            Destroy(gameObject);//Destroy object immediately if null
+            gun_reference.client_user.CmdDestroyObjectOnServer(netId);//Destroy object immediately if null
         }
     }
 
