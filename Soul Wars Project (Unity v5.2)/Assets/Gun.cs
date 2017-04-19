@@ -11,20 +11,21 @@ using System.Linq;
 using System;
 
 public abstract partial class Gun : Item {
-    private static GameObject GunLevelUp;//Reference to the table used for getting gun abilities
+    protected GameObject GunLevelUp;//Reference to the table used for getting gun abilities
+    public GameObject weapons_bar;//Reference to the weapons bar
 	public GameObject Bullet;
 	public GameObject bullet;
-    public float reload_time;//How long it takes to fire each shot
+    [SyncVar] public float reload_time;//How long it takes to fire each shot
 	private float next_time;//Next firing time
-    public float home_speed;//Angular turning speed of the bullet
-	public float home_radius;
+    [SyncVar] public float home_speed;//Angular turning speed of the bullet
+	[SyncVar] public float home_radius;
     public bool homes = true;//whether the bullets will have homing capabilities
-	public int lower_bound_damage = 7;
-    public int upper_bound_damage = 15;
-    public float knockback_power;//How much knockback force and knockback stun is done 
-    public float projectile_speed;
-    public float range;
-    public double crit_chance = .1f;
+	[SyncVar] public int lower_bound_damage = 7;
+    [SyncVar] public int upper_bound_damage = 15;
+    [SyncVar] public float knockback_power;//How much knockback force and knockback stun is done 
+    [SyncVar] public float projectile_speed;
+    [SyncVar] public float range;
+    [SyncVar]  public double crit_chance = .1f;
 	public Transform barrel_end;//Where bullets actually SPAWN from
     public Color color;//color assigned to the BULLETS
     public int layer;//Collision layer of the bullet
@@ -67,7 +68,9 @@ public abstract partial class Gun : Item {
     protected List<string> suffixes = new List<string>();
     protected string last_suffix = "";
    
-
+    protected override void OnClientUserChange()    {        weapons_bar = _client_user.hpbar_show.GetComponentsInChildren<LayoutGroup>()[1].gameObject;
+        RectTransform[] rects = _client_user.hpbar_show.GetComponentsInChildren<RectTransform>();
+        GunLevelUp = rects[rects.Count() - 1].gameObject;    }
 
     public bool HasReloaded()
     {
@@ -84,12 +87,17 @@ public abstract partial class Gun : Item {
 
     public virtual void Shoot(NetworkInstanceId ID)
     {
-        GameObject obj = ClientScene.FindLocalObject(ID);
-        ReadyWeaponForFire(ref obj);
-        obj.GetComponent<Rigidbody>().AddForce(barrel_end.forward * projectile_speed, ForceMode.Impulse);
-        bullet = obj;
+        bullet = ClientScene.FindLocalObject(ID);
+        ReadyWeaponForFire(ref bullet);
+        bullet.GetComponent<Rigidbody>().AddForce(barrel_end.forward * projectile_speed, ForceMode.Impulse);
     }
 
+    public virtual void Shoot(GameObject g)
+    {
+        bullet = g;
+        ReadyWeaponForFire(ref bullet);
+        bullet.GetComponent<Rigidbody>().AddForce(barrel_end.forward * projectile_speed, ForceMode.Impulse);
+    }
    
     protected void ReadyWeaponForFire(ref GameObject weapon_fire)
     {
@@ -109,11 +117,20 @@ public abstract partial class Gun : Item {
         script.homes = homes;
         script.gun_reference = this;//For gaining exp 
         next_time = Time.time + reload_time;
-        if (Claimed_Gun_Mods != null)//Apply chosen gun_abilities to each bullet
+       /* if (Claimed_Gun_Mods != null)//Apply chosen gun_abilities to each bullet
         {
-            foreach (Gun_Abilities g in Claimed_Gun_Mods.GetInvocationList()) { script.StartCoroutine(g(this,script)); }
-        }
+           foreach (Gun_Abilities g in Claimed_Gun_Mods.GetInvocationList()) { script.StartCoroutine(g(this,script)); }   
+        }*/
+        
+    }
 
+    public void ApplyGunAbilities()
+    {
+        if (Claimed_Gun_Mods != null && bullet != null)
+        {
+            BulletScript script = bullet.GetComponent<BulletScript>();
+            foreach (Gun_Abilities g in Claimed_Gun_Mods.GetInvocationList()) { script.StartCoroutine(g(this, script)); }
+        }
     }
 
     protected abstract string GunDesc();//Description is based on derived type
@@ -358,18 +375,6 @@ public abstract partial class Gun : Item {
         {
             unit_reference = GetComponentInParent<GenericController>();
         }
-        if (Player == null)
-        {
-            Player = GameObject.FindGameObjectWithTag("Player").GetComponent<PlayerController>();
-            inv = GameObject.FindGameObjectWithTag("Inventory").GetComponent<Inventory>();
-            main_bar_tr = GameObject.FindGameObjectWithTag("MainCanvas").transform;
-        }
-        if (GunLevelUp == null)
-        {
-            weapons_bar = GameObject.FindGameObjectWithTag("Weapons");
-            GunLevelUp = GameObject.FindGameObjectWithTag("GunLevelUp");
-            GunTable.InitGunTable();
-        }      
     }
     
     

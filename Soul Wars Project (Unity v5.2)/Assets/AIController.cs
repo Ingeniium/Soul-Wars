@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 
 public partial class AIController : GenericController {
+    public static PlayerController Host;
     private Rigidbody prb;
     public Transform ptr;
     private HealthDefence Target;
@@ -68,21 +69,23 @@ public partial class AIController : GenericController {
     private ObjectiveState State;
     private bool ally_in_range = false;
 
+    [ServerCallback]
     void Awake()
     {
-        
-        enemy_attack_detection = GetComponent<SphereCollider>();
         GetComponentInParent<HealthDefence>().Controller = this;
+
     }
 
+    [ServerCallback]
     void Start()
     {
+        enemy_attack_detection = GetComponent<SphereCollider>();
         TeamController.Units.Add(this);
         if (!TeamController.set)
         {
             TeamController.Start(new List<GroupCommunicator>()
             {
-                //new Conquer()
+                new Conquor()
             });
             TeamController.set = true;
         }
@@ -92,20 +95,24 @@ public partial class AIController : GenericController {
         gun = Gun.GetComponent<Gun>();
     }
 
+    [ServerCallback]
     void FixedUpdate()
     {
         
             State.AffirmTarget(Target);
-            prb.AddForce(Vector3.up * 10);
+            prb.AddForce(Vector3.up * 5);
             move_dir = MovementFuncs[movement_func_index](this);
             prb.AddForce(move_dir.normalized * 10);
-            if (!guarding && AttackFuncs[attack_func_index](this))
+            if (Target && AttackFuncs[attack_func_index](this))
             {
-                gun.Shoot();
+                GameObject g = Instantiate(Resources.Load("Bullet"),gun.barrel_end.position, gun.transform.rotation) as GameObject;
+                NetworkServer.Spawn(g);
+                gun.Shoot(g);
             }
         
     }
 
+    [ServerCallback]
     void OnTriggerEnter(Collider col)
     {
         /*If a player or spawn point was detected within aggro radius,
@@ -123,6 +130,7 @@ public partial class AIController : GenericController {
         }
     }
 
+    [ServerCallback]
     void OnTriggerExit(Collider col)
     {
         if (col.gameObject.layer != 9)
@@ -231,6 +239,7 @@ public partial class AIController : GenericController {
         }
     }
 
+   
     public void UpdateAggro(int damage = 0, NetworkInstanceId player_id = new NetworkInstanceId(),bool account_attack_dist = true)
     {
         try
@@ -238,7 +247,7 @@ public partial class AIController : GenericController {
             if (damage != 0)
             {
                 float dist_multiplier = 1;
-                Transform playertr = ClientScene.FindLocalObject(player_id).transform;
+                Transform playertr = NetworkServer.FindLocalObject(player_id).transform;
                 if (account_attack_dist)
                 {
                     /*The closer the player is to the enemy the more threat generated from
@@ -277,16 +286,18 @@ public partial class AIController : GenericController {
             /*There needs to be a .2 times more threat to move up one place.
              This is to prevent rapid switching of targets constantly w/o huge 
              damage changes.*/
+            
             Array.Sort(HateList, delegate(ValueGroup lhs, ValueGroup rhs)
             {
-                if (lhs.value * 1.2f > rhs.value)
+
+                if (lhs.value * .8f > rhs.value)
                 {
                     return -1;
                 }
-                else if (lhs.value < .8f * rhs.value)
+                else if (lhs.value * 1.2f <  rhs.value)
                 {
                     return 1;
-                }
+                }       
                 else
                 {
                     return 0;
@@ -296,19 +307,20 @@ public partial class AIController : GenericController {
             {
                 /*Assign target to one with most threat.The Gameobject's
                  existence is checked in event that a player disconnects.*/
-                GameObject g = ClientScene.FindLocalObject(new NetworkInstanceId((uint)HateList[0].index));
+                GameObject g = NetworkServer.FindLocalObject(new NetworkInstanceId((uint)HateList[0].index)); 
                 if (g == null)
                 {
                     RemoveAggro(new NetworkInstanceId((uint)HateList[0].index));
                 }
                 else
                 {
-                    Target = g.GetComponent<HealthDefence>();
+                    Target = g.GetComponent<HealthDefence>();                   
                 }
             }
         }
         catch (System.Exception e)
         {
+            Debug.Log("AggroException!");
             int index = 
             Array.FindIndex(HateList, delegate(ValueGroup g)
             {
@@ -332,8 +344,11 @@ public partial class AIController : GenericController {
         {
             return (v.index == (int)(ID.Value));
         });
-        HateList[index] = new ValueGroup(-1, -1);
-        UpdateAggro();
+        if (index != -1)
+        {
+            HateList[index] = new ValueGroup(-1, -1);
+            UpdateAggro();
+        }
     }
 
     void ClearHateList()

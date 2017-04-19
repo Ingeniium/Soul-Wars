@@ -4,8 +4,8 @@ using System.Collections;
 
 public class PlayerFollow : MonoBehaviour
 {
-    public PlayerController Player_;
-    public static GameObject Player;
+    public PlayerController Player;
+    public static PlayerController player;
     public Transform tr;
     public static  Vector3 offset;
     public Vector3 _offset;
@@ -21,14 +21,14 @@ public class PlayerFollow : MonoBehaviour
 
     void Start()
     {
-        _offset = transform.position - Player_.transform.position;
+        _offset = transform.position - Player.transform.position;
         //camera = GetComponent<Camera>();
-        tr = Player_.GetComponent<Transform>();
+        tr = Player.transform;
     }
 
     void FixedUpdate()
     {
-        if (Player_ != null && Player_.isLocalPlayer)
+        if (Player != null && Player.isLocalPlayer)
         {
             ray = camera.ScreenPointToRay(Input.mousePosition);
             if (Physics.Raycast(ray, out hit))
@@ -39,9 +39,9 @@ public class PlayerFollow : MonoBehaviour
     }
     void LateUpdate()
     {
-        if (Player_ != null)
+        if (Player != null)
         {
-            transform.position = Player_.transform.position + _offset;
+            transform.position = Player.transform.position + _offset;
         }
        
     }

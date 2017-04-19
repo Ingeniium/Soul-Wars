@@ -1,11 +1,11 @@
 ﻿
 using UnityEngine;
-using UnityEditor;
+using UnityEngine.Networking;
 using UnityEngine.UI;
 using System.Collections;
 using System.Xml.Linq;
 using System.Linq;
-public abstract class Item : MonoBehaviour,IRecordable
+public abstract class Item : NetworkBehaviour,IRecordable
 {
     public static T CopyComponent<T>(T original, GameObject destination) where T : Component
     {
@@ -21,9 +21,8 @@ public abstract class Item : MonoBehaviour,IRecordable
     public bool set = false;
     public static PlayerController Player;//Reference to the Player
     protected GenericController unit_reference;
-    public static Inventory inv;//Reference to the Inventory obj
-    public static GameObject weapons_bar;//Reference to the weapons bar
-    protected static Transform main_bar_tr;//Reference to the transform of the Player Bar Canvas
+    public Inventory inv;//Reference to the Inventory obj
+    //protected static Transform main_bar_tr;//Reference to the transform of the Player Bar Canvas
     public Canvas drop_canvas;
     protected Canvas drop_canvas_show;//Canvas for showing the name of dropped items upon mouse hovering
     protected bool dropped = false;
@@ -32,10 +31,27 @@ public abstract class Item : MonoBehaviour,IRecordable
     protected Canvas item_options_show;//Canvas for showing item options upon right click
     public GameObject item_image;
     public GameObject _item_image;//Reference to item image instance
-    public GameObject asset_reference;//Reference to the prefab for instantiating/destruction at runtime
     public GameObject current_reference;//Reference to the current object script works for
     protected int index;//Index for equipment
+    public GameObject asset_reference;
     protected static System.Random rand = new System.Random();
+    protected PlayerController _client_user;
+    public PlayerController client_user
+    {
+        get { return _client_user; }
+        set
+        {
+            if (value != null)
+            {
+                _client_user = value;
+                inv = _client_user.hpbar_show.GetComponentInChildren<Inventory>();
+                OnClientUserChange();
+            }
+        }
+    }
+
+    protected abstract void OnClientUserChange();
+    public abstract string GetImagePreviewString();
 
     protected virtual string GetBaseName()
     {
@@ -102,7 +118,6 @@ public abstract class Item : MonoBehaviour,IRecordable
        _item_image = Instantiate(item_image, item_image.transform.position, item_image.transform.rotation) as GameObject;
        CopyComponent<Item>(this,_item_image);//This is done due to the destruction of the actual gameobject;
        _item_image.GetComponentInChildren<ItemImage>().item_script = _item_image.GetComponent<Item>();
-       _item_image.GetComponentInChildren<ItemImage>().Item_ = asset_reference;
         inv.InsertItem(ref _item_image);//Put it in inventory
        _item_image.GetComponent<Item>()._item_image = _item_image;
     }

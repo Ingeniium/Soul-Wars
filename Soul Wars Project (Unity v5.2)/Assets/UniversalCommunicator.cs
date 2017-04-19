@@ -44,7 +44,7 @@ public partial class AIController : GenericController
                 foreach (GroupCommunicator GC in Groups)
                 {
                     NeedTable.Add(new ValueGroup(i, GC.need));
-                    print(GC.ToString() + ":" + GC.need.ToString());
+                   // print(GC.ToString() + ":" + GC.need.ToString());
                     i++;
                 }
                 if (Groups.Count > 1)

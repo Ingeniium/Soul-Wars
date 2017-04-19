@@ -1,8 +1,9 @@
 ﻿using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEngine.Networking;
 
-public class SpawnManager : MonoBehaviour {
+public class SpawnManager : NetworkBehaviour {
     public static List<SpawnManager> AllySpawnPoints = new List<SpawnManager>();
     public static List<SpawnManager> EnemySpawnPoints = new List<SpawnManager>() ;
     public static List<SpawnManager> UnclaimedSpawnPoints = new List<SpawnManager>();
@@ -11,7 +12,7 @@ public class SpawnManager : MonoBehaviour {
     public GameObject stand;
     public Vector3 spawn_direction;
 	// Use this for initialization
-	void Awake()
+    void Awake()
     {
         switch (gameObject.layer)
         {
@@ -30,14 +31,14 @@ public class SpawnManager : MonoBehaviour {
     public static IEnumerator WaitForRespawn(HealthDefence killed) 
     {
         DisableScripts(killed.gameObject);
-        if (killed.gameObject.layer == 9)
+        if (killed.gameObject.layer == 9 && PlayerController.Client.netId == killed.netId)
         {
-            PlayerFollow.Player = null;
+            (killed.Controller as PlayerController).cam_show.GetComponent<PlayerFollow>().Player = null;
             RespawnInterface.Instance.respawning = true;
             yield return new WaitForSeconds(ally_respawn_time);
             while (AllySpawnPoints.Count < 1)
             {
-               yield return new WaitForEndOfFrame();
+                yield return new WaitForEndOfFrame();
             }
             while (RespawnInterface.Instance.respawning)
             {
@@ -45,9 +46,9 @@ public class SpawnManager : MonoBehaviour {
             }
             killed.HP = killed.maxHP;
             killed.transform.position = AllySpawnPoints[RespawnInterface.Instance.spawn_index].transform.position + AllySpawnPoints[RespawnInterface.Instance.spawn_index].spawn_direction;
-            PlayerFollow.Player = killed.gameObject;
+            (killed.Controller as PlayerController).cam_show.GetComponent<PlayerFollow>().Player = killed.Controller as PlayerController;
         }
-        else
+        else if (killed.gameObject.layer == 8) 
         {
             yield return new WaitForSeconds(enemy_respawn_time);
             while (EnemySpawnPoints.Count < 1)

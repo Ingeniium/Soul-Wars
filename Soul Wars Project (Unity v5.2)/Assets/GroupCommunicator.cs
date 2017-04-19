@@ -66,13 +66,13 @@ public partial class AIController : GenericController
         {
             foreach (AIController AI in Members)
             {
-                AI.State = new AttackAllyUnits(AI);
+                AI.State = new HuntPlayers(AI);
             }
         }
 
         public override void SetMemberTarget(AIController AI)
         {
-            AI.State = new AttackAllyUnits(AI);
+            AI.State = new HuntPlayers(AI);
         }
 
         public override IEnumerator EvaluateSituation()
@@ -89,23 +89,19 @@ public partial class AIController : GenericController
         }
     }
 
-    private class Conquer : GroupCommunicator
+    private class Conquor : GroupCommunicator
     {
         public override void SetMemberTargets()
         {
             foreach (AIController AI in Members)
             {
-                AI.State = new AttackAllySpawn(AI);
-                AI.State.RespondtoAllyUnit = AI.State.BecomeAgressive;
-                AI.State.EndAllyUnitResponse = AI.State.LastSpawnNear;
+                AI.State = new Conquer(AI);
             }
         }
 
         public override void SetMemberTarget(AIController AI)
         {
-            AI.State = new AttackAllySpawn(AI);
-            AI.State.RespondtoAllyUnit = AI.State.BecomeAgressive;
-            AI.State.EndAllyUnitResponse = AI.State.LastSpawnNear;
+            AI.State = new Conquer(AI);
         }
 
         private float EvaluatePlayervEnemySpawnRatio()
@@ -133,17 +129,13 @@ public partial class AIController : GenericController
         {
             foreach (AIController AI in Members)
             {
-                AI.State = new GuardLocations(AI, AI.ptr.position, 8f);
-                AI.State.RespondtoAllyUnit = AI.State.BecomeAgressive;
-                AI.State.EndAllyUnitResponse = AI.State.OutsideJurisdiction;
+                AI.State = new Guard(AI);
             }
         }
 
         public override void SetMemberTarget(AIController AI)
         {
-            AI.State = new GuardLocations(AI, AI.ptr.position, 8f);
-            AI.State.RespondtoAllyUnit = AI.State.BecomeAgressive;
-            AI.State.EndAllyUnitResponse = AI.State.OutsideJurisdiction;
+            AI.State = new Guard(AI);
         }
     }
 }

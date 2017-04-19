@@ -4,20 +4,20 @@ using UnityEngine.UI;
 using UnityEngine.Networking;
 
 public class BulletScript : NetworkBehaviour {
-	public int upper_bound_damage;
-    public int lower_bound_damage;
+	[SyncVar] public int upper_bound_damage;
+    [SyncVar] public int lower_bound_damage;
     static System.Random rand = new System.Random();
 	public GameObject home;
     public GameObject homer;
-	public float home_radius;
-    public float home_speed;
-    public double crit_chance;
-    public float knockback_power;
+	[SyncVar] public float home_radius;
+    [SyncVar] public float home_speed;
+    [SyncVar] public double crit_chance;
+    [SyncVar] public float knockback_power;
     public Gun gun_reference;
-    public bool has_collided = false;
-    public bool legit_target = false;
+    [SyncVar] public bool has_collided = false;
+    [SyncVar] public bool legit_target = false;
     public bool homes = false;
-    public int coroutines_running = 0;
+    [SyncVar] public int coroutines_running = 0;
     private HealthDefence Target;
     public GameObject health_change_canvas;
     private GameObject health_change_show;
@@ -34,20 +34,7 @@ public class BulletScript : NetworkBehaviour {
         {
             yield return new WaitForEndOfFrame();
         }
-        gun_reference.client_user.CmdSpawnHomingDevice(transform.position, transform.rotation);
-        StartCoroutine(WaitForNetworkDestruction());
-    }
-
-    IEnumerator WaitForNetworkDestruction()
-    {
-        yield return new WaitForSeconds(3f);
-        gun_reference.client_user.CmdDestroyObjectOnServer(netId);
-    }
-
-    public void InitHomingDevice(NetworkInstanceId ID)
-    {
-        homer = ClientScene.FindLocalObject(ID);
-        homer.transform.parent = transform;
+        homer = transform.GetChild(0).gameObject;
         homer.GetComponent<SphereCollider>().radius = home_radius;
         HomingScript script = homer.GetComponent<HomingScript>();
         script.home_speed = home_speed;
@@ -57,12 +44,24 @@ public class BulletScript : NetworkBehaviour {
         {
             homer.GetComponent<HomingScript>().enabled = true;
         }
+        StartCoroutine(WaitForNetworkDestruction());
     }
 
+    IEnumerator WaitForNetworkDestruction()
+    {
+        yield return new WaitForSeconds(3f);
+        if (isServer)
+        {
+            NetworkServer.Destroy(gameObject);
+        }
+    }
+
+    
 	void OnCollisionEnter (Collision hit) 
     {
         try
         {
+            Debug.Log("Hit");
             StartCoroutine(Damage(hit));
         }
         catch (System.NullReferenceException e)
@@ -72,18 +71,25 @@ public class BulletScript : NetworkBehaviour {
                 Destroy(health_change_show.gameObject);
             }
             StopAllCoroutines();
-            gun_reference.client_user.CmdDestroyObjectOnServer(netId);//Always destroy the object upon any detectable impact upon an exception           
+            PlayerController.Client.CmdDestroy(gameObject);
+            //Always destroy the object upon any detectable impact upon an exception           
         }
         
     }
 
-    IEnumerator Damage( Collision hit)
+   
+    IEnumerator Damage(Collision hit)
     {
+        Debug.Log("Called");
         Target = hit.gameObject.GetComponent<HealthDefence>();
         /*If the target still exist and doesn't even have this script,
          Don't bother executing the rest of the code.As for the exception,it is there
          in the event the object "dies" midway execution,presumably from another bullet.*/
         has_collided = true;
+        /*If a spawn point is hit by enemy,just run on client.*/
+        /*If an enemy is hit(for enemy guns have no client user set),test whether the code is
+         running on the same client as the one who shot the bullet(for number UI to show up)
+         *If a player is hit,run the code only on whoever got hit*/
         if (Target != null)
         {
             legit_target = true;
@@ -100,7 +106,14 @@ public class BulletScript : NetworkBehaviour {
                     crit = true;
                     d *= 3;
                 }
+                /*If a spawn point is hit by enemy,just run on everyone.*/
+                /*If an enemy is hit(for enemy guns have no client user set),test whether the code is
+                 running on the same client as the one who shot the bullet(for number UI to show up)
+                 *If a player is hit,run the code only on whoever got hit*/
                 //Note that whether the bullet crit or not changes the color of the damage numbers and block indication
+              if(Target.type == HealthDefence.Type.Spawn_Point || ((gun_reference.client_user && gun_reference.client_user.netId == PlayerController.Client.netId) ||
+            (PlayerController.Client.netId == Target.netId || (Target.Controller &&  PlayerController.Client.netId == Target.Controller.netId))))
+              {
                 health_change_show = Instantiate(health_change_canvas, hit.gameObject.transform.position + new Vector3(0, 0, 1), Quaternion.Euler(90, 0, 0)) as GameObject;
                 if (Target.type != HealthDefence.Type.Shield)
                 {
@@ -126,6 +139,7 @@ public class BulletScript : NetworkBehaviour {
                         health_change_show.GetComponentInChildren<Text>().color = Color.grey;
                     }
                 }
+              }
                 if (Target.has_exp)
                 {
                     gun_reference.experience += d * Target.exp_rate;
@@ -136,7 +150,7 @@ public class BulletScript : NetworkBehaviour {
                     if (knockback > 0)
                     {
                         Target.rb.AddForce(new Vector3(transform.forward.x, 0, transform.forward.z) * knockback, ForceMode.Impulse);
-                        Target.StartCoroutine(Stun(Target, knockback));
+                        //Target.StartCoroutine(Stun(Target, knockback));
                     }
                 }
                 AIController AI = Target.Controller as AIController;
@@ -144,9 +158,9 @@ public class BulletScript : NetworkBehaviour {
                 {
                     AI.UpdateAggro(d, gun_reference.client_user.netId);
                 }
-                gun_reference.client_user.CmdActivateFuncOnServer(Target.netId, "HealthDefence", "ChangeHP",new string[]{(-d).ToString()},"int");
+                Target.HP -= d;
                 Destroy(health_change_show, 1f);
-                gun_reference.client_user.CmdDestroyObjectOnServer(netId);
+                PlayerController.Client.CmdDestroy(gameObject);
             
 
         }
@@ -155,7 +169,7 @@ public class BulletScript : NetworkBehaviour {
             /*Before destruction,Stop all coroutines(the gun_abilities operating on this instance)
              to prevent exceptions from those coroutines*/
             StopAllCoroutines();
-            gun_reference.client_user.CmdDestroyObjectOnServer(netId);//Destroy object immediately if null
+            PlayerController.Client.CmdDestroy(gameObject);
         }
     }
 

@@ -10,12 +10,6 @@ public class HomingScript : MonoBehaviour
     private bool homing = false;//Whether it is currently homing on a target
     public float home_speed;
    
-    void Start()
-    {
-        prb = GetComponentInParent<Rigidbody>();
-        ptr = transform.parent;/*After many hours of frusration,I found that GetComponentInParent<Transform>()
-        returned THIS object's transform,not the bullet's*/
-    }
 
     void OnTriggerEnter(Collider Target)
     {

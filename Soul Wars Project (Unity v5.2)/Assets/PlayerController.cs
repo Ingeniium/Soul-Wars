@@ -6,11 +6,13 @@ using System.Collections.Generic;
 using System.Reflection;
 
 public class PlayerController : GenericController {
-    public int player_index;
     private Vector3 total_move;
+    public static PlayerController Client;
+    private bool shooting = false;
     public Gun gun;//The Equipped weapon that the player currently wields
     public List<Gun> equipped_weapons = new List<Gun>();
     public static List<uint> PlayerIDList = new List<uint>();
+
     public int max_weapon_num
     {
         get { return _max_weapon_num; }
@@ -76,7 +78,15 @@ public class PlayerController : GenericController {
     private Canvas cooldown_canvas_show;
     private Canvas not_homing;
     public Camera cam;
-    private Camera cam_show;
+    public Camera cam_show
+    {
+        get { return _cam_show; }
+        private set
+        {
+            _cam_show = value;
+        }
+    }
+    private Camera _cam_show;
     public bool equip_action = true;
     public Canvas hpbar;
     public Canvas hpbar_show;
@@ -85,8 +95,7 @@ public class PlayerController : GenericController {
     void Awake()
     {
  
-            cam_show = Instantiate(cam, transform.position + new Vector3(0, 15f, 0), cam.transform.rotation) as Camera;
-            cam_show.GetComponent<PlayerFollow>().Player_ = this;
+            cam_show = Instantiate(cam) as Camera;
             if (cam_show.GetComponent<AudioListener>())
             {
                 Destroy(cam_show.GetComponent<AudioListener>());
@@ -96,11 +105,19 @@ public class PlayerController : GenericController {
             hpbar_show = Instantiate(hpbar) as Canvas;
             hpbar_show.worldCamera = cam_show;
             PlayerIDList.Add(netId.Value);
+            cam_show.GetComponent<PlayerFollow>().Player = this;
+                      
+            
     }
 
 
 	void Start() 
     {
+
+        if (netId.Value == 3)
+        {
+            CmdEnemySpawn(SpawnManager.EnemySpawnPoints[0].transform.position + SpawnManager.EnemySpawnPoints[0].spawn_direction * 3);
+        }
         if (!isLocalPlayer)
         {
             cam_show.enabled = false;
@@ -108,10 +125,17 @@ public class PlayerController : GenericController {
         }
         else
         {
+            Client = this;
             shield_collider = Shield.GetComponent<BoxCollider>();
             rb = GetComponent<Rigidbody>();
             tr = GetComponent<Transform>();
-            tr.position = SpawnManager.AllySpawnPoints[0].transform.position + SpawnManager.AllySpawnPoints[0].spawn_direction;
+            Shield.GetComponent<HealthDefence>().Controller = this;
+            if (cam_show.enabled)
+            {
+                tr.position = SpawnManager.AllySpawnPoints[0].transform.position + SpawnManager.AllySpawnPoints[0].spawn_direction;
+                cam_show.transform.position = tr.position + new Vector3(0, 15, 0);
+                cam_show.transform.rotation = cam.transform.rotation;
+            }
             gun = Gun.GetComponent<Gun>();
             equipped_weapons.Add(gun);
             max_weapon_num = 2;
@@ -134,53 +158,36 @@ public class PlayerController : GenericController {
                 gun._item_image.GetComponentInChildren<RectTransform>().sizeDelta *= 2;
                 gun._item_image.transform.parent = gun.weapons_bar.transform;
 
-            }  
+            }
+            
         }
         
 	}
+
     
     [Command]
+    void CmdEnemySpawn(Vector3 pos)
+    {
+        GameObject Enemy = Instantiate(Resources.Load("Dummy"),pos, Quaternion.identity) as GameObject;
+        NetworkServer.Spawn(Enemy);   
+    }
+
+    [Command]
     void CmdShoot(Vector3 pos,Quaternion rot)
-    { 
-        GameObject g = Instantiate(Resources.Load("Bullet"),pos,rot) as GameObject;
+    {
+        GameObject g = Instantiate(Resources.Load("Bullet"), pos, rot) as GameObject;      
         NetworkServer.SpawnWithClientAuthority(g,connectionToClient);
-        RpcShoot(g.GetComponent<NetworkIdentity>().netId);
+        RpcShoot(g);
     }
 
-    [Command]
-    public void CmdSpawnHomingDevice(Vector3 pos, Quaternion rot)
-    {
-        GameObject h = Instantiate(Resources.Load("HomingDevice"), pos, rot) as GameObject;
-        NetworkServer.SpawnWithClientAuthority(h, connectionToClient);
-        RpcSendHomingDeviceId(h.GetComponent<NetworkIdentity>().netId);
-    }
-
-    [Command]
-    public void CmdDestroyObjectOnServer(NetworkInstanceId ID)
-    {
-        GameObject g = NetworkServer.FindLocalObject(ID);
-        NetworkServer.Destroy(g);
-    }
 
     [ClientRpc]
-    void RpcSendHomingDeviceId(NetworkInstanceId ID)
-    {
-        try
-        {
-            gun.bullet.GetComponent<BulletScript>().InitHomingDevice(ID);
-        }
-        catch (System.Exception e)
-        {
-            return;
-        }
-    }
-
-    [ClientRpc]
-    void RpcShoot(NetworkInstanceId ID)
+    void RpcShoot(GameObject g)
     {
             try
             {
-                gun.Shoot(ID);
+                gun.Shoot(g);
+                shooting = false;
             }
             catch (System.NullReferenceException e)
             {
@@ -189,53 +196,40 @@ public class PlayerController : GenericController {
           
     }
 
-    [Command]
-    public void CmdActivateFuncOnServer(NetworkInstanceId ID,string class_string,string arg_func_string,string[] args,string arg_class_string)
+    IEnumerator WaitToApplyGunAbilities()
     {
-        RpcActivateFuncOnAllClients(ID, class_string, arg_func_string,args,arg_class_string);
+        while (shooting)
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        gun.ApplyGunAbilities();
+    }
+
+    [Command]
+    public void CmdDestroy(GameObject g)
+    {
+        NetworkServer.Destroy(g);
+    }
+
+    [Command]
+    public void CmdWaitForRespawn(GameObject g)
+    {
+        RpcWaitForRespawn(g);
     }
 
     [ClientRpc]
-    public void RpcActivateFuncOnAllClients(NetworkInstanceId ID, string class_string, string arg_func_string,string[] args,string arg_class_string)
+    void RpcWaitForRespawn(GameObject g)
     {
-        GameObject g = ClientScene.FindLocalObject(ID);
-        System.Type t = System.Type.GetType(class_string);
-        Component c = g.GetComponent(t);
-        MethodInfo m = t.GetMethod(arg_func_string);
-        object[] array = null;
-        switch (arg_class_string)
-        {
-            case "int":
-                {
-                    array = new object[args.Length];
-                    int i = 0;
-                    foreach (string s in args)
-                    {
-                        array[i] = System.Int32.Parse(s);
-                        i++;
-                    }
-                    break;
-                }
-            case "float":
-                {
-                    array = new object[args.Length];
-                    int i = 0;
-                    foreach (string s in args)
-                    {
-                        array[i] = System.Single.Parse(s);
-                        i++;
-                    }
-                    break;
-                }
-            case null :
-                break;            
-        }
-       // System.Convert.ChangeType(args, arg_type); - Doesn't work
-        m.Invoke(c,array);
+        StartCoroutine(SpawnManager.WaitForRespawn(g.GetComponent<HealthDefence>()));
     }
 
-    
-   
+
+    [Command]
+    void CmdAssignAuthority(NetworkIdentity Id)
+    {
+        Id.AssignClientAuthority(connectionToClient);
+    }
+
 	void Update() 
     {
         if (!isLocalPlayer || !equip_action)
@@ -248,7 +242,9 @@ public class PlayerController : GenericController {
             {
                 cooldown_canvas_show = Instantiate(cooldown_canvas, gun._item_image.transform.position + new Vector3(.25f, 0, 0), gun._item_image.transform.rotation) as Canvas;
                 cooldown_canvas_show.transform.SetParent(gun._item_image.transform);
-                CmdShoot(gun.barrel_end.position,gun.transform.rotation);
+                shooting = true;
+                StartCoroutine(WaitToApplyGunAbilities());
+                CmdShoot(gun.barrel_end.position, gun.transform.rotation);
                 StartCoroutine(Cooldown.NumericalCooldown(cooldown_canvas_show, gun.reload_time));
                 
             }

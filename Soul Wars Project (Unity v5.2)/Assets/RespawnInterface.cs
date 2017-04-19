@@ -33,7 +33,7 @@ public class RespawnInterface : MonoBehaviour
             {
                 _spawn_index = value;
             }
-            PlayerFollow.camera.transform.position = SpawnManager.AllySpawnPoints[spawn_index].transform.position + PlayerFollow.offset;
+            PlayerController.Client.cam_show.transform.position = SpawnManager.AllySpawnPoints[spawn_index].transform.position + PlayerController.Client.cam_show.GetComponent<PlayerFollow>()._offset;
         }
     }
     public bool respawning
@@ -44,7 +44,7 @@ public class RespawnInterface : MonoBehaviour
             if (value == true)
             {
                 wait_for_respawn_show = Instantiate(wait_for_respawn, wait_for_respawn.transform.position, wait_for_respawn.transform.rotation) as Canvas;
-                wait_for_respawn_show.worldCamera = PlayerFollow.camera;
+                wait_for_respawn_show.worldCamera = PlayerController.Client.cam_show;
                 StartCoroutine(Cooldown.NumericalCooldown(wait_for_respawn_show, SpawnManager.ally_respawn_time));
             }
             enabled = value;
@@ -58,7 +58,7 @@ public class RespawnInterface : MonoBehaviour
 
     void Update()
     {
-        if (SpawnManager.AllySpawnPoints.Count == 0 && PlayerFollow.Player == null)
+        if (SpawnManager.AllySpawnPoints.Count == 0 && PlayerController.Client.HP.HP == 0)
         {
             if (wait_for_respawn_show)
             {
@@ -69,7 +69,7 @@ public class RespawnInterface : MonoBehaviour
                 Destroy(choose_respawn_location_show.gameObject);
             }
             game_over_show = Instantiate(game_over, game_over.transform.position, game_over.transform.rotation) as Canvas;
-            game_over_show.worldCamera = PlayerFollow.camera;
+            game_over_show.worldCamera = PlayerController.Client.cam_show;
             enabled = false;
         }
         if (!wait_for_respawn_show && !choose_respawn_location_show)
@@ -77,8 +77,8 @@ public class RespawnInterface : MonoBehaviour
             if (SpawnManager.AllySpawnPoints.Count > 1)
             {
                 choose_respawn_location_show = Instantiate(choose_respawn_location, choose_respawn_location.transform.position, choose_respawn_location.transform.rotation) as Canvas;
-                choose_respawn_location_show.worldCamera = PlayerFollow.camera;
-                PlayerFollow.camera.transform.position = SpawnManager.AllySpawnPoints[spawn_index].transform.position + PlayerFollow.offset;
+                choose_respawn_location_show.worldCamera = PlayerController.Client.cam_show;
+                PlayerController.Client.cam_show.transform.position = SpawnManager.AllySpawnPoints[spawn_index].transform.position + PlayerFollow.offset;
                 Button[] buttons = choose_respawn_location_show.GetComponentsInChildren<Button>();
                 spawn_index_text = choose_respawn_location_show.GetComponentInChildren<Text>();
                 spawn_index_text.text = spawn_index.ToString();

@@ -2,6 +2,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEngine.Networking;
 
 public class Strike : Gun {
     private readonly static string[] gun_ability_names = new string[3] { "Marksman", "Sniper", "Drone" };
@@ -50,7 +51,7 @@ public class Strike : Gun {
             yield return null;
         }
     }
-
+    
     protected override string ClassGunAbilityNames(int index)
     {
         return gun_ability_names[index];
@@ -105,5 +106,10 @@ public class Strike : Gun {
         drop_canvas = Resources.Load("Drop Item Name Box") as Canvas;
         item_options = Resources.Load("WeaponOptions") as Canvas;
         Bullet = Resources.Load("Bullet") as GameObject;
+    }
+
+    public override string GetImagePreviewString()
+    {
+        return "StrikeImage";
     }
 }

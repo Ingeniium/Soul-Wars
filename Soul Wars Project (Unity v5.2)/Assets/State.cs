@@ -19,6 +19,7 @@ public partial class AIController : GenericController
              determined.*/
             if (!Target)
             {
+                
                 Unit.UpdateAggro();
                 return;
             }
@@ -44,10 +45,15 @@ public partial class AIController : GenericController
 
         protected IEnumerator GenerateGradualThreat(Transform tr, NetworkInstanceId ID, int amount = 5)
         {
-            while (tr != null && Vector3.Distance(Unit.ptr.position, tr.position) < Unit.enemy_attack_detection.radius)
+            //Debug.Log(Vector3.Distance(tr.position, Unit.ptr.position).ToString());
+            /*Interestingly enough,Unity records that the distance is actually GREATER than the actual radius 
+             whenever spawns enter the radius.Hence,w/o a subtraction of atleast ~.6f,the coroutine will never
+             really function how it's supposed to.*/
+            while (tr != null && Vector3.Distance(Unit.ptr.position, tr.position) - .75f < Unit.enemy_attack_detection.radius)
             {
                 Unit.UpdateAggro(amount, ID, false);
                 yield return new WaitForSeconds(1);
+               
             }
         }
 
@@ -112,11 +118,12 @@ public partial class AIController : GenericController
                 }
             }
             /*A Spawn Point in the radius gradually gain threat at a rate of
-             5 units per second*/
+             10 units per second*/
             else if (target.type == HealthDefence.Type.Spawn_Point)
             {
-                Unit.StartCoroutine(GenerateGradualThreat(target.transform,target.netId));
+                Unit.StartCoroutine(GenerateGradualThreat(target.transform,target.netId,10));
             }
+           
         }
 
         public Conquer(AIController AI) : base(AI) { }
@@ -135,9 +142,12 @@ public partial class AIController : GenericController
             foreach (uint u in PlayerController.PlayerIDList)
             {
                 /*Index information is stored in order to refer to the same SpawnManager*/
-                p = ClientScene.FindLocalObject(new NetworkInstanceId(u));
-                Distances.Add(new ValueGroup(i, Vector3.Distance(Unit.ptr.position, p.transform.position)));
-                i++;
+                if (u != 100)
+                {
+                    p = ClientScene.FindLocalObject(new NetworkInstanceId(u));
+                    Distances.Add(new ValueGroup(i, Vector3.Distance(Unit.ptr.position, p.transform.position)));
+                    i++;
+                }
             }
             /*Sort from closest to farthest from unit*/
             Distances.Sort(delegate(ValueGroup lhs, ValueGroup rhs)
