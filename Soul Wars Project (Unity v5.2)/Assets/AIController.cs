@@ -157,9 +157,12 @@ public partial class AIController : GenericController {
             {
                 distances.Add(new ValueGroup(i, Vector3.Distance(ptr.position, bullet_colliders[i].gameObject.transform.position)));
             }
-            catch (System.Exception e)
+            catch (System.Exception e) 
             {
-                distances.RemoveAt(i);
+                if (distances.Count > i)
+                {
+                    distances.RemoveAt(i);
+                }
             }
         }     
         distances.Sort(delegate(ValueGroup lhs, ValueGroup rhs)

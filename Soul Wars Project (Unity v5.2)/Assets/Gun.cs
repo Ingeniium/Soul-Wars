@@ -11,7 +11,7 @@ using System.Linq;
 using System;
 
 public abstract partial class Gun : Item {
-    protected GameObject GunLevelUp;//Reference to the table used for getting gun abilities
+    public GameObject GunLevelUp;//Reference to the table used for getting gun abilities
     public GameObject weapons_bar;//Reference to the weapons bar
 	public GameObject Bullet;
 	public GameObject bullet;
@@ -67,10 +67,12 @@ public abstract partial class Gun : Item {
     protected List<string> prefixes = new List<string>();
     protected List<string> suffixes = new List<string>();
     protected string last_suffix = "";
-   
-    protected override void OnClientUserChange()    {        weapons_bar = _client_user.hpbar_show.GetComponentsInChildren<LayoutGroup>()[1].gameObject;
-        RectTransform[] rects = _client_user.hpbar_show.GetComponentsInChildren<RectTransform>();
-        GunLevelUp = rects[rects.Count() - 1].gameObject;    }
+
+    protected override void OnClientUserChange()    {        weapons_bar = _client_user.hpbar_show.GetComponentInChildren<VerticalLayoutGroup>().gameObject;
+        GunLevelUp = client_user.hpbar_show.GetComponentInChildren<MenuDisplay>().
+                    Guntable.gameObject;    }
+
+    
 
     public bool HasReloaded()
     {
@@ -170,7 +172,7 @@ public abstract partial class Gun : Item {
     public override void PrepareItemForUse()
     {
        
-        GameObject prev_Gun = Player.Gun;
+        GameObject prev_Gun = PlayerController.Client.Gun;
         if (prev_Gun == null)
         {
             throw new System.NullReferenceException("It looks like prev_Gun wasn't set properly after destruction");
@@ -179,7 +181,7 @@ public abstract partial class Gun : Item {
         {
                _item_image.transform.SetParent(weapons_bar.transform);     
                 GameObject Gun = Instantiate(asset_reference, prev_Gun.transform.position, prev_Gun.transform.rotation) as GameObject;
-                Gun.transform.SetParent(Player.gameObject.transform);
+                Gun.transform.SetParent(PlayerController.Client.gameObject.transform);
                 CopyComponent<Gun>(this, Gun);
                 Gun gun = Gun.GetComponent<Gun>();
                 _item_image.GetComponentInChildren<ItemImage>().item_script = gun;
@@ -193,23 +195,29 @@ public abstract partial class Gun : Item {
                 {
                     inv.RemoveItem(ref _item_image);
                 }
-            
-            int i = Player.equipped_weapons.IndexOf(null);
-            /*If there isn't an empty slot within equipped weapons, assign the newly instanced gun
-            to the index of the gun which the Player is currently wielding,sending the previous weapon
-            to the Inventory by storing the Item Image*/
-            if (i == -1)
-            {
-                gun.EquipAtSlot(Player.main_weapon_index);
-            }
-            /*Otherwise,disable rendering of the newly created instance and put it somewhere
-             in which there is an empty slot*/
-            else
-            {
-                gun.current_reference.GetComponent<Renderer>().enabled = false;
-                Player.equipped_weapons[i] = gun;
-                gun.index = i;
-            }
+                if (gun.index > -1)
+                {
+                    gun.EquipAtSlot(gun.index);
+                }
+                else
+                {
+                    int i = PlayerController.Client.equipped_weapons.IndexOf(null);
+                    /*If there isn't an empty slot within equipped weapons, assign the newly instanced gun
+                    to the index of the gun which the Player is currently wielding,sending the previous weapon
+                    to the Inventory by storing the Item Image*/
+                    if (i == -1)
+                    {
+                        gun.EquipAtSlot(PlayerController.Client.main_weapon_index);
+                    }
+                    /*Otherwise,disable rendering of the newly created instance and put it somewhere
+                     in which there is an empty slot*/
+                    else
+                    {
+                        gun.current_reference.GetComponent<Renderer>().enabled = false;
+                        PlayerController.Client.equipped_weapons[i] = gun;
+                        gun.index = i;
+                    }
+                }
             Destroy(this);
             
         }
@@ -219,7 +227,7 @@ public abstract partial class Gun : Item {
         item_options_show = Instantiate(item_options, _item_image.transform.position + new Vector3(0, 2, 2), item_options.transform.rotation) as Canvas;
         item_options_show.GetComponent<HPbar>().Object = _item_image.gameObject;
         Button[] buttons = item_options_show.GetComponentsInChildren<Button>();
-        for (int i = buttons.Length - 3; i > Player.max_weapon_num; i--)
+        for (int i = buttons.Length - 3; i > PlayerController.Client.max_weapon_num; i--)
         {
             //Adjust the location of the Allocate LvlUP points button
             buttons[buttons.Length - 2].transform.localPosition = buttons[buttons.Length - 1].transform.localPosition;
@@ -238,7 +246,7 @@ public abstract partial class Gun : Item {
                     //print("int i is " + i.ToString());//to here
                     EquipAtSlot(temp);
                     _item_image.GetComponentInChildren<ItemImage>().option_showing = false;
-                    Item.Player.equip_action = true;
+                    PlayerController.Client.equip_action = true;
                     if (item_options_show)
                     {
                         Destroy(item_options_show.gameObject);
@@ -256,12 +264,12 @@ public abstract partial class Gun : Item {
         
         buttons[buttons.Length - 2].onClick.AddListener(delegate 
         {
-            if (Player.equipped_weapons.Count > 1)//Can't drop a weapon if its the only one you have
+            if (PlayerController.Client.equipped_weapons.Count > 1)//Can't drop a weapon if its the only one you have
             {
                 DropItem();
             }
             _item_image.GetComponentInChildren<ItemImage>().option_showing = false;
-            Item.Player.equip_action = true;
+            PlayerController.Client.equip_action = true;
             if (item_options_show)
             {
                 Destroy(item_options_show.gameObject);
@@ -271,7 +279,7 @@ public abstract partial class Gun : Item {
         buttons[buttons.Length - 1].onClick.AddListener(delegate
         {
             BringUpLevelUpTable();
-            Item.Player.equip_action = true;
+            PlayerController.Client.equip_action = true;
             _item_image.GetComponentInChildren<ItemImage>().option_showing = false;
             if (item_options_show)
             {
@@ -287,30 +295,31 @@ public abstract partial class Gun : Item {
 
    
 
-    protected void EquipAtSlot(int Index)
+    public void EquipAtSlot(int Index)
     {
-            if (!Player.equipped_weapons[Index] && index != 1)//equipped weapons cant be assigned to an empty slot
+        if (!PlayerController.Client.equipped_weapons[Index] && index != 1)//equipped weapons cant be assigned to an empty slot
             {
                  return;
             }
-            else if (Player.equipped_weapons[Index])//if there's already equipped gun in slot
+            else if (PlayerController.Client.equipped_weapons[Index])//if there's already equipped gun in slot
             {
-                Player.equipped_weapons[Index].index = -1;//Secondhand indicator that it isn't equipped by a player
-                inv.InsertItem(ref Player.equipped_weapons[Index]._item_image);//Put item in inventory
+                PlayerController.Client.equipped_weapons[Index].index = -1;//Secondhand indicator that it isn't equipped by a player
+                inv.InsertItem(ref PlayerController.Client.equipped_weapons[Index]._item_image);//Put item in inventory
                 /*transfer the script from the weapon to the item image before destroying the weapon instance*/
-                CopyComponent<Gun>(Player.equipped_weapons[Index].current_reference.GetComponent<Gun>(), Player.equipped_weapons[Index]._item_image);
-                Player.equipped_weapons[Index]._item_image.GetComponentInChildren<ItemImage>().item_script = Player.equipped_weapons[Index]._item_image.GetComponent<Gun>();
-                Destroy(Player.equipped_weapons[Index].current_reference);
+                CopyComponent<Gun>(PlayerController.Client.equipped_weapons[Index].current_reference.GetComponent<Gun>(), PlayerController.Client.equipped_weapons[Index]._item_image);
+                PlayerController.Client.equipped_weapons[Index]._item_image.GetComponentInChildren<ItemImage>().item_script = PlayerController.Client.equipped_weapons[Index]._item_image.GetComponent<Gun>();
+                Destroy(PlayerController.Client.equipped_weapons[Index].current_reference);
             }
-            Player.equipped_weapons[index] = null;
+            PlayerController.Client.equipped_weapons[index] = null;
             index = Index;
-            if (Index == Player.main_weapon_index)//Set it up to be main gun if the index is equivalent to the current equipped gun
+            if (Index == PlayerController.Client.main_weapon_index)//Set it up to be main gun if the index is equivalent to the current equipped gun
             {
-                Player.gun = this;
-                Player.Gun = current_reference;
+                PlayerController.Client.gun = this;
+                PlayerController.Client.Gun = current_reference;
+                //PlayerController.Client.GetComponent<NetworkTransformChild>().target = current_reference.transform;
                 current_reference.GetComponent<Renderer>().enabled = true;
             }
-            Player.equipped_weapons[Index] = this;
+            PlayerController.Client.equipped_weapons[Index] = this;
      }
 
     public override XElement RecordValuesToSaveFile()

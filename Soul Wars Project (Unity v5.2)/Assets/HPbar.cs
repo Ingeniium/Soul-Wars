@@ -15,10 +15,10 @@ public class HPbar : MonoBehaviour {
         {
             transform.position = Object.transform.position + offset;
         }
-        else
+      /*  else
         {
             Destroy(gameObject);
-        }
+        }*/
 
 	}
 	

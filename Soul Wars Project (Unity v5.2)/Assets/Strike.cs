@@ -103,8 +103,11 @@ public class Strike : Gun {
         home_speed = 5f;
         home_radius = 1.5f;
         homes = true;
-        drop_canvas = Resources.Load("Drop Item Name Box") as Canvas;
-        item_options = Resources.Load("WeaponOptions") as Canvas;
+        /*Resources.Load seems to only work for getting prefabs as only game objects.*/
+        GameObject g = Resources.Load("Drop Item Name Box") as GameObject;
+        drop_canvas = g.GetComponent<Canvas>();
+        g = Resources.Load("WeaponOptions") as GameObject;
+        item_options = g.GetComponent<Canvas>();
         Bullet = Resources.Load("Bullet") as GameObject;
     }
 

@@ -35,16 +35,17 @@ public abstract class Item : NetworkBehaviour,IRecordable
     protected int index;//Index for equipment
     public GameObject asset_reference;
     protected static System.Random rand = new System.Random();
-    protected PlayerController _client_user;
+    public PlayerController _client_user;//this being protected actually causes a null ref error in bulletscript
     public PlayerController client_user
     {
         get { return _client_user; }
         set
         {
-            if (value != null)
+            _client_user = value;
+            if (_client_user != null)
             {
-                _client_user = value;
-                inv = _client_user.hpbar_show.GetComponentInChildren<Inventory>();
+                inv = _client_user.hpbar_show.GetComponentInChildren<MenuDisplay>().
+                    Menu.GetComponent<Inventory>();
                 OnClientUserChange();
             }
         }
@@ -63,6 +64,10 @@ public abstract class Item : NetworkBehaviour,IRecordable
         if (rand.NextDouble() <= chance)
         {
             GameObject item = Instantiate(current_reference, current_reference.transform.position, current_reference.transform.rotation) as GameObject;
+            if (isServer)
+            {
+                NetworkServer.Spawn(item);
+            }
             Item script = item.GetComponent<Item>();
             script.unit_reference = null;
             item.layer = 0;
@@ -113,8 +118,9 @@ public abstract class Item : NetworkBehaviour,IRecordable
 
     protected void RetrieveItem()//Used for picking items off ground
     {
+
         //Create and set a respective item image object
-        unit_reference = Player;
+        unit_reference = PlayerController.Client;
        _item_image = Instantiate(item_image, item_image.transform.position, item_image.transform.rotation) as GameObject;
        CopyComponent<Item>(this,_item_image);//This is done due to the destruction of the actual gameobject;
        _item_image.GetComponentInChildren<ItemImage>().item_script = _item_image.GetComponent<Item>();
@@ -141,13 +147,27 @@ public abstract class Item : NetworkBehaviour,IRecordable
         {
             if (dropped)
             {
-                in_inventory = true;
-                RetrieveItem();
-                if (drop_canvas_show)
+                try
                 {
-                    Destroy(drop_canvas_show.gameObject);
+                    in_inventory = true;
+                    RetrieveItem();
+                    if (drop_canvas_show)
+                    {
+                        Destroy(drop_canvas_show.gameObject);
+                    }
+                    PlayerController.Client.CmdDestroy(gameObject);
                 }
-                Destroy(gameObject);
+                catch (System.Exception e)
+                {
+                    if (_item_image)
+                    {
+                        Destroy(_item_image);
+                    }
+                    if (drop_canvas_show)
+                    {
+                        Destroy(drop_canvas_show.gameObject);
+                    }
+                }
             }
             
            

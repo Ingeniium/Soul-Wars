@@ -1,53 +1,34 @@
-﻿using UnityEngine;
+﻿
+using UnityEngine;
 using UnityEngine.UI;
-using UnityEditor;
 using System.Collections;
 using System;
 
 public class ItemImage : MonoBehaviour {
     private Image this_pic;
-    public GameObject Item_
-    {
-        get { return _Item; }
-        set
-        {
-            _Item = value;
-            while (preview == null)
-            {
-                this_pic = GetComponent<Image>();
-                Texture2D tex = AssetPreview.GetAssetPreview(value) as Texture2D;
-                try
-                {
-                    preview = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(.5f, .5f));
-                }
-                catch (NullReferenceException exception) { preview = null; }
-                this_pic.sprite = preview;
-            }
-        }
-    }
-    private GameObject _Item;
     private Sprite preview;
     public Item item_script
     {
         get { return _item_script; }
         set
         {
-            if (value is Gun)
-            {
-                _item_script = value as Gun;
-            }
-            else
-            {
-                _item_script = value;
-            }
+            _item_script = value;
+            this_pic = GetComponent<Image>();
+            Texture2D tex = Resources.Load(_item_script.GetImagePreviewString(), typeof(Texture2D)) as Texture2D;
+            preview = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(.5f, .5f));
+            this_pic.sprite = preview;
         }                       
     }
     public Item _item_script;
     public Canvas item_description_canvas;
     private Canvas item_descritption_canvas_show;
     public bool option_showing = false;
-	
-	
+
+    void Start()
+    {
+        GetComponent<BoxCollider>().center = Vector3.zero;
+    }
+
     void OnMouseEnter()
     {
        item_descritption_canvas_show = Instantiate(item_description_canvas,transform.position + new Vector3(1.5f,0,1.75f), item_description_canvas.transform.rotation) as Canvas;
@@ -67,7 +48,7 @@ public class ItemImage : MonoBehaviour {
     }
     void OnMouseOver()
     {
-        Item.Player.equip_action = false;
+          PlayerController.Client.equip_action = false;
          if (Input.GetMouseButton(1) && option_showing == false)
           {
                 item_script.Options();
@@ -78,7 +59,7 @@ public class ItemImage : MonoBehaviour {
 
     void OnMouseExit()
     {
-        Item.Player.equip_action = true;
+        PlayerController.Client.equip_action = true;
         if (item_descritption_canvas_show)
         {
             Destroy(item_descritption_canvas_show.gameObject);

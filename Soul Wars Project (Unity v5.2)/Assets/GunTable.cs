@@ -23,14 +23,13 @@ public abstract partial class Gun : Item
             set
             {
                 _gun_for_consideration = value;
-                if (GunTable.buttons != null)
-                {
-                    SetGunTable();
-                }
-                else
+                if (GunTable.buttons == null)
                 {
                     InitGunTable();
                 }
+
+                SetGunTable();
+                
             }
         }
         private static Gun _gun_for_consideration;

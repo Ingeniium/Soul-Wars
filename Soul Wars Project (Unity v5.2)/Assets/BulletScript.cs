@@ -44,43 +44,48 @@ public class BulletScript : NetworkBehaviour {
         {
             homer.GetComponent<HomingScript>().enabled = true;
         }
-        StartCoroutine(WaitForNetworkDestruction());
+        StartCoroutine(WaitForNetworkDestruction(gameObject));
     }
 
-    IEnumerator WaitForNetworkDestruction()
+    IEnumerator WaitForNetworkDestruction(GameObject g,float num = 3f)
     {
-        yield return new WaitForSeconds(3f);
+        yield return new WaitForSeconds(num);
         if (isServer)
         {
-            NetworkServer.Destroy(gameObject);
+            NetworkServer.Destroy(g);
         }
     }
 
-    
-	void OnCollisionEnter (Collision hit) 
+    [ServerCallback]
+    void OnCollisionEnter(Collision hit)
     {
         try
         {
-            Debug.Log("Hit");
             StartCoroutine(Damage(hit));
         }
         catch (System.NullReferenceException e)
         {
-            if (health_change_show)
-            {
-                Destroy(health_change_show.gameObject);
-            }
-            StopAllCoroutines();
-            PlayerController.Client.CmdDestroy(gameObject);
+            RpcStopAllCoroutines();
+            NetworkServer.Destroy(gameObject);
             //Always destroy the object upon any detectable impact upon an exception           
         }
-        
+    }
+
+    [ClientRpc]
+    void RpcStopAllCoroutines()
+    {
+        if (health_change_show)
+        {
+            Destroy(health_change_show.gameObject);
+        }
+        StopAllCoroutines();
     }
 
    
+
+    
     IEnumerator Damage(Collision hit)
     {
-        Debug.Log("Called");
         Target = hit.gameObject.GetComponent<HealthDefence>();
         /*If the target still exist and doesn't even have this script,
          Don't bother executing the rest of the code.As for the exception,it is there
@@ -106,40 +111,9 @@ public class BulletScript : NetworkBehaviour {
                     crit = true;
                     d *= 3;
                 }
-                /*If a spawn point is hit by enemy,just run on everyone.*/
-                /*If an enemy is hit(for enemy guns have no client user set),test whether the code is
-                 running on the same client as the one who shot the bullet(for number UI to show up)
-                 *If a player is hit,run the code only on whoever got hit*/
-                //Note that whether the bullet crit or not changes the color of the damage numbers and block indication
-              if(Target.type == HealthDefence.Type.Spawn_Point || ((gun_reference.client_user && gun_reference.client_user.netId == PlayerController.Client.netId) ||
-            (PlayerController.Client.netId == Target.netId || (Target.Controller &&  PlayerController.Client.netId == Target.Controller.netId))))
-              {
-                health_change_show = Instantiate(health_change_canvas, hit.gameObject.transform.position + new Vector3(0, 0, 1), Quaternion.Euler(90, 0, 0)) as GameObject;
-                if (Target.type != HealthDefence.Type.Shield)
-                {
-                    health_change_show.GetComponentInChildren<Text>().text = "-" + d;
-                    if (crit)
-                    {
-                        health_change_show.GetComponentInChildren<Text>().color = new Color(114, 0, 198);//A violet like color
-                    }
-                    else
-                    {
-                        health_change_show.GetComponentInChildren<Text>().color = Color.red;
-                    }
-                }
-                else
-                {
-                    health_change_show.GetComponentInChildren<Text>().text = "*BLOCKED*";
-                    if (crit)
-                    {
-                        health_change_show.GetComponentInChildren<Text>().color = Color.black;
-                    }
-                    else
-                    {
-                        health_change_show.GetComponentInChildren<Text>().color = Color.grey;
-                    }
-                }
-              }
+
+                DisplayHPChange(d, crit, hit.gameObject.transform.position + new Vector3(0, 0, 1));
+                
                 if (Target.has_exp)
                 {
                     gun_reference.experience += d * Target.exp_rate;
@@ -159,8 +133,7 @@ public class BulletScript : NetworkBehaviour {
                     AI.UpdateAggro(d, gun_reference.client_user.netId);
                 }
                 Target.HP -= d;
-                Destroy(health_change_show, 1f);
-                PlayerController.Client.CmdDestroy(gameObject);
+                NetworkServer.Destroy(gameObject);
             
 
         }
@@ -168,10 +141,49 @@ public class BulletScript : NetworkBehaviour {
         {
             /*Before destruction,Stop all coroutines(the gun_abilities operating on this instance)
              to prevent exceptions from those coroutines*/
-            StopAllCoroutines();
-            PlayerController.Client.CmdDestroy(gameObject);
+            RpcStopAllCoroutines();
+            NetworkServer.Destroy(gameObject);
         }
     }
+
+    void DisplayHPChange(int num,bool crit,Vector3 pos)
+    {
+        health_change_show = Instantiate(health_change_canvas,pos, Quaternion.Euler(90, 0, 0)) as GameObject;
+        NetworkServer.Spawn(health_change_show);
+        if (Target.type != HealthDefence.Type.Shield)
+        {
+            health_change_show.GetComponentInChildren<Text>().text = "-" + num;
+            if (crit)
+            {
+                health_change_show.GetComponentInChildren<Text>().color = new Color(114, 0, 198);//A violet like color
+            }
+            else
+            {
+                health_change_show.GetComponentInChildren<Text>().color = Color.red;
+            }
+        }
+        else
+        {
+            health_change_show.GetComponentInChildren<Text>().text = "*BLOCKED*";
+            if (crit)
+            {
+                health_change_show.GetComponentInChildren<Text>().color = Color.black;
+            }
+            else
+            {
+                health_change_show.GetComponentInChildren<Text>().color = Color.grey;
+            }
+        }
+        if (gun_reference)
+        {
+            gun_reference.StartCoroutine(WaitForNetworkDestruction(health_change_show, 1f));
+        }
+        else
+        {
+            NetworkServer.Destroy(health_change_show);
+        }
+    }
+    
 
     IEnumerator Stun(HealthDefence Target,float knockback)
     {

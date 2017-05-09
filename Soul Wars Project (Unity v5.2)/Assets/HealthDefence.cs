@@ -12,21 +12,7 @@ public class HealthDefence : NetworkBehaviour {
         set
         {
             _HP = value;
-            if (health_bar_show == null)
-            {
-                health_bar_show = Instantiate(health_bar, transform.position + new Vector3(0, 1, 1), health_bar.transform.rotation) as GameObject;
-                health_bar_show.GetComponent<HPbar>().Object = gameObject;
-                health_bar_show.GetComponent<HPbar>().offset = health_bar_show.transform.position - gameObject.transform.position;
-                hp_string = health_bar_show.GetComponentInChildren<Text>();
-                Slider[] r = health_bar_show.GetComponentsInChildren<Slider>();
-                maxWidth = r[0].GetComponent<RectTransform>().rect.width;
-                hp_bar = r[1].GetComponent<RectTransform>();
-                Destroy(health_bar_show.gameObject, 5f);
-            }
-            hp_string.text = "<b>" + HP + "</b>";
-            float n = value * 1.0f;
-            n /= maxHP * 1.0f;
-            hp_bar.sizeDelta = new Vector2(maxWidth * n, hp_bar.rect.height);
+            RpcDisplayHP();
             if (value >= maxHP)
             {
                 _HP = maxHP;
@@ -163,10 +149,24 @@ public class HealthDefence : NetworkBehaviour {
         }
     }
 
-
-    public void RestoreHP()
+    [ClientRpc]
+    void RpcDisplayHP()
     {
-        HP = maxHP;
+        if (health_bar_show == null)
+        {
+            health_bar_show = Instantiate(health_bar, transform.position + new Vector3(0, 1, 1), health_bar.transform.rotation) as GameObject;
+            health_bar_show.GetComponent<HPbar>().Object = gameObject;
+            health_bar_show.GetComponent<HPbar>().offset = health_bar_show.transform.position - gameObject.transform.position;
+            hp_string = health_bar_show.GetComponentInChildren<Text>();
+            Slider[] r = health_bar_show.GetComponentsInChildren<Slider>();
+            maxWidth = r[0].GetComponent<RectTransform>().rect.width;
+            hp_bar = r[1].GetComponent<RectTransform>();
+            Destroy(health_bar_show.gameObject, 5f);
+        }
+        hp_string.text = "<b>" + HP + "</b>";
+        float n = _HP * 1.0f;
+        n /= maxHP * 1.0f;
+        hp_bar.sizeDelta = new Vector2(maxWidth * n, hp_bar.rect.height);
     }
     
     IEnumerator Regeneration()

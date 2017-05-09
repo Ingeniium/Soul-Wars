@@ -104,6 +104,7 @@ public class PlayerController : GenericController {
             HP.Controller = this;
             hpbar_show = Instantiate(hpbar) as Canvas;
             hpbar_show.worldCamera = cam_show;
+         
             PlayerIDList.Add(netId.Value);
             cam_show.GetComponent<PlayerFollow>().Player = this;
                       
@@ -113,7 +114,6 @@ public class PlayerController : GenericController {
 
 	void Start() 
     {
-
         if (netId.Value == 3)
         {
             CmdEnemySpawn(SpawnManager.EnemySpawnPoints[0].transform.position + SpawnManager.EnemySpawnPoints[0].spawn_direction * 3);
@@ -163,7 +163,6 @@ public class PlayerController : GenericController {
         }
         
 	}
-
     
     [Command]
     void CmdEnemySpawn(Vector3 pos)
@@ -204,7 +203,7 @@ public class PlayerController : GenericController {
         }
         gun.ApplyGunAbilities();
     }
-
+   
     [Command]
     public void CmdDestroy(GameObject g)
     {
@@ -228,6 +227,17 @@ public class PlayerController : GenericController {
     void CmdAssignAuthority(NetworkIdentity Id)
     {
         Id.AssignClientAuthority(connectionToClient);
+    }
+
+    [Command]
+    public void CmdCreateName(string name,GameObject ga)
+    {
+        GameObject g = Resources.Load("NameDisplay") as GameObject;
+        GameObject G = Instantiate(g);
+        NetworkServer.Spawn(G);
+        G.GetComponentInChildren<Text>().text = name;
+        G.GetComponent<HPbar>().Object = ga;
+        
     }
 
 	void Update() 
