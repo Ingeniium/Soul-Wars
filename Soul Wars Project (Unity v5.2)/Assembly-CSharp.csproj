@@ -49,6 +49,7 @@
      <Compile Include="Assets\BulletScript.cs" />
      <Compile Include="Assets\Cooldown.cs" />
      <Compile Include="Assets\ExitButton.cs" />
+     <Compile Include="Assets\Flurry.cs" />
      <Compile Include="Assets\GenericControllerBaseClass.cs" />
      <Compile Include="Assets\GroupCommunicator.cs" />
      <Compile Include="Assets\Gun.cs" />
