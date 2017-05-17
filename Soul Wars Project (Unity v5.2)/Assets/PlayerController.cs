@@ -6,6 +6,18 @@ using System.Collections.Generic;
 using System.Reflection;
 
 public class PlayerController : GenericController {
+    public string player_name
+    {
+        get { return _player_name; }
+        set
+        {
+            _player_name = value;
+            NameDisplayShow.GetComponentInChildren<Text>().text = value;
+        }
+    }
+    private string _player_name;
+    public GameObject NameDisplay;
+    public GameObject NameDisplayShow;
     private Vector3 total_move;
     public static PlayerController Client;
     private bool shooting = false;
@@ -104,7 +116,7 @@ public class PlayerController : GenericController {
             HP.Controller = this;
             hpbar_show = Instantiate(hpbar) as Canvas;
             hpbar_show.worldCamera = cam_show;
-         
+            NameDisplayShow = Instantiate(NameDisplay) as GameObject;
             PlayerIDList.Add(netId.Value);
             cam_show.GetComponent<PlayerFollow>().Player = this;
                       
@@ -114,7 +126,12 @@ public class PlayerController : GenericController {
 
 	void Start() 
     {
-        if (netId.Value == 3)
+        gun = Gun.GetComponent<Gun>();
+        equipped_weapons.Add(gun);
+        max_weapon_num = 2;
+        shield_collider = Shield.GetComponent<BoxCollider>();
+        gun.client_user = this;
+        if (isServer && isLocalPlayer)
         {
             CmdEnemySpawn(SpawnManager.EnemySpawnPoints[0].transform.position + SpawnManager.EnemySpawnPoints[0].spawn_direction * 3);
         }
@@ -126,19 +143,18 @@ public class PlayerController : GenericController {
         else
         {
             Client = this;
+            //NameDisplayShow.GetComponentInChildren<Text>().text = player_name;
+            NameDisplayShow.GetComponent<HPbar>().Object = this.gameObject;
             shield_collider = Shield.GetComponent<BoxCollider>();
             rb = GetComponent<Rigidbody>();
             tr = GetComponent<Transform>();
-            Shield.GetComponent<HealthDefence>().Controller = this;
             if (cam_show.enabled)
             {
                 tr.position = SpawnManager.AllySpawnPoints[0].transform.position + SpawnManager.AllySpawnPoints[0].spawn_direction;
                 cam_show.transform.position = tr.position + new Vector3(0, 15, 0);
                 cam_show.transform.rotation = cam.transform.rotation;
             }
-            gun = Gun.GetComponent<Gun>();
-            equipped_weapons.Add(gun);
-            max_weapon_num = 2;
+            
             HP.health_bar_show = hpbar_show.GetComponentsInChildren<Slider>()[1].gameObject as GameObject;
             HP.hp_string = HP.health_bar_show.GetComponentInChildren<Text>();
             HP.hp_bar = HP.health_bar_show.GetComponentInChildren<Slider>().GetComponent<RectTransform
@@ -148,7 +164,6 @@ public class PlayerController : GenericController {
             SP.hp_string = SP.health_bar_show.GetComponentInChildren<Text>();
             SP.hp_bar = SP.health_bar_show.GetComponentInChildren<Slider>().GetComponent<RectTransform
                 >();
-            gun.client_user = this;
             if (!gun.set)
             {
                 gun.current_reference = Gun;
@@ -159,11 +174,17 @@ public class PlayerController : GenericController {
                 gun._item_image.transform.parent = gun.weapons_bar.transform;
 
             }
-            
+            StartCoroutine(SetNameDisplay());
         }
         
 	}
-    
+
+    IEnumerator SetNameDisplay()
+    {
+        yield return new WaitForSeconds(.3f);
+        CmdNameChange(true,_player_name);
+    }
+
     [Command]
     void CmdEnemySpawn(Vector3 pos)
     {
@@ -174,9 +195,17 @@ public class PlayerController : GenericController {
     [Command]
     void CmdShoot(Vector3 pos,Quaternion rot)
     {
-        GameObject g = Instantiate(Resources.Load("Bullet"), pos, rot) as GameObject;      
-        NetworkServer.SpawnWithClientAuthority(g,connectionToClient);
-        RpcShoot(g);
+        try
+        {
+            gun.Shoot();
+        }
+        catch(System.NullReferenceException e)
+        {
+            Debug.Log(gun);
+        }
+
+       // RpcShoot(g);
+        
     }
 
 
@@ -210,35 +239,25 @@ public class PlayerController : GenericController {
         NetworkServer.Destroy(g);
     }
 
+   
     [Command]
-    public void CmdWaitForRespawn(GameObject g)
+    void CmdNameChange(bool again,string name)
     {
-        RpcWaitForRespawn(g);
+        RpcNameChange(again,name);
     }
+
 
     [ClientRpc]
-    void RpcWaitForRespawn(GameObject g)
+    void RpcNameChange(bool again,string name)
     {
-        StartCoroutine(SpawnManager.WaitForRespawn(g.GetComponent<HealthDefence>()));
+        NameDisplayShow.GetComponentInChildren<Text>().text = name;
+        NameDisplayShow.GetComponent<HPbar>().Object = this.gameObject;
+        if (again)
+        {
+            PlayerController.Client.CmdNameChange(false,name);
+        }
     }
 
-
-    [Command]
-    void CmdAssignAuthority(NetworkIdentity Id)
-    {
-        Id.AssignClientAuthority(connectionToClient);
-    }
-
-    [Command]
-    public void CmdCreateName(string name,GameObject ga)
-    {
-        GameObject g = Resources.Load("NameDisplay") as GameObject;
-        GameObject G = Instantiate(g);
-        NetworkServer.Spawn(G);
-        G.GetComponentInChildren<Text>().text = name;
-        G.GetComponent<HPbar>().Object = ga;
-        
-    }
 
 	void Update() 
     {

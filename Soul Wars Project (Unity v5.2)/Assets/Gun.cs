@@ -78,18 +78,16 @@ public abstract partial class Gun : Item {
     {
         return (Time.time > next_time);       
     }
+
+    public void OnApplicationPause()
+    {
+    }
     
 
     public virtual void Shoot()
     {
         bullet = Instantiate(Bullet, barrel_end.position, gameObject.transform.rotation) as GameObject;
-        ReadyWeaponForFire(ref bullet);
-        bullet.GetComponent<Rigidbody>().AddForce(barrel_end.forward * projectile_speed, ForceMode.Impulse);
-    }
-
-    public virtual void Shoot(NetworkInstanceId ID)
-    {
-        bullet = ClientScene.FindLocalObject(ID);
+        NetworkServer.SpawnWithClientAuthority(bullet, client_user.connectionToClient);
         ReadyWeaponForFire(ref bullet);
         bullet.GetComponent<Rigidbody>().AddForce(barrel_end.forward * projectile_speed, ForceMode.Impulse);
     }
@@ -119,10 +117,10 @@ public abstract partial class Gun : Item {
         script.homes = homes;
         script.gun_reference = this;//For gaining exp 
         next_time = Time.time + reload_time;
-       /* if (Claimed_Gun_Mods != null)//Apply chosen gun_abilities to each bullet
+        if (Claimed_Gun_Mods != null)//Apply chosen gun_abilities to each bullet
         {
            foreach (Gun_Abilities g in Claimed_Gun_Mods.GetInvocationList()) { script.StartCoroutine(g(this,script)); }   
-        }*/
+        }
         
     }
 

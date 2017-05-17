@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using UnityEngine.Networking;
 
 public class Strike : Gun {
-    private readonly static string[] gun_ability_names = new string[3] { "Marksman", "Sniper", "Drone" };
+    private readonly static string[] gun_ability_names = new string[3] { "Marksman", "Sniper", null };
     private readonly static string[] gun_name_addons = new string[3] { "Marksmanship",null,null };
     /*This class's pool of gun_abilities.Use of a static container of static methods requiring explicit this
      pointers are used for onetime,pre-Awake() initialization of delegates*/

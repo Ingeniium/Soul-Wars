@@ -5,7 +5,7 @@ using System.Collections;
 
 public class HealthDefence : NetworkBehaviour {
     private Color Original_Color;
-    public int maxHP;
+    [SyncVar] public int maxHP;
     public int HP
     {
         get { return _HP; }
@@ -41,7 +41,7 @@ public class HealthDefence : NetworkBehaviour {
                         {
                             GetComponentInChildren<AIController>().gun.DropItem(ref gun_drop_chance);
                         }
-                        PlayerController.Client.CmdWaitForRespawn(gameObject);
+                        StartCoroutine(SpawnManager.WaitForRespawn(this));
                         break;
                     case Type.Shield:
                         if (shield_collider)
@@ -57,23 +57,24 @@ public class HealthDefence : NetworkBehaviour {
                         if (gameObject.layer == 9)
                         {
                             gameObject.layer = 8;
+                            RpcChangeLayer(gameObject.layer);
                             SpawnManager s = GetComponent<SpawnManager>();
-                            s.GetComponent<Renderer>().material.color = Color.red;
-                            s.stand.GetComponent<Renderer>().material.color = Color.red;
-                            s.stand.layer = 8;
+                            RpcChangeColor(gameObject, Color.red);
+                            RpcChangeColor(s.stand.gameObject, Color.red);
                             SpawnManager.EnemySpawnPoints.Add(s);
                             SpawnManager.AllySpawnPoints.Remove(s);
                         }
                         else
                         {
                             gameObject.layer = 9;
+                            RpcChangeLayer(gameObject.layer);
                             SpawnManager s = GetComponent<SpawnManager>();
-                            s.GetComponent<Renderer>().material.color = new Color32(52, 95, 221, 225);
-                            s.stand.GetComponent<Renderer>().material.color = new Color32(52, 95, 221, 225);
-                            s.stand.layer = 9;
+                            RpcChangeColor(s.gameObject, new Color32(52, 95, 221, 225));
+                            RpcChangeColor(s.stand, new Color32(52, 95, 221, 225));
                             SpawnManager.AllySpawnPoints.Add(s);
                             SpawnManager.EnemySpawnPoints.Remove(s);
                         }
+                        _HP = maxHP;
                         break;
                 }
             }
@@ -99,6 +100,7 @@ public class HealthDefence : NetworkBehaviour {
             }
         }
     }
+    
     private float _standing_power;
     public float max_standing_power = 10;
     public Rigidbody rb;
@@ -150,6 +152,19 @@ public class HealthDefence : NetworkBehaviour {
     }
 
     [ClientRpc]
+    public void RpcChangeLayer(int layer)
+    {
+        gameObject.layer = layer;
+    }
+
+    [ClientRpc]
+    public void RpcChangeColor(GameObject g,Color color)
+    {
+        g.GetComponent<Renderer>().material.color = color;
+        Debug.Log(g.GetComponent<Renderer>());
+    }
+
+    
     void RpcDisplayHP()
     {
         if (health_bar_show == null)
