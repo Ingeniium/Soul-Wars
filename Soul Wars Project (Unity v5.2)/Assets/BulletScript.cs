@@ -37,6 +37,7 @@ public class BulletScript : NetworkBehaviour {
         }
         homer = transform.GetChild(0).gameObject;
         homer.GetComponent<SphereCollider>().radius = home_radius;
+        homer.layer = gun_reference.home_layer;
         GetComponent<Collider>().isTrigger = can_pierce;
         HomingScript script = homer.GetComponent<HomingScript>();
         script.home_speed = home_speed;
@@ -63,20 +64,40 @@ public class BulletScript : NetworkBehaviour {
     {
         Collider first = GetComponent<Collider>();
         Collider second = hit.gameObject.GetComponent<Collider>();
+        Collider third = null;
+        if (homer)
+        {
+            third = homer.GetComponent<Collider>();
+            Physics.IgnoreCollision(third, second);
+        }
         Physics.IgnoreCollision(first, second);
         yield return new WaitForEndOfFrame();
         Physics.IgnoreCollision(first, second, false);
+        if (homer)
+        {
+            Physics.IgnoreCollision(third, second, false);
+        }
     }
 
     IEnumerator Pierce(Collider hit)
     {
         Collider first = GetComponent<Collider>();
         Collider second = hit;
+        Collider third = null;
+        if (homer)
+        {
+            third = homer.GetComponent<Collider>();
+            Physics.IgnoreCollision(third, second);
+        }
         Physics.IgnoreCollision(first, second);
         yield return new WaitForSeconds(1);
         if (second.enabled)
         {
             Physics.IgnoreCollision(first, second, false);
+            if (homer)
+            {
+                Physics.IgnoreCollision(third, second, false);
+            }
         }
     }
 
@@ -100,7 +121,10 @@ public class BulletScript : NetworkBehaviour {
    {
        try
        {
-           StartCoroutine(Damage(null,hit));
+           if (can_pierce)//Check put there b/c otherwise,homing detection would call it
+           {
+               StartCoroutine(Damage(null, hit));
+           }
        }
        catch (System.NullReferenceException e)
        {
@@ -185,14 +209,7 @@ public class BulletScript : NetworkBehaviour {
         {
             /* Before destruction,Stop all coroutines(the gun_abilities operating on this instance)
              to prevent exceptions from those coroutines*/
-            if (col)
-            {
-                Debug.Log(col.gameObject);
-            }
-            else
-            {
-                Debug.Log(hit.gameObject);
-            }
+           
             StopAllCoroutines();
             NetworkServer.Destroy(gameObject);
         }

@@ -10,10 +10,10 @@ public class Flurry : Gun
     public List<ValueGroup[]> TrioList = new List<ValueGroup[]>();
     bool targ_recorded;
     private readonly static string[] gun_ability_names = new string[3] { "Hunter", "Archer", null };
-    private readonly static string[] gun_name_addons = new string[3] { null, null, null };
+    private readonly static string[] gun_name_addons = new string[3] { "Precision", "Archery", null };
     private readonly static string[] gun_ability_desc = new string[3] {
-        null,
-        null,
+        "Hunter" + "\n Causes bullets that aren't" + "\n homing in on a target to" + "\n to reroute to another flurry " + "\n bullet's target.",
+        "Archer" + "\n Bullets have a 30%" + "\n chance to penetrate its target.",
         null
     };
     /*This class's pool of gun_abilities.Use of a static container of static methods requiring explicit this
@@ -21,53 +21,50 @@ public class Flurry : Gun
 
     private static List<Gun_Abilities> Gun_Mods = new List<Gun_Abilities>()//This class's pool of gun_abilities
     {
-        null,
-        null,
+        Hunter,
+        Archer,
         null
     };
 
     private static IEnumerator Hunter(Gun gun, BulletScript script)
     {
         script.coroutines_running++;
-        Flurry Gun = gun as Flurry;
-        while (script.has_collided == false && Gun.targ_recorded == false )//Wait for Collision
-        {
-            yield return new WaitForFixedUpdate();
-        }
-        if (script.legit_target == false)//Check if target even is valid
-        {
-            script.coroutines_running--;
-            yield return null;
-        }
-        ValueGroup[] array = Gun.TrioList.Find(delegate(ValueGroup[] arr)
-        {
-            return (Array.Exists(arr,delegate(ValueGroup v)
-            {
-                return (v.index == script.netId.Value);
-            }));
-        });
-
-        foreach (ValueGroup v in array)
-        {
-            if (v.index !=(int)script.netId.Value && v.index != 0)
-            {
-                
-            }
-
-        }
-       
-    }
-
-    IEnumerator TrackBullet(GameObject g)
-    {
-        BulletScript script = g.GetComponent<BulletScript>();
-        while (!script.has_collided)
+        while (!script.homer)//wait for homingscript reference
         {
             yield return new WaitForEndOfFrame();
         }
-        
-
+        HomingScript home = script.homer.GetComponent<HomingScript>();
+        while (!home.homing && !script.has_collided)//Wait untuil it homes or collides
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        Collider[] bullet_colliders = Physics.OverlapSphere(script.gameObject.transform.position, 10,-1, QueryTriggerInteraction.Collide);
+        foreach (Collider col in bullet_colliders)
+        {
+            /*Check if its a flurry bullet that's shot from an ally and isn't homing*/
+            BulletScript b = col.GetComponent<BulletScript>();
+            if (b && b.gun_reference is Flurry && !b.homer.GetComponent<HomingScript>().homing && b.gameObject.layer == script.gameObject.layer)
+            {
+                b.transform.LookAt(new Vector3(home.main_col.gameObject.transform.position.x, script.transform.position.y, home.main_col.gameObject.transform.position.z));
+                b.GetComponent<Rigidbody>().velocity = b.transform.forward * b.GetComponent<Rigidbody>().velocity.magnitude;
+            }
+        }
+        script.coroutines_running--;     
+       
     }
+
+    private static IEnumerator Archer(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        if (rand.NextDouble() < .30)
+        {
+            script.can_pierce = true;
+        }
+        script.coroutines_running--;
+        yield return null;
+    }
+
+    
 
     public override void Shoot()
     {
@@ -170,7 +167,7 @@ public class Flurry : Gun
         crit_chance = .1;
         reload_time = .5f;
         home_speed = 5f;
-        home_radius = 1.5f;
+        home_radius = 3f;
         homes = true;
         /*Resources.Load seems to only work for getting prefabs as only game objects.*/
         GameObject g = Resources.Load("Drop Item Name Box") as GameObject;
