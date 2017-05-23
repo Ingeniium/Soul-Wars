@@ -24,6 +24,7 @@ public class PlayerController : GenericController {
     public Gun gun;//The Equipped weapon that the player currently wields
     public List<Gun> equipped_weapons = new List<Gun>();
     public static List<uint> PlayerIDList = new List<uint>();
+    public GameObject pass_over;//reference to cmd created objects
 
     public int max_weapon_num
     {
@@ -123,7 +124,6 @@ public class PlayerController : GenericController {
             
     }
 
-
 	void Start() 
     {
         gun = Gun.GetComponent<Gun>();
@@ -131,7 +131,7 @@ public class PlayerController : GenericController {
         max_weapon_num = 2;
         shield_collider = Shield.GetComponent<BoxCollider>();
         gun.client_user = this;
-        if (isServer && isLocalPlayer)
+        if (isLocalPlayer && netId.Value == 5)
         {
             CmdEnemySpawn(SpawnManager.EnemySpawnPoints[0].transform.position + SpawnManager.EnemySpawnPoints[0].spawn_direction * 3);
         }
@@ -143,8 +143,7 @@ public class PlayerController : GenericController {
         else
         {
             Client = this;
-            //NameDisplayShow.GetComponentInChildren<Text>().text = player_name;
-            NameDisplayShow.GetComponent<HPbar>().Object = this.gameObject;
+            //NameDisplayShow.GetComponent<HPbar>().Object = this.gameObject;
             shield_collider = Shield.GetComponent<BoxCollider>();
             rb = GetComponent<Rigidbody>();
             tr = GetComponent<Transform>();
@@ -188,12 +187,37 @@ public class PlayerController : GenericController {
     [Command]
     void CmdEnemySpawn(Vector3 pos)
     {
-        GameObject Enemy = Instantiate(Resources.Load("Dummy"),pos, Quaternion.identity) as GameObject;
-        NetworkServer.Spawn(Enemy);   
+        GameObject Enemy = Instantiate(Resources.Load("Dummy 1"), pos, Quaternion.identity) as GameObject;
+        NetworkServer.Spawn(Enemy);
+        foreach (Renderer r in Enemy.GetComponentsInChildren<Renderer>())
+        {
+            NetworkServer.Spawn(r.gameObject);
+        }
+    }
+
+
+    [Command]
+    public void CmdSpawnItem(GameObject g,Vector3 pos,Quaternion rot,bool child)
+    {
+        pass_over = Instantiate(g, pos, rot) as GameObject;
+        NetworkServer.SpawnWithClientAuthority(pass_over, connectionToClient);
+        pass_over.GetComponent<Item>().client_user = this;
+        if (child)
+        {
+            pass_over.transform.SetParent(transform);
+        }
+        RpcSetPassOver(pass_over);
+    }
+
+    [ClientRpc]
+    void RpcSetPassOver(GameObject g)
+    {
+        pass_over = g;
+        pass_over.GetComponent<Item>().client_user = this;
     }
 
     [Command]
-    void CmdShoot(Vector3 pos,Quaternion rot)
+    void CmdShoot()
     {
         try
         {
@@ -203,11 +227,8 @@ public class PlayerController : GenericController {
         {
             Debug.Log(gun);
         }
-
-       // RpcShoot(g);
         
     }
-
 
     [ClientRpc]
     void RpcShoot(GameObject g)
@@ -222,15 +243,6 @@ public class PlayerController : GenericController {
                 Debug.Log(gun != null);
             }
           
-    }
-
-    IEnumerator WaitToApplyGunAbilities()
-    {
-        while (shooting)
-        {
-            yield return new WaitForEndOfFrame();
-        }
-        gun.ApplyGunAbilities();
     }
    
     [Command]
@@ -271,9 +283,7 @@ public class PlayerController : GenericController {
             {
                 cooldown_canvas_show = Instantiate(cooldown_canvas, gun._item_image.transform.position + new Vector3(.25f, 0, 0), gun._item_image.transform.rotation) as Canvas;
                 cooldown_canvas_show.transform.SetParent(gun._item_image.transform);
-                shooting = true;
-                StartCoroutine(WaitToApplyGunAbilities());
-                CmdShoot(gun.barrel_end.position, gun.transform.rotation);
+                CmdShoot();
                 StartCoroutine(Cooldown.NumericalCooldown(cooldown_canvas_show, gun.reload_time));
                 
             }

@@ -16,7 +16,7 @@ public abstract partial class Gun : Item {
 	public GameObject Bullet;
 	public GameObject bullet;
     [SyncVar] public float reload_time;//How long it takes to fire each shot
-	private float next_time;//Next firing time
+	public float next_time;//Next firing time
     [SyncVar] public float home_speed;//Angular turning speed of the bullet
 	[SyncVar] public float home_radius;
     public bool homes = true;//whether the bullets will have homing capabilities
@@ -25,7 +25,11 @@ public abstract partial class Gun : Item {
     [SyncVar] public float knockback_power;//How much knockback force and knockback stun is done 
     [SyncVar] public float projectile_speed;
     [SyncVar] public float range;
-    [SyncVar]  public double crit_chance = .1f;
+    [SyncVar] public double crit_chance = .1f;
+    [SyncVar] public bool can_pierce;
+    [SyncVar] public double chill_strength;
+    [SyncVar] public double burn_strength;
+    public Gun median;//for copy transfer
 	public Transform barrel_end;//Where bullets actually SPAWN from
     public Color color;//color assigned to the BULLETS
     public int layer;//Collision layer of the bullet
@@ -45,7 +49,7 @@ public abstract partial class Gun : Item {
                 _experience = 0;
                 level += 1;
                 next_lvl = (level + 20 + level / 4) * 2;
-                level_up_indication = Instantiate(Player.cooldown_canvas, _item_image.transform.position + new Vector3(-.25f, 0, 0), Player.cooldown_canvas.transform.rotation) as Canvas;
+                level_up_indication = Instantiate(client_user.cooldown_canvas, _item_image.transform.position + new Vector3(-.25f, 0, 0), client_user.cooldown_canvas.transform.rotation) as Canvas;
                 level_up_indication.GetComponentInChildren<Text>().text = "!";
                 level_up_indication.GetComponentInChildren<Text>().color = Color.green;
                 level_up_indication.transform.SetParent(_item_image.transform);
@@ -79,35 +83,62 @@ public abstract partial class Gun : Item {
         return (Time.time > next_time);       
     }
 
-    public void OnApplicationPause()
+    [ClientRpc]
+    protected void RpcSetLayer(GameObject weapon_fire)
     {
+        if (weapon_fire)
+        {
+            BulletScript script = weapon_fire.GetComponent<BulletScript>();
+            script.home.layer = home_layer;
+            weapon_fire.GetComponent<Renderer>().material.color = new Color(color.r, color.g, color.b, weapon_fire.GetComponent<Renderer>().material.color.a);
+            Renderer[] child_rends = weapon_fire.GetComponentsInChildren<Renderer>();
+            if (child_rends != null)
+            {
+                foreach (Renderer r in child_rends)
+                {
+                    r.material.color = new Color(color.r, color.g, color.b, r.material.color.a);
+                }
+            }
+        }
+    }
+
+    [ClientRpc]
+    protected void RpcFire(Vector3 dir,GameObject weapon_fire)
+    {
+        if (weapon_fire)
+        {
+            weapon_fire.GetComponent<Rigidbody>().AddForce(dir * projectile_speed, ForceMode.Impulse);
+           // weapon_fire.transform.rotation = Quaternion.Euler(weapon_fire.transform.rotation.x, weapon_fire.transform.rotation.y, weapon_fire.transform.rotation.z);
+        }
     }
     
-
+    
     public virtual void Shoot()
     {
-        bullet = Instantiate(Bullet, barrel_end.position, gameObject.transform.rotation) as GameObject;
-        NetworkServer.SpawnWithClientAuthority(bullet, client_user.connectionToClient);
+        bullet = Instantiate(Bullet, barrel_end.position, barrel_end.rotation) as GameObject;
+        NetworkServer.SpawnWithClientAuthority(bullet,client_user.connectionToClient);
         ReadyWeaponForFire(ref bullet);
-        bullet.GetComponent<Rigidbody>().AddForce(barrel_end.forward * projectile_speed, ForceMode.Impulse);
+        RpcFire(barrel_end.forward,bullet);
     }
 
     public virtual void Shoot(GameObject g)
     {
         bullet = g;
         ReadyWeaponForFire(ref bullet);
-        bullet.GetComponent<Rigidbody>().AddForce(barrel_end.forward * projectile_speed, ForceMode.Impulse);
+        RpcFire(barrel_end.forward,g);
     }
    
     protected void ReadyWeaponForFire(ref GameObject weapon_fire)
     {
-        //Make bullet the designated color
-        weapon_fire.GetComponent<Renderer>().material.color = color;
+
+        RpcSetLayer(weapon_fire);
         BulletScript script = weapon_fire.GetComponent<BulletScript>();
         //Pass values on to bullet
         script.crit_chance = crit_chance;
         script.upper_bound_damage = upper_bound_damage;
         script.lower_bound_damage = lower_bound_damage;
+        script.chill_strength = chill_strength;
+        script.burn_strength = burn_strength;
         script.gameObject.layer = layer;
         script.knockback_power = knockback_power;
         /*Homing script values passed for homing toggle*/
@@ -115,6 +146,7 @@ public abstract partial class Gun : Item {
         script.home_speed = home_speed;
         script.home_radius = home_radius;
         script.homes = homes;
+        script.can_pierce = can_pierce;
         script.gun_reference = this;//For gaining exp 
         next_time = Time.time + reload_time;
         if (Claimed_Gun_Mods != null)//Apply chosen gun_abilities to each bullet
@@ -124,14 +156,6 @@ public abstract partial class Gun : Item {
         
     }
 
-    public void ApplyGunAbilities()
-    {
-        if (Claimed_Gun_Mods != null && bullet != null)
-        {
-            BulletScript script = bullet.GetComponent<BulletScript>();
-            foreach (Gun_Abilities g in Claimed_Gun_Mods.GetInvocationList()) { script.StartCoroutine(g(this, script)); }
-        }
-    }
 
     protected abstract string GunDesc();//Description is based on derived type
 
@@ -167,18 +191,35 @@ public abstract partial class Gun : Item {
         return string.Format(GetName() + "\n" + GunDesc() + "\n" + "Level : {0}" + "\n" + "Experience : {1}/{2} " + "\n" + "Level Up Points : {3}" + "\n" + " Homing : {4} " + "\n" + " Damage : {5} - {6}" + " \n" + " Reload Time : {7}",level,experience,next_lvl,points, home_radius, lower_bound_damage, upper_bound_damage, reload_time);                
     }
 
-    public override void PrepareItemForUse()
+    [ClientRpc]
+    void RpcSetGun(int _level,uint _points,int _experience,int _next_lvl,int[] indeces)
     {
-       
-        GameObject prev_Gun = PlayerController.Client.Gun;
-        if (prev_Gun == null)
+        SetBaseStats();
+        level = _level;
+        points = _points;
+        next_lvl = _next_lvl;
+        experience = _experience;
+        foreach (int index in indeces)
         {
-            throw new System.NullReferenceException("It looks like prev_Gun wasn't set properly after destruction");
+            claimed_gun_ability.Add(index);
+            Claimed_Gun_Mods += ClassGunMods(index);
+            SetGunNameAddons(index);
         }
+        color = new Color32(52, 95, 221, 225);
+        layer = 13;
+        home_layer = 10;
+        barrel_end = transform.GetChild(0);
+        in_inventory = false;
+        current_reference = gameObject;
+    }
+
+    public override IEnumerator PrepareItemForUse()
+    {
+
         if (in_inventory)
         {
-               _item_image.transform.SetParent(weapons_bar.transform);     
-                GameObject Gun = Instantiate(asset_reference, prev_Gun.transform.position, prev_Gun.transform.rotation) as GameObject;
+                _item_image.transform.SetParent(weapons_bar.transform);     
+                /*GameObject Gun = Instantiate(asset_reference, prev_Gun.transform.position, prev_Gun.transform.rotation) as GameObject;
                 Gun.transform.SetParent(PlayerController.Client.gameObject.transform);
                 CopyComponent<Gun>(this, Gun);
                 Gun gun = Gun.GetComponent<Gun>();
@@ -187,15 +228,29 @@ public abstract partial class Gun : Item {
                 gun.color = prev_Gun.GetComponent<Gun>().color;
                 gun.layer = 13;
                 gun.home_layer = 10;
-                gun.barrel_end = Gun.GetComponentInChildren<Transform>();
-                gun.in_inventory = false;
+                gun.barrel_end = Gun.transform.GetChild(0);
+                gun.in_inventory = false;*/
+                PlayerController.Client.CmdSpawnItem(asset_reference, client_user.Gun.transform.position, client_user.Gun.transform.rotation,true);
+                Gun median = client_user.pass_over.GetComponent<Gun>();
+                int[] index = new int[claimed_gun_ability.Count()];
+                for (int i = 0; i < claimed_gun_ability.Count(); i++)
+                {
+                    index[i] = claimed_gun_ability[i];
+                }
+                median.RpcSetGun(level, points,experience,next_lvl,index);
+                while (!median.current_reference)
+                {
+                    yield return new WaitForEndOfFrame();
+                }
+                _item_image.GetComponentInChildren<ItemImage>().item_script = median;
+                median._item_image = _item_image;
                 if (inv)
                 {
                     inv.RemoveItem(ref _item_image);
                 }
-                if (gun.index > -1)
+                if (median.index > -1)
                 {
-                    gun.EquipAtSlot(gun.index);
+                    median.EquipAtSlot(median.index);
                 }
                 else
                 {
@@ -205,17 +260,18 @@ public abstract partial class Gun : Item {
                     to the Inventory by storing the Item Image*/
                     if (i == -1)
                     {
-                        gun.EquipAtSlot(PlayerController.Client.main_weapon_index);
+                        median.EquipAtSlot(PlayerController.Client.main_weapon_index);
                     }
                     /*Otherwise,disable rendering of the newly created instance and put it somewhere
                      in which there is an empty slot*/
                     else
                     {
-                        gun.current_reference.GetComponent<Renderer>().enabled = false;
-                        PlayerController.Client.equipped_weapons[i] = gun;
-                        gun.index = i;
+                        median.current_reference.GetComponent<Renderer>().enabled = false;
+                        PlayerController.Client.equipped_weapons[i] = median;
+                        median.index = i;
                     }
                 }
+                median = null;
             Destroy(this);
             
         }
@@ -356,7 +412,7 @@ public abstract partial class Gun : Item {
         if (element.Descendants("MethodIndex").Any())
         {
             int num;
-            foreach (XElement e in element.Elements("MethodIndex"))
+            foreach (XElement e in element.Elements("MethodIndex").Elements("Index"))
             {
                 num = Int32.Parse(e.Value);
                 SetGunNameAddons(num);
@@ -371,12 +427,14 @@ public abstract partial class Gun : Item {
     protected abstract Gun_Abilities ClassGunMods(int index);//For getting a derived class's Gun_ability delegates
     protected abstract string ClassGunAbilityNames(int index);//For getting a derived class's Gun_ability string names 
     protected abstract void SetGunNameAddons(int index);//For getting a derived class's prefixes/suffixes
+    protected abstract string GunAbilityDesc(int index);//For getting a derived class's descriptions
     
     /*Functions below are virtual as to allow derived classes their own static variables for keeping track of assignment*/
     protected abstract bool AreGunLevelUpButtonsAssignedForClass();
 
     protected void Start()
     {
+       
         unit_reference = GetComponent<GenericController>();
         if (!unit_reference)
         {

@@ -7,8 +7,15 @@ using UnityEngine.Networking;
 public class Flurry : Gun
 {
     [SyncVar] public int num_bullets = 3;
+    public List<ValueGroup[]> TrioList = new List<ValueGroup[]>();
+    bool targ_recorded;
     private readonly static string[] gun_ability_names = new string[3] { "Hunter", "Archer", null };
     private readonly static string[] gun_name_addons = new string[3] { null, null, null };
+    private readonly static string[] gun_ability_desc = new string[3] {
+        null,
+        null,
+        null
+    };
     /*This class's pool of gun_abilities.Use of a static container of static methods requiring explicit this
      pointers are used for onetime,pre-Awake() initialization of delegates*/
 
@@ -19,27 +26,70 @@ public class Flurry : Gun
         null
     };
 
+    private static IEnumerator Hunter(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        Flurry Gun = gun as Flurry;
+        while (script.has_collided == false && Gun.targ_recorded == false )//Wait for Collision
+        {
+            yield return new WaitForFixedUpdate();
+        }
+        if (script.legit_target == false)//Check if target even is valid
+        {
+            script.coroutines_running--;
+            yield return null;
+        }
+        ValueGroup[] array = Gun.TrioList.Find(delegate(ValueGroup[] arr)
+        {
+            return (Array.Exists(arr,delegate(ValueGroup v)
+            {
+                return (v.index == script.netId.Value);
+            }));
+        });
+
+        foreach (ValueGroup v in array)
+        {
+            if (v.index !=(int)script.netId.Value && v.index != 0)
+            {
+                
+            }
+
+        }
+       
+    }
+
+    IEnumerator TrackBullet(GameObject g)
+    {
+        BulletScript script = g.GetComponent<BulletScript>();
+        while (!script.has_collided)
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        
+
+    }
+
     public override void Shoot()
     {
         base.Shoot();
+        TrioList.Add(new ValueGroup[num_bullets]);
+        TrioList[TrioList.Count - 1][0].index = (int)bullet.GetComponent<NetworkIdentity>().netId.Value;
         for (int i = 1; i < num_bullets; i++)
         {
             Quaternion rot;
-            Vector3 pos;
             if (i % 2 != 0)
             {
-                rot = GetComponentsInChildren<Transform>()[1].rotation;
-                pos = GetComponentsInChildren<Transform>()[1].position;
+                rot = GetComponentsInChildren<Transform>()[2].rotation;
             }
             else
             {
-                rot = GetComponentsInChildren<Transform>()[2].rotation;
-                pos = GetComponentsInChildren<Transform>()[2].position;
+                rot = GetComponentsInChildren<Transform>()[3].rotation;
             }
-            bullet = Instantiate(Bullet, pos, rot) as GameObject;
+            bullet = Instantiate(Bullet, barrel_end.position, rot) as GameObject;
             NetworkServer.SpawnWithClientAuthority(bullet, client_user.connectionToClient);
+            TrioList[TrioList.Count - 1][i].index = (int)bullet.GetComponent<NetworkIdentity>().netId.Value;
             ReadyWeaponForFire(ref bullet);
-            bullet.GetComponent<Rigidbody>().AddForce(bullet.transform.forward * projectile_speed, ForceMode.Impulse);
+            RpcFire(bullet.transform.forward,bullet);
         }
     }
 
@@ -49,22 +99,24 @@ public class Flurry : Gun
         for (int i = 1; i < num_bullets; i++)
         {
             Quaternion rot;
-            Vector3 pos;
             if (i % 2 != 0)
             {
-                rot = GetComponentsInChildren<Transform>()[1].rotation;
-                pos = GetComponentsInChildren<Transform>()[1].position;
+                rot = GetComponentsInChildren<Transform>()[2].rotation;
             }
             else
             {
-                rot = GetComponentsInChildren<Transform>()[2].rotation;
-                pos = GetComponentsInChildren<Transform>()[2].position;
+                rot = GetComponentsInChildren<Transform>()[3].rotation;
             }
-            bullet = Instantiate(Bullet, pos, rot) as GameObject;
+            bullet = Instantiate(Bullet, barrel_end.position, rot) as GameObject;
             NetworkServer.Spawn(bullet);
             ReadyWeaponForFire(ref bullet);
-            bullet.GetComponent<Rigidbody>().AddForce(bullet.transform.forward * projectile_speed, ForceMode.Impulse);
+            RpcFire(bullet.transform.forward,bullet);
         }
+    }
+
+    protected override string GunAbilityDesc(int index)
+    {
+        return gun_ability_desc[index];
     }
 
     protected override string ClassGunAbilityNames(int index)
@@ -112,7 +164,7 @@ public class Flurry : Gun
         layer = 13;
         home_layer = 10;
         color = new Color(43, 179, 234);
-        range = 5;
+        range = 10;
         projectile_speed = 5;
         knockback_power = 5;
         crit_chance = .1;

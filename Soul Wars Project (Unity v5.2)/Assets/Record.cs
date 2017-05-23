@@ -70,9 +70,7 @@ class Record : MonoBehaviour
             stream = new FileStream("SoulWars.xml", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             file = XDocument.Load("SoulWars.xml");
             player_name = (file.Root.FirstNode as XElement).Name.ToString();
-            PlayerController.Client.CmdCreateName(
-                   player_name,
-                   PlayerController.Client.gameObject);
+            PlayerController.Client.player_name = player_name;
             XElement parent = file.Root.Element(player_name);
             GameObject image_canvas = Resources.Load("ItemImageCanvas") as GameObject;
             Type t;
@@ -91,7 +89,7 @@ class Record : MonoBehaviour
                     i.set = true;
                     image_canvas_show.GetComponentInChildren<ItemImage>().item_script = i;
                     i.client_user = PlayerController.Client;
-                    
+                    Debug.Log("Called");
                
                     if (Int32.Parse(e.Attribute("Index").Value) < 0)
                     {
@@ -99,7 +97,7 @@ class Record : MonoBehaviour
                     }
                     else
                     {
-                        i.PrepareItemForUse();
+                       StartCoroutine(i.PrepareItemForUse());
                         if (Int32.Parse(e.Attribute("Index").Value) == 0)
                         {
                             GameObject first_gun = ClientScene.FindLocalObject(new NetworkInstanceId(first_gun_id));
@@ -140,9 +138,7 @@ class Record : MonoBehaviour
                 f.DeactivateInputField();
                 PlayerController.Client.enabled = true;
                 PlayerController.Client.gameObject.layer = 9;
-                PlayerController.Client.CmdCreateName(
-                   player_name,
-                   PlayerController.Client.gameObject);
+                PlayerController.Client.player_name = s;
                 Destroy(name_input_show.gameObject);
             }
         });

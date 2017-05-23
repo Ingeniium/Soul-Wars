@@ -62,8 +62,8 @@ public partial class AIController : GenericController {
         new ValueGroup(0,-1), new ValueGroup(0,-1)   
     };
     
-    private int attack_func_index = 0;
-    private int movement_func_index = 0;
+    private int attack_func_index = 1;
+    private int movement_func_index = 2;
     private int evasion_func_index = 1;
     private static System.Random rand = new System.Random();
     private ObjectiveState State;
@@ -231,16 +231,6 @@ public partial class AIController : GenericController {
         yield return null;
     }
 
-    private struct ValueGroup//Unity doesn't support Tuple
-    {
-        public int index;
-        public float value;
-        public ValueGroup(int i, float v)
-        {
-            index = i;
-            value = v;
-        }
-    }
 
    
     public void UpdateAggro(int damage = 0, NetworkInstanceId player_id = new NetworkInstanceId(),bool account_attack_dist = true)

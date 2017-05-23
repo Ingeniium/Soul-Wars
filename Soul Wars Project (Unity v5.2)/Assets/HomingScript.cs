@@ -9,6 +9,7 @@ public class HomingScript : MonoBehaviour
     private Collider main_col;//Collider that device is currently homing in
     private bool homing = false;//Whether it is currently homing on a target
     public float home_speed;
+    Vector3 target_pos;
    
 
     void OnTriggerEnter(Collider Target)
@@ -60,7 +61,8 @@ public class HomingScript : MonoBehaviour
         {
             try
             {
-                ptr.forward = Vector3.RotateTowards(ptr.forward, main_col.gameObject.transform.position - ptr.position, home_speed, 0);                
+                target_pos = new Vector3(main_col.gameObject.transform.position.x, ptr.position.y, main_col.gameObject.transform.position.z);
+                ptr.forward = Vector3.RotateTowards(ptr.forward, target_pos - ptr.position, home_speed, 0);                
             }
             catch (System.Exception e) 
             {

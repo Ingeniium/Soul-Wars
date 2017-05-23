@@ -2,6 +2,7 @@
 using UnityEngine.UI;
 using UnityEngine.Networking;
 using System.Collections;
+using System.Collections.Generic;
 
 public class HealthDefence : NetworkBehaviour {
     private Color Original_Color;
@@ -29,6 +30,7 @@ public class HealthDefence : NetworkBehaviour {
             else if (value <= 0)
             {
                 _HP = 0;
+                RpcClearAilments();
                 hp_string.text = "<b>" + HP + "</b>";
                 if ((Controller is PlayerController) != true)
                 {
@@ -87,6 +89,10 @@ public class HealthDefence : NetworkBehaviour {
     [SyncVar] public int defence;
     [SyncVar] public double crit_resistance = 0;
     [SyncVar] public float knockback_resistance = 2.5f;
+    [SyncVar] public double chill_resistance;
+    [SyncVar] public double burn_resistance;
+    [SyncVar] bool chilling;
+    [SyncVar] bool burning;
     public float standing_power
     {
         get { return _standing_power; }
@@ -118,6 +124,13 @@ public class HealthDefence : NetworkBehaviour {
     public bool has_exp = true;
     public int exp_rate = 1;
     public double gun_drop_chance;
+    public GameObject ailment_display;
+    private GameObject ailment_display_show;
+    private Text ailment_text;
+    private List<string> ailments = new List<string>();
+    public GameObject health_change_canvas;
+    public GameObject health_change_show;
+    static System.Random rand = new System.Random();
     public Type type = Type.Unit;
     public enum Type
     {
@@ -131,10 +144,17 @@ public class HealthDefence : NetworkBehaviour {
         if (type == Type.Shield)
         {
             shield_collider = GetComponent<BoxCollider>();
-            transform.localScale = new Vector3(transform.localScale.x,transform.localScale.y*scale_factor,transform.localScale.z*scale_factor);
+            transform.localScale = new Vector3(transform.localScale.x, transform.localScale.y * scale_factor, transform.localScale.z * scale_factor);
+        }
+        else
+        {
+            ailment_display_show = Instantiate(ailment_display) as GameObject;
+            ailment_display_show.GetComponent<HPbar>().Object = gameObject;
+            ailment_text = ailment_display_show.GetComponentInChildren<Text>();
         }
         Original_Color = gameObject.GetComponent<Renderer>().material.color;
         _HP = maxHP;
+        
 	}
 
     void Start()
@@ -151,6 +171,79 @@ public class HealthDefence : NetworkBehaviour {
         }
     }
 
+    public IEnumerator DetermineChill(double chill)
+    {
+        double net_chill = chill - chill_resistance;
+        if (net_chill > 0 && rand.NextDouble() < net_chill * 8 && type == HealthDefence.Type.Unit && !chilling)
+        {
+            chilling = true;
+            float original = Controller.speed;
+            Controller.speed = (100 - (float)net_chill * 400) * (.01f * Controller.speed);
+            float time = (float)(net_chill * 150);
+            float next_time = Time.time + time;
+            RpcUpdateAilments("\r\n <color=cyan>Chill</color> ", time);
+            while (Time.time < next_time || HP == 0)
+            {
+                yield return new WaitForEndOfFrame();
+            }
+            Controller.speed = original;
+            chilling = false;
+        }
+    }
+
+    public IEnumerator DetermineBurn(double burn,int damage)
+    {
+        double net_burn = burn - burn_resistance;
+        if (net_burn > 0 && rand.NextDouble() < net_burn * 4 && type == HealthDefence.Type.Unit && !burning)
+        {
+            burning = true;
+            int num = (damage / 3) + (int)net_burn * 100;
+            float time = (float)(net_burn * 200);
+            float next_time = Time.time + time;
+            RpcUpdateAilments("\r\n <color=orange>Burn</color> ", time);
+            while (Time.time < next_time || HP == 0)
+            {
+                HP -= num;
+                RpcDisplayHPChange(new Color(0.2f, 0.3f, 0.4f), num);
+                yield return new WaitForSeconds(1);
+            }
+            burning = false;
+        }
+    }
+
+    [ClientRpc]
+    public void RpcUpdateAilments(string s, float time)
+    {
+        StartCoroutine(UpdateAilments(s, time));
+    }
+
+    [ClientRpc]
+    public void RpcClearAilments()
+    {
+        if (ailment_display_show)
+        {
+            ailments.Clear();
+            ailment_text.text = "";
+        }
+    }
+
+    IEnumerator UpdateAilments(string s, float time)
+    {
+        ailments.Add(s);
+        ailment_text.text = "";
+        foreach (string t in ailments)
+        {
+            ailment_text.text += t;
+        }
+        yield return new WaitForSeconds(time);
+        ailments.Remove(s);
+        ailment_text.text = "";
+        foreach (string t in ailments)
+        {
+            ailment_text.text += t;
+        }
+    }
+
     [ClientRpc]
     public void RpcChangeLayer(int layer)
     {
@@ -161,10 +254,9 @@ public class HealthDefence : NetworkBehaviour {
     public void RpcChangeColor(GameObject g,Color color)
     {
         g.GetComponent<Renderer>().material.color = color;
-        Debug.Log(g.GetComponent<Renderer>());
     }
 
-    
+    [ClientRpc]
     void RpcDisplayHP()
     {
         if (health_bar_show == null)
@@ -182,6 +274,23 @@ public class HealthDefence : NetworkBehaviour {
         float n = _HP * 1.0f;
         n /= maxHP * 1.0f;
         hp_bar.sizeDelta = new Vector2(maxWidth * n, hp_bar.rect.height);
+    }
+
+    [ClientRpc]
+    public void RpcDisplayHPChange(Color color,int num)
+    {
+        health_change_show = Instantiate(health_change_canvas, gameObject.transform.position + new Vector3(0, 0, 1), Quaternion.Euler(90, 0, 0)) as GameObject;
+        if (type != HealthDefence.Type.Shield)
+        {
+            health_change_show.GetComponentInChildren<Text>().text = "-" + num;
+            health_change_show.GetComponentInChildren<Text>().color = color;
+        }
+        else
+        {
+            health_change_show.GetComponentInChildren<Text>().text = "*BLOCKED*";
+            health_change_show.GetComponentInChildren<Text>().color = Color.black;
+        }
+        Destroy(health_change_show, 1f);
     }
     
     IEnumerator Regeneration()

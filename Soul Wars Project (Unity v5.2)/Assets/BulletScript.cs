@@ -13,14 +13,15 @@ public class BulletScript : NetworkBehaviour {
     [SyncVar] public float home_speed;
     [SyncVar] public double crit_chance;
     [SyncVar] public float knockback_power;
+    [SyncVar] public double chill_strength;
+    [SyncVar] public double burn_strength;
     public Gun gun_reference;
     [SyncVar] public bool has_collided = false;
     [SyncVar] public bool legit_target = false;
     public bool homes = false;
     [SyncVar] public int coroutines_running = 0;
-    private HealthDefence Target;
-    public GameObject health_change_canvas;
-    public GameObject health_change_show;
+    [SyncVar] public bool can_pierce;
+    public HealthDefence Target;
 	// Use this for initialization
 
 	void Start () 
@@ -36,6 +37,7 @@ public class BulletScript : NetworkBehaviour {
         }
         homer = transform.GetChild(0).gameObject;
         homer.GetComponent<SphereCollider>().radius = home_radius;
+        GetComponent<Collider>().isTrigger = can_pierce;
         HomingScript script = homer.GetComponent<HomingScript>();
         script.home_speed = home_speed;
         script.prb = GetComponent<Rigidbody>();
@@ -57,115 +59,87 @@ public class BulletScript : NetworkBehaviour {
         }
     }
 
+    IEnumerator Pierce(Collision hit)
+    {
+        Collider first = GetComponent<Collider>();
+        Collider second = hit.gameObject.GetComponent<Collider>();
+        Physics.IgnoreCollision(first, second);
+        yield return new WaitForEndOfFrame();
+        Physics.IgnoreCollision(first, second, false);
+    }
+
+    IEnumerator Pierce(Collider hit)
+    {
+        Collider first = GetComponent<Collider>();
+        Collider second = hit;
+        Physics.IgnoreCollision(first, second);
+        yield return new WaitForSeconds(1);
+        if (second.enabled)
+        {
+            Physics.IgnoreCollision(first, second, false);
+        }
+    }
+
    [ServerCallback]
     void OnCollisionEnter(Collision hit)
     {
         try
         {
-            //RpcHit(hit.gameObject);
             StartCoroutine(Damage(hit));
         }
         catch (System.NullReferenceException e)
         {
-            RpcStopAllCoroutines();
+            StopAllCoroutines();
             NetworkServer.Destroy(gameObject);
             //Always destroy the object upon any detectable impact upon an exception           
         }
     }
 
-    [ClientRpc]
-    void RpcHit(GameObject g)
-    {
-       // StartCoroutine(Damage(g.GetComponent<Collider>()));
-    }
+   [ServerCallback]
+   void OnTriggerEnter(Collider hit)
+   {
+       try
+       {
+           StartCoroutine(Damage(null,hit));
+       }
+       catch (System.NullReferenceException e)
+       {
+           StopAllCoroutines();
+           NetworkServer.Destroy(gameObject);
+           //Always destroy the object upon any detectable impact upon an exception           
+       }
+   }
 
-    [ClientRpc]
-    void RpcStopAllCoroutines()
+     
+    IEnumerator Damage(Collision hit,Collider col = null)
     {
-        if (health_change_show)
+        if (col == null)
         {
-            Destroy(health_change_show.gameObject);
+            Target = hit.gameObject.GetComponent<HealthDefence>();
         }
-        StopAllCoroutines();
-    }
-
-     [ServerCallback]
-    IEnumerator Damage(Collision hit)
-    {
-        Target = hit.gameObject.GetComponent<HealthDefence>();
+        else
+        {
+            Target = col.gameObject.GetComponent<HealthDefence>();
+        }
         /*If the target still exist and doesn't even have this script,
          Don't bother executing the rest of the code.As for the exception,it is there
          in the event the object "dies" midway execution,presumably from another bullet.*/
-       // has_collided = true;
         /*If a spawn point is hit by enemy,just run on client.*/
         /*If an enemy is hit(for enemy guns have no client user set),test whether the code is
          running on the same client as the one who shot the bullet(for number UI to show up)
          *If a player is hit,run the code only on whoever got hit*/
         if (Target != null)
         {
-            legit_target = true;
-            //Wait until all coroutines operating on the bullet finish
-            while (coroutines_running > 0)
+            if (hit != null)
             {
-                yield return new WaitForFixedUpdate();
+                StartCoroutine(Pierce(hit));
             }
-            int damage = rand.Next(lower_bound_damage, upper_bound_damage);
-                int d = (damage - Target.defence);
-                bool crit = false;
-                if ((crit_chance - Target.crit_resistance) >= rand.NextDouble() + .001)//bullets with a crit chance of 0 shouldn't be able to land a crit
-                {
-                    crit = true;
-                    d *= 3;
-                }
-                
-                RpcDisplayHPChange(d,crit,(int)Target.type);
-
-                if (Target.has_exp)
-                {
-                    gun_reference.experience += d * Target.exp_rate;
-                }
-                if (Target.type == HealthDefence.Type.Unit && Target.HP - d > 0)
-                {
-                    float knockback = knockback_power - Target.knockback_resistance;
-                    if (knockback > 0)
-                    {
-                        Target.rb.AddForce(new Vector3(transform.forward.x, 0, transform.forward.z) * knockback, ForceMode.Impulse);
-                        //Target.StartCoroutine(Stun(Target, knockback));
-                    }
-                }
-                AIController AI = Target.Controller as AIController;
-                if (AI != null)
-                {
-                    //AI.UpdateAggro(d, gun_reference.client_user.netId);
-                }
-                Target.HP -= d;
-                StartCoroutine(WaitForNetworkDestruction(gameObject,.15f));
-            
-
-        }
-        else//if target is null
-        {
-           /* Before destruction,Stop all coroutines(the gun_abilities operating on this instance)
-             to prevent exceptions from those coroutines*/
-            RpcStopAllCoroutines();
-            StartCoroutine(WaitForNetworkDestruction(gameObject, .15f));
-        }
-    }
-    /*
-    IEnumerator Damage(Collider hit)
-    {
-        Target = hit.gameObject.GetComponent<HealthDefence>();
-        /*If the target still exist and doesn't even have this script,
-         Don't bother executing the rest of the code.As for the exception,it is there
-         in the event the object "dies" midway execution,presumably from another bullet.
-        has_collided = true;
-        /*If a spawn point is hit by enemy,just run on client.
-        /*If an enemy is hit(for enemy guns have no client user set),test whether the code is
-         running on the same client as the one who shot the bullet(for number UI to show up)
-         *If a player is hit,run the code only on whoever got hit
-        if (Target != null)
-        {
+            else
+            {
+                StartCoroutine(Pierce(col));
+            }
             legit_target = true;
+            has_collided = true;
             //Wait until all coroutines operating on the bullet finish
             while (coroutines_running > 0)
             {
@@ -179,21 +153,21 @@ public class BulletScript : NetworkBehaviour {
                 crit = true;
                 d *= 3;
             }
-
-            DisplayHPChange(d, crit, (int)Target.type);
+            Target.StartCoroutine(Target.DetermineChill(chill_strength));
+            Target.StartCoroutine(Target.DetermineBurn(burn_strength,d));
+            if (crit)
+            {
+                Target.RpcDisplayHPChange(new Color(114, 0, 198), d);//Violet
+            }
+            else
+            {
+                Target.RpcDisplayHPChange(Color.red, d);
+            }
+            //RpcDisplayHPChange(d, crit, (int)Target.type);
 
             if (Target.has_exp)
             {
                 gun_reference.experience += d * Target.exp_rate;
-            }
-            if (Target.type == HealthDefence.Type.Unit && Target.HP - d > 0)
-            {
-                float knockback = knockback_power - Target.knockback_resistance;
-                if (knockback > 0)
-                {
-                    Target.rb.AddForce(new Vector3(transform.forward.x, 0, transform.forward.z) * knockback, ForceMode.Impulse);
-                    //Target.StartCoroutine(Stun(Target, knockback));
-                }
             }
             AIController AI = Target.Controller as AIController;
             if (AI != null)
@@ -201,61 +175,31 @@ public class BulletScript : NetworkBehaviour {
                 AI.UpdateAggro(d, gun_reference.client_user.netId);
             }
             Target.HP -= d;
-            StartCoroutine(WaitForNetworkDestruction(gameObject, .15f));
-
-
-        }
-        else//if target is null
-        {
-            /*Before destruction,Stop all coroutines(the gun_abilities operating on this instance)
-             to prevent exceptions from those coroutines
-            RpcStopAllCoroutines();
-            StartCoroutine(WaitForNetworkDestruction(gameObject, .15f));
-        }
-    } */
-
-    
-    void RpcDisplayHPChange(int num,bool crit,int type)
-    {
-        health_change_show = Instantiate(health_change_canvas, gameObject.transform.position + new Vector3(0, 0, 1), Quaternion.Euler(90, 0, 0)) as GameObject;
-        if (type != 1)
-        {
-            health_change_show.GetComponentInChildren<Text>().text = "-" + num;
-            if (crit)
+            if (!can_pierce)
             {
-                health_change_show.GetComponentInChildren<Text>().color = new Color(114, 0, 198);//A violet like color
+                NetworkServer.Destroy(gameObject);
+            }
+        }
+        /*If target is null or hit enemy detetion*/
+        else if ((col && !col.isTrigger) || (hit != null && !hit.gameObject.GetComponent<Collider>().isTrigger))
+        {
+            /* Before destruction,Stop all coroutines(the gun_abilities operating on this instance)
+             to prevent exceptions from those coroutines*/
+            if (col)
+            {
+                Debug.Log(col.gameObject);
             }
             else
             {
-                health_change_show.GetComponentInChildren<Text>().color = Color.red;
+                Debug.Log(hit.gameObject);
             }
+            StopAllCoroutines();
+            NetworkServer.Destroy(gameObject);
         }
-        else
-        {
-            health_change_show.GetComponentInChildren<Text>().text = "*BLOCKED*";
-            if (crit)
-            {
-                health_change_show.GetComponentInChildren<Text>().color = Color.black;
-            }
-            else
-            {
-                health_change_show.GetComponentInChildren<Text>().color = Color.grey;
-            }
-        }
+    }
+
+
        
-        Destroy(health_change_show, 1f);
-    }
-    
-
-    IEnumerator Stun(HealthDefence Target,float knockback)
-    {
-        Target.Controller.enabled = false;
-        yield return new WaitForSeconds(knockback / 10);
-        Target.Controller.enabled = true;
-        Target.standing_power -= knockback;
-    }
-
-    
 
    
 }

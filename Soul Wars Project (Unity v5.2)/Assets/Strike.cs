@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.UI;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -6,13 +7,18 @@ using UnityEngine.Networking;
 
 public class Strike : Gun {
     private readonly static string[] gun_ability_names = new string[3] { "Marksman", "Sniper", null };
-    private readonly static string[] gun_name_addons = new string[3] { "Marksmanship",null,null };
+    private readonly static string[] gun_name_addons = new string[3] { "Marksmanship","Accuracy",null };
+    private readonly static string[] gun_ability_desc = new string[3] {
+        "Marksman" + "\n Can grant up to" + "\n 30% crit chance based on" + "\n how little the bullet turns.",
+        "Sniper" + "\n Adds a seconds of" + "\n cooldown to the enemy's" + "\n current gun.",
+        null
+    };
     /*This class's pool of gun_abilities.Use of a static container of static methods requiring explicit this
      pointers are used for onetime,pre-Awake() initialization of delegates*/
     private static List<Gun_Abilities> Gun_Mods = new List<Gun_Abilities>()//This class's pool of gun_abilities
     {
         {Marksman},
-        null,
+        {Sniper},
         null
     };
    
@@ -51,10 +57,43 @@ public class Strike : Gun {
             yield return null;
         }
     }
+
+    private static IEnumerator Sniper(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        while (script.has_collided == false)//Wait for Collision
+        {
+            yield return new WaitForFixedUpdate();
+        }
+        if (script.legit_target == false || script.Target.type != HealthDefence.Type.Unit)//Check if target even is valid
+        {
+            script.coroutines_running--;
+            yield return null;
+        }
+        else
+        {
+            script.Target.RpcUpdateAilments("\r\n <color=yellow>+ 1 sec cooldown on gun </color>", 1);
+            Gun targ = script.Target.Controller.Gun.GetComponent<Gun>();
+            if (targ.HasReloaded())
+            {
+                targ.next_time = Time.time + 1f;
+            }
+            else
+            {
+                targ.next_time += 1f;
+            }
+            script.coroutines_running--;
+        }
+    }
     
     protected override string ClassGunAbilityNames(int index)
     {
         return gun_ability_names[index];
+    }
+
+    protected override string GunAbilityDesc(int index)
+    {
+        return gun_ability_desc[index];
     }
 
     protected override Gun_Abilities ClassGunMods(int index)
@@ -63,6 +102,7 @@ public class Strike : Gun {
     }
 
     protected override void SetGunNameAddons(int index)     {
+        Debug.Log(index);
         if (index < 4 || index > 12)
         {
             suffixes.Add(gun_name_addons[index]);
@@ -95,7 +135,7 @@ public class Strike : Gun {
         layer = 13;
         home_layer = 10;
         color = new Color(43, 179, 234);
-        range = 5;
+        range = 10f;
         projectile_speed = 5;
         knockback_power = 5;
         crit_chance = .1;

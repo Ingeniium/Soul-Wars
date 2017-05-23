@@ -8,7 +8,6 @@ using System.Collections.Generic;
 public class HPbar : MonoBehaviour {
     public GameObject Object;
     public Vector3 offset;
-	
 	void LateUpdate ()
     {
         if (Object)

@@ -54,10 +54,7 @@ public abstract class Item : NetworkBehaviour,IRecordable
     protected abstract void OnClientUserChange();
     public abstract string GetImagePreviewString();
 
-    protected virtual string GetBaseName()
-    {
-        return ToString();
-    }
+    protected abstract string GetBaseName();
 
     public void DropItem(ref double chance)
     {
@@ -129,7 +126,7 @@ public abstract class Item : NetworkBehaviour,IRecordable
     }
 
 
-    public abstract void PrepareItemForUse();//Creates and sets up gameobject
+    public abstract IEnumerator PrepareItemForUse();//Creates and sets up gameobject
     public abstract void Options();//Sets up options
 
     void OnMouseEnter()
