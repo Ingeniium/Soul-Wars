@@ -16,7 +16,7 @@ public abstract partial class Gun : Item {
 	public GameObject Bullet;
 	public GameObject bullet;
     [SyncVar] public float reload_time;//How long it takes to fire each shot
-	public float next_time;//Next firing time
+	[SyncVar] public float next_time;//Next firing time
     [SyncVar] public float home_speed;//Angular turning speed of the bullet
 	[SyncVar] public float home_radius;
     public bool homes = true;//whether the bullets will have homing capabilities
@@ -142,7 +142,7 @@ public abstract partial class Gun : Item {
         script.gameObject.layer = layer;
         script.knockback_power = knockback_power;
         /*Homing script values passed for homing toggle*/
-        script.home.layer = home_layer;
+        //.homer.layer = home_layer;
         script.home_speed = home_speed;
         script.home_radius = home_radius;
         script.homes = homes;
@@ -175,9 +175,15 @@ public abstract partial class Gun : Item {
         if (suffixes.Count > 0)
         {
             phrase += "of ";
+            int i = 1;
             foreach (string s in suffixes)
             {
                 phrase += s + " ";
+                if (i < suffixes.Count)
+                {
+                    i++;
+                    phrase += "and ";
+                }
             }
         }
 
@@ -192,7 +198,7 @@ public abstract partial class Gun : Item {
     }
 
     [ClientRpc]
-    void RpcSetGun(int _level,uint _points,int _experience,int _next_lvl,int[] indeces)
+    public void RpcSetGun(int _level,uint _points,int _experience,int _next_lvl,int[] indeces)
     {
         SetBaseStats();
         level = _level;
@@ -219,25 +225,18 @@ public abstract partial class Gun : Item {
         if (in_inventory)
         {
                 _item_image.transform.SetParent(weapons_bar.transform);     
-                /*GameObject Gun = Instantiate(asset_reference, prev_Gun.transform.position, prev_Gun.transform.rotation) as GameObject;
-                Gun.transform.SetParent(PlayerController.Client.gameObject.transform);
-                CopyComponent<Gun>(this, Gun);
-                Gun gun = Gun.GetComponent<Gun>();
-                _item_image.GetComponentInChildren<ItemImage>().item_script = gun;
-                gun.current_reference = Gun;
-                gun.color = prev_Gun.GetComponent<Gun>().color;
-                gun.layer = 13;
-                gun.home_layer = 10;
-                gun.barrel_end = Gun.transform.GetChild(0);
-                gun.in_inventory = false;*/
-                PlayerController.Client.CmdSpawnItem(asset_reference, client_user.Gun.transform.position, client_user.Gun.transform.rotation,true);
+                PlayerController.Client.CmdSpawnItem(GetBaseName(),client_user.Gun.transform.position, client_user.Gun.transform.rotation,true);
+                while (!client_user.pass_over)
+                {
+                    yield return new WaitForEndOfFrame();
+                }
                 Gun median = client_user.pass_over.GetComponent<Gun>();
                 int[] index = new int[claimed_gun_ability.Count()];
                 for (int i = 0; i < claimed_gun_ability.Count(); i++)
                 {
                     index[i] = claimed_gun_ability[i];
                 }
-                median.RpcSetGun(level, points,experience,next_lvl,index);
+                client_user.CmdSetGun(client_user.pass_over, level, points, experience, next_lvl, index);
                 while (!median.current_reference)
                 {
                     yield return new WaitForEndOfFrame();
@@ -272,6 +271,7 @@ public abstract partial class Gun : Item {
                     }
                 }
                 median = null;
+                
             Destroy(this);
             
         }
@@ -368,9 +368,7 @@ public abstract partial class Gun : Item {
             index = Index;
             if (Index == PlayerController.Client.main_weapon_index)//Set it up to be main gun if the index is equivalent to the current equipped gun
             {
-                PlayerController.Client.gun = this;
-                PlayerController.Client.Gun = current_reference;
-                //PlayerController.Client.GetComponent<NetworkTransformChild>().target = current_reference.transform;
+                client_user.CmdEquipGun(current_reference);
                 current_reference.GetComponent<Renderer>().enabled = true;
             }
             PlayerController.Client.equipped_weapons[Index] = this;

@@ -90,7 +90,7 @@ public abstract partial class Gun : Item
                 for (int i = 0; i < buttons.Length - 1; i++)//Exclude "x" button
                 {
                     int temp = i;
-                    buttons[temp].method = gun_for_consideration.ClassGunMods(temp);
+                    buttons[temp].method = gun_for_consideration.ClassGunMods(temp);                 
                 }
             }
             if (gun_for_consideration.points == 0 && gun_for_consideration.level_up_indication)
@@ -119,7 +119,8 @@ public abstract partial class Gun : Item
         public int index;
         private GameObject desc_canvas_show;
 
-        void OnMouseDown()
+        
+        public void OnMouseDrag()
         {
             if (GunTable.gun_for_consideration.points > 0 && button.interactable && method != null)
             {

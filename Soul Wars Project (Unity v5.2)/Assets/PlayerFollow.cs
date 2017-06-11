@@ -21,10 +21,10 @@ public class PlayerFollow : MonoBehaviour
 
     void Start()
     {
-        _offset = transform.position - Player.transform.position;
-        //camera = GetComponent<Camera>();
         tr = Player.transform;
+        _offset = new Vector3(0, 20, 0);
     }
+
 
     void FixedUpdate()
     {

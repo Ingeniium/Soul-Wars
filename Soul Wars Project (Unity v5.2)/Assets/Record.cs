@@ -89,7 +89,6 @@ class Record : MonoBehaviour
                     i.set = true;
                     image_canvas_show.GetComponentInChildren<ItemImage>().item_script = i;
                     i.client_user = PlayerController.Client;
-                    Debug.Log("Called");
                
                     if (Int32.Parse(e.Attribute("Index").Value) < 0)
                     {
@@ -110,6 +109,7 @@ class Record : MonoBehaviour
                     }
                 }
             }
+            PlayerController.Client.loaded = true;
             
               
         }
@@ -153,8 +153,9 @@ class Record : MonoBehaviour
 
     void Start()
     {
-        if (PlayerController.Client)
+        if (PlayerController.Client && !PlayerController.Client.loaded)
         {
+           
             if (File.Exists("SoulWars.xml"))
             {
                 LoadFromFile();

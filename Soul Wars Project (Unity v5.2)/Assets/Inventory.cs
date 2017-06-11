@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 
 public class Inventory : MonoBehaviour {
-    private List<GameObject> inventory_items;
+    private List<GameObject> inventory_items = new List<GameObject>();
     private uint maximum = 10;
 	// Use this for initialization
 	void Start () 
@@ -21,7 +21,10 @@ public class Inventory : MonoBehaviour {
     }
     public void RemoveItem(ref GameObject item)
     {
-        inventory_items.Remove(item);
+        if(inventory_items.Contains(item))
+        {
+            inventory_items.Remove(item);
+        }
     }
 
 }

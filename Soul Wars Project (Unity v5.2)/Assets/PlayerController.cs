@@ -15,6 +15,7 @@ public class PlayerController : GenericController {
             NameDisplayShow.GetComponentInChildren<Text>().text = value;
         }
     }
+    [SyncVar] public bool loaded = false;
     private string _player_name;
     public GameObject NameDisplay;
     public GameObject NameDisplayShow;
@@ -85,7 +86,7 @@ public class PlayerController : GenericController {
     }
     private float moveHorizontal;
     private float moveVertical;
-	private Rigidbody rb;
+    public Rigidbody rb;
 	private Transform tr;
     public Canvas cooldown_canvas;
     private Canvas cooldown_canvas_show;
@@ -133,7 +134,7 @@ public class PlayerController : GenericController {
         gun.client_user = this;
         if (isLocalPlayer && netId.Value == 5)
         {
-            CmdEnemySpawn(SpawnManager.EnemySpawnPoints[0].transform.position + SpawnManager.EnemySpawnPoints[0].spawn_direction * 3);
+           //CmdEnemySpawn(SpawnManager.EnemySpawnPoints[0].transform.position + SpawnManager.EnemySpawnPoints[0].spawn_direction * 3);
         }
         if (!isLocalPlayer)
         {
@@ -143,14 +144,11 @@ public class PlayerController : GenericController {
         else
         {
             Client = this;
-            //NameDisplayShow.GetComponent<HPbar>().Object = this.gameObject;
             shield_collider = Shield.GetComponent<BoxCollider>();
             rb = GetComponent<Rigidbody>();
             tr = GetComponent<Transform>();
             if (cam_show.enabled)
             {
-                tr.position = SpawnManager.AllySpawnPoints[0].transform.position + SpawnManager.AllySpawnPoints[0].spawn_direction;
-                cam_show.transform.position = tr.position + new Vector3(0, 15, 0);
                 cam_show.transform.rotation = cam.transform.rotation;
             }
             
@@ -189,31 +187,41 @@ public class PlayerController : GenericController {
     {
         GameObject Enemy = Instantiate(Resources.Load("Dummy 1"), pos, Quaternion.identity) as GameObject;
         NetworkServer.Spawn(Enemy);
-        foreach (Renderer r in Enemy.GetComponentsInChildren<Renderer>())
+      /*  foreach (NetworkIdentity n in Enemy.GetComponentsInChildren<NetworkIdentity>())
         {
-            NetworkServer.Spawn(r.gameObject);
-        }
+            NetworkServer.Spawn(n.gameObject);
+        }*/
+        NetworkServer.Spawn(Enemy.GetComponentInChildren<Gun>().gameObject);
     }
 
 
     [Command]
-    public void CmdSpawnItem(GameObject g,Vector3 pos,Quaternion rot,bool child)
+    public void CmdSpawnItem(string asset_reference,Vector3 pos,Quaternion rot,bool child)
     {
-        pass_over = Instantiate(g, pos, rot) as GameObject;
+        GameObject obj = Resources.Load(asset_reference) as GameObject;
+        pass_over = Instantiate(obj, pos, rot) as GameObject;
         NetworkServer.SpawnWithClientAuthority(pass_over, connectionToClient);
+        pass_over.GetComponent<Item>().client_user = this;
+        RpcSetPassOver(pass_over,child);
+    }
+
+    [Command]
+    public void CmdEquipGun(GameObject g)
+    {
+        Gun = g;
+        gun = g.GetComponent<Gun>();
+    }
+
+    [ClientRpc]
+    void RpcSetPassOver(GameObject g,bool child)
+    {
+        pass_over = g;
         pass_over.GetComponent<Item>().client_user = this;
         if (child)
         {
             pass_over.transform.SetParent(transform);
+            gameObject.GetComponent<NetworkTransformChild>().target = g.transform;
         }
-        RpcSetPassOver(pass_over);
-    }
-
-    [ClientRpc]
-    void RpcSetPassOver(GameObject g)
-    {
-        pass_over = g;
-        pass_over.GetComponent<Item>().client_user = this;
     }
 
     [Command]
@@ -221,28 +229,22 @@ public class PlayerController : GenericController {
     {
         try
         {
-            gun.Shoot();
+            if (gun.HasReloaded() && !shield_collider.enabled)
+            {
+                gun.Shoot();
+            }
         }
         catch(System.NullReferenceException e)
         {
-            Debug.Log(gun);
+            
         }
         
     }
 
-    [ClientRpc]
-    void RpcShoot(GameObject g)
+    [Command]
+    public void CmdSetGun(GameObject g,int _level,uint _points, int _experience,int _next_level, int[] indeces)
     {
-            try
-            {
-                gun.Shoot(g);
-                shooting = false;
-            }
-            catch (System.NullReferenceException e)
-            {
-                Debug.Log(gun != null);
-            }
-          
+        g.GetComponent<Gun>().RpcSetGun(_level, _points, _experience, _next_level, indeces);
     }
    
     [Command]
@@ -270,7 +272,6 @@ public class PlayerController : GenericController {
         }
     }
 
-
 	void Update() 
     {
         if (!isLocalPlayer || !equip_action)
@@ -279,16 +280,21 @@ public class PlayerController : GenericController {
         }
         else
         {
-            if (Input.GetMouseButtonDown(0) && gun.HasReloaded() && !shield_collider.enabled)
+           
+            if (Input.GetMouseButtonDown(0) && !cooldown_canvas_show)
             {
                 cooldown_canvas_show = Instantiate(cooldown_canvas, gun._item_image.transform.position + new Vector3(.25f, 0, 0), gun._item_image.transform.rotation) as Canvas;
                 cooldown_canvas_show.transform.SetParent(gun._item_image.transform);
-                CmdShoot();
                 StartCoroutine(Cooldown.NumericalCooldown(cooldown_canvas_show, gun.reload_time));
+                CmdShoot();
                 
             }
             else if (Input.GetMouseButton(1) && !shield_collider.enabled)
             {
+                if (Gun == null)
+                {
+                    Gun = pass_over;
+                }
                 StartShieldBlocking();
             }
             if (Input.GetMouseButtonUp(1))
@@ -354,7 +360,7 @@ public class PlayerController : GenericController {
             moveHorizontal = Input.GetAxis("Horizontal");
             moveVertical = Input.GetAxis("Vertical");
             total_move = new Vector3(moveHorizontal, 0, -1 * moveVertical);
-            rb.AddForce(total_move * speed);
+            rb.velocity = speed * total_move;
         }
     }
 

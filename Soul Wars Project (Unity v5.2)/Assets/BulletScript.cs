@@ -154,13 +154,17 @@ public class BulletScript : NetworkBehaviour {
          *If a player is hit,run the code only on whoever got hit*/
         if (Target != null)
         {
-            if (hit != null)
+            if (can_pierce)
             {
-                StartCoroutine(Pierce(hit));
-            }
-            else
-            {
-                StartCoroutine(Pierce(col));
+                if (hit != null)
+                {
+                    StartCoroutine(Pierce(hit));
+                }
+                else
+                {
+                    StartCoroutine(Pierce(col));
+                }
+
             }
             legit_target = true;
             has_collided = true;
@@ -187,11 +191,15 @@ public class BulletScript : NetworkBehaviour {
             {
                 Target.RpcDisplayHPChange(Color.red, d);
             }
-            //RpcDisplayHPChange(d, crit, (int)Target.type);
+            
 
             if (Target.has_exp)
             {
                 gun_reference.experience += d * Target.exp_rate;
+            }
+            if (Target.Controller)
+            {
+                Target.GetComponent<Rigidbody>().velocity = Vector3.zero;
             }
             AIController AI = Target.Controller as AIController;
             if (AI != null)

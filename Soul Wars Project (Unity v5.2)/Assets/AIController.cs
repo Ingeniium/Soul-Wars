@@ -26,6 +26,7 @@ public partial class AIController : GenericController {
     private static UniversalCommunicator TeamController = new UniversalCommunicator();
     private FunctionChooser attack_func_chances = new FunctionChooser();
     private Vector3 move_dir;
+    public Rigidbody rb;
 
     private static Dictionary<int, Func<AIController, Vector3>> MovementFuncs = new Dictionary<int, Func<AIController, Vector3>>()
     {
@@ -93,6 +94,7 @@ public partial class AIController : GenericController {
         //GetCOmponent In parent apparently isn't working for transform
         gtr = Gun.GetComponent<Transform>();
         gun = Gun.GetComponent<Gun>();
+        gun.SetBaseStats();
     }
 
     [ServerCallback]
@@ -100,9 +102,8 @@ public partial class AIController : GenericController {
     {
         
             State.AffirmTarget(Target);
-            prb.AddForce(Vector3.up * 5);
             move_dir = MovementFuncs[movement_func_index](this);
-            prb.AddForce(move_dir.normalized * 10);
+            prb.velocity = move_dir.normalized * speed;
             if (Target && AttackFuncs[attack_func_index](this))
             {
                 GameObject g = Instantiate(Resources.Load("Bullet"),gun.barrel_end.position, gun.transform.rotation) as GameObject;

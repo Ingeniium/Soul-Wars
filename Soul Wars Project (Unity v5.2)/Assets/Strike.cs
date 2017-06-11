@@ -127,21 +127,29 @@ public class Strike : Gun {
         return "Strike";
     }
 
-    protected override void SetBaseStats()
+    public override void SetBaseStats()
     {
         upper_bound_damage = 15;
         lower_bound_damage = 7;
         asset_reference = Resources.Load("Strike") as GameObject;
-        layer = 13;
-        home_layer = 10;
-        color = new Color(43, 179, 234);
+        if (client_user)
+        {
+            layer = 13;
+            home_layer = 10;
+            color = new Color(43, 179, 234);
+        }
+        else
+        {
+            layer = 14;
+            home_layer = 12;
+        }
         range = 10f;
         projectile_speed = 5;
         knockback_power = 5;
-        crit_chance = .1;
+        crit_chance = .05;
         reload_time = .5f;
-        home_speed = 5f;
-        home_radius = 1.5f;
+        home_speed = 2.5f;
+        home_radius = 3f;
         homes = true;
         /*Resources.Load seems to only work for getting prefabs as only game objects.*/
         GameObject g = Resources.Load("Drop Item Name Box") as GameObject;

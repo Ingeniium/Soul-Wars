@@ -6,8 +6,8 @@ public class HomingScript : MonoBehaviour
     public Rigidbody prb;
     public Transform ptr;
     private List<Collider> col = new List<Collider>();//Made into a list as to enable consideration of multiple projectiles
-    private Collider main_col;//Collider that device is currently homing in
-    private bool homing = false;//Whether it is currently homing on a target
+    public Collider main_col;//Collider that device is currently homing in
+    public bool homing = false;//Whether it is currently homing on a target
     public float home_speed;
     Vector3 target_pos;
    

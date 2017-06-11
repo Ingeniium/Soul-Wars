@@ -38,13 +38,24 @@ public class Flurry : Gun
         {
             yield return new WaitForEndOfFrame();
         }
-        Collider[] bullet_colliders = Physics.OverlapSphere(script.gameObject.transform.position, 10,-1, QueryTriggerInteraction.Collide);
+        string layer = null;
+        if (script.gameObject.layer == 13)
+        {
+            layer = "AllyAttack";
+        }
+        else
+        {
+            layer = "EnemyAttack";
+        }
+        Collider[] bullet_colliders = Physics.OverlapSphere(script.gameObject.transform.position, 10,
+            LayerMask.GetMask(layer), QueryTriggerInteraction.Collide);
         foreach (Collider col in bullet_colliders)
         {
-            /*Check if its a flurry bullet that's shot from an ally and isn't homing*/
+            /*Check if its a flurry bullet that isn't isn't homing*/
             BulletScript b = col.GetComponent<BulletScript>();
-            if (b && b.gun_reference is Flurry && !b.homer.GetComponent<HomingScript>().homing && b.gameObject.layer == script.gameObject.layer)
+            if (b && b.gun_reference is Flurry && !b.homer.GetComponent<HomingScript>().homing)
             {
+                /*Make bullet face target and fire towards them*/
                 b.transform.LookAt(new Vector3(home.main_col.gameObject.transform.position.x, script.transform.position.y, home.main_col.gameObject.transform.position.z));
                 b.GetComponent<Rigidbody>().velocity = b.transform.forward * b.GetComponent<Rigidbody>().velocity.magnitude;
             }
@@ -140,7 +151,7 @@ public class Flurry : Gun
 
     protected override bool AreGunLevelUpButtonsAssignedForClass()
     {
-        return (GunTable.buttons[0].method == null);
+        return (GunTable.buttons[0].method == Hunter);
     }
 
     protected override string GunDesc()
@@ -153,20 +164,28 @@ public class Flurry : Gun
         return "Flurry";
     }
 
-    protected override void SetBaseStats()
+    public override void SetBaseStats()
     {
         upper_bound_damage = 7;
         lower_bound_damage = 4;
         asset_reference = Resources.Load("Flurry") as GameObject;
-        layer = 13;
-        home_layer = 10;
-        color = new Color(43, 179, 234);
+        if (client_user)
+        {
+            layer = 13;
+            home_layer = 10;
+            color = new Color(43, 179, 234);
+        }
+        else
+        {
+            layer = 14;
+            home_layer = 12;
+        }
         range = 10;
         projectile_speed = 5;
         knockback_power = 5;
-        crit_chance = .1;
-        reload_time = .5f;
-        home_speed = 5f;
+        crit_chance = .05;
+        reload_time = 1f;
+        home_speed = 1.5f;
         home_radius = 3f;
         homes = true;
         /*Resources.Load seems to only work for getting prefabs as only game objects.*/

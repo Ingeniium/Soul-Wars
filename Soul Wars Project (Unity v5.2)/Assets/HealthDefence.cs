@@ -31,7 +31,10 @@ public class HealthDefence : NetworkBehaviour {
             {
                 _HP = 0;
                 RpcClearAilments();
-                hp_string.text = "<b>" + HP + "</b>";
+                if (hp_string)
+                {
+                    hp_string.text = "<b>" + HP + "</b>";
+                }
                 if ((Controller is PlayerController) != true)
                 {
                     Destroy(health_bar_show.gameObject);
@@ -204,7 +207,7 @@ public class HealthDefence : NetworkBehaviour {
             while (Time.time < next_time || HP == 0)
             {
                 HP -= num;
-                RpcDisplayHPChange(new Color(0.2f, 0.3f, 0.4f), num);
+                RpcDisplayHPChange(new Color(255, 150,0), num);
                 yield return new WaitForSeconds(1);
             }
             burning = false;

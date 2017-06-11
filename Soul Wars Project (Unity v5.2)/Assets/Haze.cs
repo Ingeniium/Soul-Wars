@@ -9,8 +9,8 @@ public class Haze : Gun
     private readonly static string[] gun_ability_names = new string[3] { "Fog", "Conflagration", null };
     private readonly static string[] gun_name_addons = new string[3] { "Fog", "Conflagration", null };
     private readonly static string[] gun_ability_desc = new string[3] {
-        "Fog" + "\n Adds +5 Chill power to bullets",
-        "Conflagration" + "\n Adds +5 Burn power to bullets",
+        "Fog" + "\n Adds +5 Chill power to bullets.",
+        "Conflagration" + "\n Adds +5 Burn power to bullets.",
         null
     };
     /*This class's pool of gun_abilities.Use of a static container of static methods requi"Markring explicit this
@@ -79,18 +79,26 @@ public class Haze : Gun
         return "Haze";
     }
 
-    protected override void SetBaseStats()
+    public override void SetBaseStats()
     {
         upper_bound_damage = 8;
         lower_bound_damage = 6;
         asset_reference = Resources.Load("Haze") as GameObject;
-        layer = 13;
-        home_layer = 10;
-        color = new Color(43, 179, 234);
+        if (client_user)
+        {
+            layer = 13;
+            home_layer = 10;
+            color = new Color(43, 179, 234);
+        }
+        else
+        {
+            layer = 14;
+            home_layer = 12;
+        }
         range = 10;
         projectile_speed = 2;
         knockback_power = 5;
-        crit_chance = .1;
+        crit_chance = .05;
         reload_time = 2f;
         home_speed = 0;
         home_radius = 0;

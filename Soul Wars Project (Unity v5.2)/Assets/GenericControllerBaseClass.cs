@@ -12,7 +12,7 @@ public abstract class GenericController : NetworkBehaviour
     public GameObject Gun;
     public GameObject Shield;
     protected Collider shield_collider;
-    [SyncVar] public float speed = 75f;
+    [SyncVar] public float speed = 20f;
 
     protected void StartShieldBlocking()
     {
@@ -30,8 +30,8 @@ public abstract class GenericController : NetworkBehaviour
     {
         Quaternion rot = Quaternion.AngleAxis(90, Vector3.up);
         Shield.transform.rotation *= rot;
+        shield_collider.enabled = false; 
         Gun.transform.rotation *= rot;
-        shield_collider.enabled = false;
         Vector3 temp = Gun.transform.position;
         Gun.transform.position = Shield.transform.position;
         Shield.transform.position = temp;

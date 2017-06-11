@@ -181,7 +181,7 @@ public abstract class Item : NetworkBehaviour,IRecordable
 
     public abstract XElement RecordValuesToSaveFile();
     public abstract void RecordValuesFromSaveFile(XElement element);
-    protected abstract void SetBaseStats();
+    public abstract void SetBaseStats();
     
 }
 
