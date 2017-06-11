@@ -46,6 +46,7 @@
   </ItemGroup>
   <ItemGroup>
      <Compile Include="Assets\AIController.cs" />
+     <Compile Include="Assets\Blaster.cs" />
      <Compile Include="Assets\BulletScript.cs" />
      <Compile Include="Assets\Cooldown.cs" />
      <Compile Include="Assets\ExitButton.cs" />
