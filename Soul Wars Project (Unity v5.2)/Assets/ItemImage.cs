@@ -1,5 +1,6 @@
 ﻿
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using System.Collections;
 using System;
@@ -24,40 +25,34 @@ public class ItemImage : MonoBehaviour {
     private Canvas item_descritption_canvas_show;
     public bool option_showing = false;
 
-    void Start()
-    {
-        GetComponent<BoxCollider>().center = Vector3.zero;
-    }
+  
 
-    void OnMouseEnter()
+    public void OnPointerEnter()
     {
-       item_descritption_canvas_show = Instantiate(item_description_canvas,transform.position + new Vector3(1.5f,0,1.75f), item_description_canvas.transform.rotation) as Canvas;
-       item_descritption_canvas_show.transform.parent = transform;
-       item_descritption_canvas_show.GetComponentInChildren<Text>().text = item_script.ToString();
+         item_descritption_canvas_show = Instantiate(item_description_canvas, transform.position + new Vector3(1.5f, 0, 1.75f), item_description_canvas.transform.rotation) as Canvas;
+         item_descritption_canvas_show.transform.parent = transform;
+         item_descritption_canvas_show.GetComponentInChildren<Text>().text = item_script.ToString();     
     }
-    //Mouse events can't evaluate more than on button,therefore use two events for detection.
-    void OnMouseDown()
+    
+    public void OnPointerClick()
     {
-        if (Input.GetMouseButton(0))
-        {
-            if (item_script.in_inventory)
-            {
-                item_script.PrepareItemForUse();
-            }
-        }
+         if (item_script.in_inventory)
+         {
+             StartCoroutine(item_script.PrepareItemForUse());
+         }
     }
-    void OnMouseOver()
+    public void OnPointerDown()
     {
           PlayerController.Client.equip_action = false;
-         if (Input.GetMouseButton(1) && option_showing == false)
+          if (Input.GetMouseButton(1) && option_showing == false)
           {
-                item_script.Options();
-                option_showing = true;
+              item_script.Options();
+              option_showing = true;
           }
               
     }
 
-    void OnMouseExit()
+    public void OnPointerExit()
     {
         PlayerController.Client.equip_action = true;
         if (item_descritption_canvas_show)

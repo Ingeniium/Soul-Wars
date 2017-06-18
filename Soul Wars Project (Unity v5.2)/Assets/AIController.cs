@@ -5,10 +5,9 @@ using System.Collections;
 using System.Collections.Generic;
 
 public partial class AIController : GenericController {
-    public static PlayerController Host;
     private Rigidbody prb;
     public Transform ptr;
-    private HealthDefence Target;
+    public HealthDefence Target;
     private bool target_focus = true;
     private Collider trig;
     private List<Collider> bullet_colliders = new List<Collider>();
@@ -48,7 +47,7 @@ public partial class AIController : GenericController {
         {1,SideStep}
     };
 
-    private ValueGroup[] HateList = new ValueGroup[20]
+    public ValueGroup[] HateList = new ValueGroup[20]
     {
         new ValueGroup(0,-1), new ValueGroup(0,-1), 
         new ValueGroup(0,-1), new ValueGroup(0,-1), 
@@ -91,10 +90,14 @@ public partial class AIController : GenericController {
             TeamController.set = true;
         }
         prb = GetComponentInParent<Rigidbody>();
+        Gun = Instantiate(Resources.Load("Strike"), transform.position, transform.rotation) as GameObject;
         //GetCOmponent In parent apparently isn't working for transform
         gtr = Gun.GetComponent<Transform>();
         gun = Gun.GetComponent<Gun>();
         gun.SetBaseStats();
+        gun.barrel_end = Gun.transform.GetChild(0);
+        NetworkServer.Spawn(Gun);
+        NetworkMethods.Instance.RpcSetParent(Gun, ptr.gameObject, new Vector3(.004f, .005f, .794f),new Quaternion(0,0,0,0));
     }
 
     [ServerCallback]
@@ -283,8 +286,11 @@ public partial class AIController : GenericController {
             
             Array.Sort(HateList, delegate(ValueGroup lhs, ValueGroup rhs)
             {
-
-                if (lhs.value * .8f > rhs.value)
+                if (lhs.value == -1)
+                {
+                    return 0;
+                }
+                else if (lhs.value * .8f > rhs.value)
                 {
                     return -1;
                 }
@@ -301,15 +307,20 @@ public partial class AIController : GenericController {
             {
                 /*Assign target to one with most threat.The Gameobject's
                  existence is checked in event that a player disconnects.*/
-                GameObject g = NetworkServer.FindLocalObject(new NetworkInstanceId((uint)HateList[0].index)); 
+                GameObject g = NetworkServer.FindLocalObject(new NetworkInstanceId((uint)HateList[0].index));
                 if (g == null)
                 {
                     RemoveAggro(new NetworkInstanceId((uint)HateList[0].index));
                 }
                 else
                 {
-                    Target = g.GetComponent<HealthDefence>();                   
+
+                    Target = g.GetComponent<HealthDefence>();
                 }
+            }
+            else
+            {
+                Target = null;
             }
         }
         catch (System.Exception e)
@@ -322,6 +333,7 @@ public partial class AIController : GenericController {
             });
             if(index != -1)
             {
+                Target = null;
                 HateList[index] = new ValueGroup(-1,-1);
                 UpdateAggro();
             }
@@ -463,20 +475,34 @@ public partial class AIController : GenericController {
                if (target_focus)
                {
                    Vector3 dif = (Target.transform.position - ptr.transform.position);
-                   Vector3 proj = Target.GetComponent<Rigidbody>().velocity;
                    ptr.LookAt(Target.transform);
-                   if (proj.magnitude > 1)
+                   if (Target.type != HealthDefence.Type.Spawn_Point)
                    {
-                       Vector3 dir = Vector3.Project(dif, proj);
-                       return dir;
-                   }
-                   else if (dif.magnitude < minimal_distance)
-                   {
-                       return Vector3.zero;
+                       Vector3 proj = Target.GetComponent<Rigidbody>().velocity;
+                       if (proj.magnitude > 1)
+                       {
+                           Vector3 dir = Vector3.Project(dif, proj);
+                           return dir;
+                       }
+                       else if (dif.magnitude < minimal_distance)
+                       {
+                           return Vector3.zero;
+                       }
+                       else
+                       {
+                           return dif;
+                       }
                    }
                    else
                    {
-                       return dif.normalized;
+                       if (dif.magnitude < minimal_distance)
+                       {
+                           return Vector3.zero;
+                       }
+                       else
+                       {
+                           return dif;
+                       }
                    }
                }
                else

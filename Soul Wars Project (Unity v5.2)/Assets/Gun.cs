@@ -35,7 +35,7 @@ public abstract partial class Gun : Item {
     public int layer;//Collision layer of the bullet
     public int home_layer;//Collision layer of the bullet's homing device
     private int level = 0;//Level of the current gun
-    private int next_lvl = 20;//experience to next level
+    private int next_lvl = 40;//experience to next level
     /*Note that level and experience is limited to one script and not entire class
      (scripts are copied,but value isn't static) to allow player option of choosing
      different gun abilities within same type of gun*/
@@ -44,11 +44,15 @@ public abstract partial class Gun : Item {
         get { return _experience; }
         set 
         {
-            if (value >= next_lvl)
+            if (level == 5)
+            {
+                return;
+            }
+            else if (value >= next_lvl)
             {
                 _experience = 0;
                 level += 1;
-                next_lvl = (level + 20 + level / 4) * 2;
+                next_lvl = level * 30 + next_lvl;
                 level_up_indication = Instantiate(client_user.cooldown_canvas, _item_image.transform.position + new Vector3(-.25f, 0, 0), client_user.cooldown_canvas.transform.rotation) as Canvas;
                 level_up_indication.GetComponentInChildren<Text>().text = "!";
                 level_up_indication.GetComponentInChildren<Text>().color = Color.green;
@@ -225,7 +229,7 @@ public abstract partial class Gun : Item {
         if (in_inventory)
         {
                 _item_image.transform.SetParent(weapons_bar.transform);     
-                PlayerController.Client.CmdSpawnItem(GetBaseName(),client_user.Gun.transform.position, client_user.Gun.transform.rotation,true);
+                PlayerController.Client.CmdSpawnItem(GetBaseName(),new Vector3(0.21f,.11f,.902f),new Quaternion(0,0,0,0),true);
                 while (!client_user.pass_over)
                 {
                     yield return new WaitForEndOfFrame();
@@ -351,11 +355,8 @@ public abstract partial class Gun : Item {
 
     public void EquipAtSlot(int Index)
     {
-        if (!PlayerController.Client.equipped_weapons[Index] && index != 1)//equipped weapons cant be assigned to an empty slot
-            {
-                 return;
-            }
-            else if (PlayerController.Client.equipped_weapons[Index])//if there's already equipped gun in slot
+        
+            if (PlayerController.Client.equipped_weapons[Index])//if there's already equipped gun in slot
             {
                 PlayerController.Client.equipped_weapons[Index].index = -1;//Secondhand indicator that it isn't equipped by a player
                 inv.InsertItem(ref PlayerController.Client.equipped_weapons[Index]._item_image);//Put item in inventory

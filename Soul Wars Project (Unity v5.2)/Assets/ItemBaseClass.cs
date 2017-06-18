@@ -129,7 +129,7 @@ public abstract class Item : NetworkBehaviour,IRecordable
     public abstract IEnumerator PrepareItemForUse();//Creates and sets up gameobject
     public abstract void Options();//Sets up options
 
-    void OnMouseEnter()
+    public void OnPointerEnter()
     {
         if (dropped)//Shows item name on while on the ground
         {
@@ -138,10 +138,8 @@ public abstract class Item : NetworkBehaviour,IRecordable
         }
     }
 
-    void OnMouseDown()
+    public void OnPointerClick()
     {
-        if (Input.GetMouseButtonDown(0))
-        {
             if (dropped)
             {
                 try
@@ -168,10 +166,10 @@ public abstract class Item : NetworkBehaviour,IRecordable
             }
             
            
-        }
+        
     }
 
-    void OnMouseExit()
+    public void OnPointerExit()
     {
         if (drop_canvas_show)
         {

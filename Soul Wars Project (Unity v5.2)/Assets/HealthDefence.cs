@@ -13,7 +13,7 @@ public class HealthDefence : NetworkBehaviour {
         set
         {
             _HP = value;
-            RpcDisplayHP();
+            RpcDisplayHP(value);
             if (value >= maxHP)
             {
                 _HP = maxHP;
@@ -22,7 +22,7 @@ public class HealthDefence : NetworkBehaviour {
                 {
                     if (shield_collider)
                     {
-                        shield_collider.enabled = true;
+                        NetworkMethods.Instance.RpcSetEnabled(gameObject, "Collider", true);
                     }
                     StopCoroutine(Regeneration());
                 }
@@ -46,12 +46,16 @@ public class HealthDefence : NetworkBehaviour {
                         {
                             GetComponentInChildren<AIController>().gun.DropItem(ref gun_drop_chance);
                         }
+                        if (Controller is PlayerController)
+                        {
+                            PlayersAlive.Instance.Players.Remove(netId.Value);
+                        }
                         StartCoroutine(SpawnManager.WaitForRespawn(this));
                         break;
                     case Type.Shield:
                         if (shield_collider)
                         {
-                            shield_collider.enabled = false;
+                            NetworkMethods.Instance.RpcSetEnabled(gameObject, "Collider", false);
                         }
                         hp_string.text = "<b>" + HP + "</b>";
                         regeneration = true;
@@ -61,23 +65,19 @@ public class HealthDefence : NetworkBehaviour {
                     case Type.Spawn_Point:
                         if (gameObject.layer == 9)
                         {
-                            gameObject.layer = 8;
-                            RpcChangeLayer(gameObject.layer);
+                            NetworkMethods.Instance.RpcSetLayer(gameObject, 8);
                             SpawnManager s = GetComponent<SpawnManager>();
-                            RpcChangeColor(gameObject, Color.red);
-                            RpcChangeColor(s.stand.gameObject, Color.red);
-                            SpawnManager.EnemySpawnPoints.Add(s);
-                            SpawnManager.AllySpawnPoints.Remove(s);
+                            NetworkMethods.Instance.RpcSetColor(gameObject, Color.red);
+                            NetworkMethods.Instance.RpcSetColor(s.stand, Color.red);
+                            s.RpcMakeEnemy();
                         }
                         else
                         {
-                            gameObject.layer = 9;
-                            RpcChangeLayer(gameObject.layer);
+                            NetworkMethods.Instance.RpcSetLayer(gameObject,9);
                             SpawnManager s = GetComponent<SpawnManager>();
-                            RpcChangeColor(s.gameObject, new Color32(52, 95, 221, 225));
-                            RpcChangeColor(s.stand, new Color32(52, 95, 221, 225));
-                            SpawnManager.AllySpawnPoints.Add(s);
-                            SpawnManager.EnemySpawnPoints.Remove(s);
+                            NetworkMethods.Instance.RpcSetColor(gameObject, new Color32(52, 95, 221, 225));
+                            NetworkMethods.Instance.RpcSetColor(s.stand, new Color32(52, 95, 221, 225));
+                            s.RpcMakeAlly();
                         }
                         _HP = maxHP;
                         break;
@@ -172,6 +172,10 @@ public class HealthDefence : NetworkBehaviour {
         {
             maxWidth = hp_bar.rect.width;
         }
+        if (Controller && Controller is PlayerController)
+        {
+            PlayersAlive.Instance.Players.Add(netId.Value);
+        }
     }
 
     public IEnumerator DetermineChill(double chill)
@@ -247,20 +251,9 @@ public class HealthDefence : NetworkBehaviour {
         }
     }
 
-    [ClientRpc]
-    public void RpcChangeLayer(int layer)
-    {
-        gameObject.layer = layer;
-    }
 
     [ClientRpc]
-    public void RpcChangeColor(GameObject g,Color color)
-    {
-        g.GetComponent<Renderer>().material.color = color;
-    }
-
-    [ClientRpc]
-    void RpcDisplayHP()
+    void RpcDisplayHP(int val)//Takes an int,for synvar _HP isnt synced in time with the Rpc call
     {
         if (health_bar_show == null)
         {
@@ -273,8 +266,8 @@ public class HealthDefence : NetworkBehaviour {
             hp_bar = r[1].GetComponent<RectTransform>();
             Destroy(health_bar_show.gameObject, 5f);
         }
-        hp_string.text = "<b>" + HP + "</b>";
-        float n = _HP * 1.0f;
+        hp_string.text = "<b>" + val + "</b>";
+        float n = val * 1.0f;
         n /= maxHP * 1.0f;
         hp_bar.sizeDelta = new Vector2(maxWidth * n, hp_bar.rect.height);
     }

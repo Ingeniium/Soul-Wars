@@ -10,8 +10,12 @@ public class HomingScript : MonoBehaviour
     public bool homing = false;//Whether it is currently homing on a target
     public float home_speed;
     Vector3 target_pos;
-   
 
+    void Start()
+    {
+        prb = GetComponentInParent<Rigidbody>();
+        ptr = GetComponentsInParent<Transform>()[1];
+    }
     void OnTriggerEnter(Collider Target)
     {
         col.Add(Target);//Add the collider for consideration
@@ -70,7 +74,7 @@ public class HomingScript : MonoBehaviour
             }
         }
     }
-
+  
     void FixedUpdate()
     {       
         if (homing)
