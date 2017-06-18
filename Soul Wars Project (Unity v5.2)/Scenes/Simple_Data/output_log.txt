@@ -1,0 +1,49 @@
+Initialize engine version: 5.2.0f3 (e7947df39b5c)
+GfxDevice: creating device client; threaded=1
+d3d11: failed to create D3D11 device (0x887a0004)
+GfxDevice: creating device client; threaded=1
+Direct3D:
+    Version:  Direct3D 9.0c [nvd3dum.dll 7.15.11.7521]
+    Renderer: NVIDIA GeForce 6150SE nForce 430    
+    Vendor:   NVIDIA
+    VRAM:     472 MB (via DXGI)
+    Caps:     Shader=30 DepthRT=1 NativeDepth=0 NativeShadow=1 DF16=0 INTZ=0 NULL=1 RESZ=0 SlowINTZ=0
+Default GameObject Tag: Player already registered
+ 
+(Filename:  Line: 88)
+
+Begin MonoManager ReloadAssembly
+Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\UnityEngine.dll (this message is harmless)
+Loading C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\UnityEngine.dll into Unity Child Domain
+Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\Assembly-CSharp.dll (this message is harmless)
+Loading C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\Assembly-CSharp.dll into Unity Child Domain
+Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\UnityEngine.UI.dll (this message is harmless)
+Loading C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\UnityEngine.UI.dll into Unity Child Domain
+Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\UnityEngine.Networking.dll (this message is harmless)
+Loading C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\UnityEngine.Networking.dll into Unity Child Domain
+Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\System.Core.dll (this message is harmless)
+- Completed reload, in  0.179 seconds
+desktop: 1440x900 60Hz; virtual: 1440x900 at 0,0
+<RI> Initializing input.
+<RI> Input initialized.
+Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\System.dll (this message is harmless)
+Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\System.Xml.Linq.dll (this message is harmless)
+Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\System.Xml.dll (this message is harmless)
+Setting up 1 worker threads for Enlighten.
+  Thread -> id: 11b0 -> priority: 1 
+Parent of RectTransform is being set with parent property. Consider using the SetParent method instead, with the worldPositionStays argument set to false. This will retain local orientation and scale rather than world orientation and scale, which can prevent common UI scaling issues.
+ 
+(Filename: C:/buildslave/unity/build/artifacts/generated/common/runtime/UnityEngineDebugBindings.gen.cpp Line: 64)
+
+SendBytesToReady object EnemyInitialization (UnityEngine.GameObject) has not been spawned
+ 
+(Filename: C:/buildslave/unity/build/artifacts/generated/common/runtime/UnityEngineDebugBindings.gen.cpp Line: 64)
+
+Parent of RectTransform is being set with parent property. Consider using the SetParent method instead, with the worldPositionStays argument set to false. This will retain local orientation and scale rather than world orientation and scale, which can prevent common UI scaling issues.
+ 
+(Filename: C:/buildslave/unity/build/artifacts/generated/common/runtime/UnityEngineDebugBindings.gen.cpp Line: 64)
+
+SendBytesToReady object EnemyInitialization (UnityEngine.GameObject) has not been spawned
+ 
+(Filename: C:/buildslave/unity/build/artifacts/generated/common/runtime/UnityEngineDebugBindings.gen.cpp Line: 64)
+
