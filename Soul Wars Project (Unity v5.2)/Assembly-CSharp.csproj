@@ -49,6 +49,8 @@
      <Compile Include="Assets\Blaster.cs" />
      <Compile Include="Assets\BulletScript.cs" />
      <Compile Include="Assets\Cooldown.cs" />
+     <Compile Include="Assets\EnemyGroup.cs" />
+     <Compile Include="Assets\EnemyInitialization.cs" />
      <Compile Include="Assets\ExitButton.cs" />
      <Compile Include="Assets\Flurry.cs" />
      <Compile Include="Assets\GenericControllerBaseClass.cs" />
@@ -64,9 +66,11 @@
      <Compile Include="Assets\ItemBaseClass.cs" />
      <Compile Include="Assets\ItemImage.cs" />
      <Compile Include="Assets\MenuDisplay.cs" />
+     <Compile Include="Assets\NetworkMethods.cs" />
      <Compile Include="Assets\Options.cs" />
      <Compile Include="Assets\PlayerController.cs" />
      <Compile Include="Assets\PlayerFollow.cs" />
+     <Compile Include="Assets\PlayersAlive.cs" />
      <Compile Include="Assets\Record.cs" />
      <Compile Include="Assets\RespawnInterface.cs" />
      <Compile Include="Assets\SpawnManager.cs" />
@@ -76,17 +80,11 @@
      <Compile Include="Assets\UniversalCommunicator.cs" />
      <Compile Include="Assets\ValueGroup.cs" />
      <Compile Include="Assets\WeaponHolder.cs" />
- <Reference Include="UnityEngine.Advertisements">
- <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/Advertisements/UnityEngine.Advertisements.dll</HintPath>
- </Reference>
  <Reference Include="UnityEngine.UI">
  <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/GUISystem/UnityEngine.UI.dll</HintPath>
  </Reference>
  <Reference Include="UnityEngine.Networking">
  <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/Networking/UnityEngine.Networking.dll</HintPath>
- </Reference>
- <Reference Include="UnityEngine.Analytics">
- <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/UnityAnalytics/UnityEngine.Analytics.dll</HintPath>
  </Reference>
  <Reference Include="Mono.Cecil">
  <HintPath>C:/Program Files/Unity/Editor/Data/Managed/Mono.Cecil.dll</HintPath>
