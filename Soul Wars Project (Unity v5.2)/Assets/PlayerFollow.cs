@@ -5,9 +5,7 @@ using System.Collections;
 public class PlayerFollow : MonoBehaviour
 {
     public PlayerController Player;
-    public static PlayerController player;
     public Transform tr;
-    public static  Vector3 offset;
     public Vector3 _offset;
     public static new Camera camera;
     private float next_time = 0;

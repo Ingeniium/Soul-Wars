@@ -26,23 +26,26 @@ public class SpawnManager : NetworkBehaviour {
                 UnclaimedSpawnPoints.Add(this);
                 break;
         }
-	}
 
+    }
+
+    [ClientRpc]
+    public void RpcMakeEnemy()
+    {
+        AllySpawnPoints.Remove(this);
+        EnemySpawnPoints.Add(this);
+    }
+
+    [ClientRpc]
+    public void RpcMakeAlly()
+    {
+        EnemySpawnPoints.Remove(this);
+        AllySpawnPoints.Add(this);
+    }
+    
     public static IEnumerator WaitForRespawn(HealthDefence killed) 
     {
-        if (killed.gameObject.layer == 9)
-        {
-            if (SpawnManager.AllySpawnPoints.Count != 0)
-            {
-                SpawnManager.AllySpawnPoints[0].RpcOnClientDeath(killed.gameObject);
-            }
-            else
-            {
-                SpawnManager.EnemySpawnPoints[0].RpcOnClientDeath(killed.gameObject);
-            }
-        }
-        else if (killed.gameObject.layer == 8) 
-        {
+       
             if (SpawnManager.AllySpawnPoints.Count != 0)
             {
                 SpawnManager.AllySpawnPoints[0].RpcDisableScripts(killed.gameObject);
@@ -51,32 +54,48 @@ public class SpawnManager : NetworkBehaviour {
             {
                 SpawnManager.EnemySpawnPoints[0].RpcDisableScripts(killed.gameObject);
             }
-            yield return new WaitForSeconds(enemy_respawn_time);
-            while (EnemySpawnPoints.Count < 1)
+            if (killed.gameObject.layer == 8)
             {
-                yield return new WaitForEndOfFrame();
+                yield return new WaitForSeconds(enemy_respawn_time);
+                while (EnemySpawnPoints.Count < 1)
+                {
+                    yield return new WaitForEndOfFrame();
+                }
+                killed.transform.position = EnemySpawnPoints[0].transform.position + EnemySpawnPoints[0].spawn_direction;
+            }
+            else
+            {
+                RespawnInterface.Instance.respawning = true;
+                yield return new WaitForSeconds(ally_respawn_time);
+                while (AllySpawnPoints.Count < 1)
+                {
+                    yield return new WaitForEndOfFrame();
+                }
+                killed.transform.position = AllySpawnPoints[0].transform.position + AllySpawnPoints[0].spawn_direction;
+                PlayersAlive.Instance.Players.Add(killed.netId.Value);
             }
             killed.HP = killed.maxHP;
-            killed.transform.position = EnemySpawnPoints[0].transform.position + EnemySpawnPoints[0].spawn_direction;
             if (SpawnManager.AllySpawnPoints.Count != 0)
             {
                 SpawnManager.AllySpawnPoints[0].RpcEnableScripts(killed.gameObject);
+                SpawnManager.AllySpawnPoints[0].RpcBlink(killed.gameObject);
             }
             else
             {
                 SpawnManager.EnemySpawnPoints[0].RpcEnableScripts(killed.gameObject);
+                SpawnManager.EnemySpawnPoints[0].RpcBlink(killed.gameObject);
             }
-        }
-        int l = killed.gameObject.layer;
-        killed.gameObject.layer = 15;
-        killed.RpcChangeLayer(15);
-        killed.StartCoroutine(Blink(killed.gameObject));
-        yield return new WaitForSeconds(1.5f);
-        killed.gameObject.layer = l;
-        killed.RpcChangeLayer(l);
-    }
+        
+        
+   }
 
     [ClientRpc]
+    void RpcBlink(GameObject g)
+    {
+        StartCoroutine(Blink(g));
+    }
+
+    /*[ClientRpc]
     public void RpcOnClientDeath(GameObject g)
     {
         if (PlayerController.Client.netId == g.GetComponent<NetworkIdentity>().netId)
@@ -119,7 +138,7 @@ public class SpawnManager : NetworkBehaviour {
         killed.transform.position = AllySpawnPoints[RespawnInterface.Instance.spawn_index].transform.position + AllySpawnPoints[RespawnInterface.Instance.spawn_index].spawn_direction;
         (killed.Controller as PlayerController).cam_show.GetComponent<PlayerFollow>().Player = killed.Controller as PlayerController;
         
-    }
+    }*/
 
     [ClientRpc]
     private void RpcDisableScripts(GameObject killed)
@@ -189,6 +208,8 @@ public class SpawnManager : NetworkBehaviour {
 
     public static IEnumerator Blink(GameObject Respawned, float invis_time = 1.5f)
     {
+        int l = Respawned.layer;
+        Respawned.layer = 15;
         Renderer rend = Respawned.GetComponent<Renderer>();
         Renderer[] child_rends = Respawned.GetComponentsInChildren<Renderer>();
         rend.enabled = false;
@@ -223,14 +244,8 @@ public class SpawnManager : NetworkBehaviour {
         {
             r.enabled = true;
         }
-        if (Respawned.tag == "Player")
-        {
-            Respawned.layer = 9;
-        }
-        else
-        {
-            Respawned.layer = 8;
-        }
+        Respawned.layer = l;
     }
-	
 }
+	
+

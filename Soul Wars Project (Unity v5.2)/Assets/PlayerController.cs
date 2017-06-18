@@ -89,7 +89,7 @@ public class PlayerController : GenericController {
     public Rigidbody rb;
 	private Transform tr;
     public Canvas cooldown_canvas;
-    private Canvas cooldown_canvas_show;
+    public Canvas cooldown_canvas_show;
     private Canvas not_homing;
     public Camera cam;
     public Camera cam_show
@@ -122,20 +122,15 @@ public class PlayerController : GenericController {
             PlayerIDList.Add(netId.Value);
             cam_show.GetComponent<PlayerFollow>().Player = this;
                       
-            
     }
+
 
 	void Start() 
     {
-        gun = Gun.GetComponent<Gun>();
-        equipped_weapons.Add(gun);
+       
         max_weapon_num = 2;
         shield_collider = Shield.GetComponent<BoxCollider>();
-        gun.client_user = this;
-        if (isLocalPlayer && netId.Value == 5)
-        {
-           //CmdEnemySpawn(SpawnManager.EnemySpawnPoints[0].transform.position + SpawnManager.EnemySpawnPoints[0].spawn_direction * 3);
-        }
+        
         if (!isLocalPlayer)
         {
             cam_show.enabled = false;
@@ -161,16 +156,6 @@ public class PlayerController : GenericController {
             SP.hp_string = SP.health_bar_show.GetComponentInChildren<Text>();
             SP.hp_bar = SP.health_bar_show.GetComponentInChildren<Slider>().GetComponent<RectTransform
                 >();
-            if (!gun.set)
-            {
-                gun.current_reference = Gun;
-                //Giving the gun its own item image object,and setting it to be the 1st equipped weapon
-                gun._item_image = Instantiate(gun.item_image, gun.weapons_bar.transform.position, gun.item_image.transform.rotation) as GameObject;
-                gun._item_image.GetComponentInChildren<ItemImage>().item_script = gun;
-                gun._item_image.GetComponentInChildren<RectTransform>().sizeDelta *= 2;
-                gun._item_image.transform.parent = gun.weapons_bar.transform;
-
-            }
             StartCoroutine(SetNameDisplay());
         }
         
@@ -182,17 +167,6 @@ public class PlayerController : GenericController {
         CmdNameChange(true,_player_name);
     }
 
-    [Command]
-    void CmdEnemySpawn(Vector3 pos)
-    {
-        GameObject Enemy = Instantiate(Resources.Load("Dummy 1"), pos, Quaternion.identity) as GameObject;
-        NetworkServer.Spawn(Enemy);
-      /*  foreach (NetworkIdentity n in Enemy.GetComponentsInChildren<NetworkIdentity>())
-        {
-            NetworkServer.Spawn(n.gameObject);
-        }*/
-        NetworkServer.Spawn(Enemy.GetComponentInChildren<Gun>().gameObject);
-    }
 
 
     [Command]
@@ -201,27 +175,32 @@ public class PlayerController : GenericController {
         GameObject obj = Resources.Load(asset_reference) as GameObject;
         pass_over = Instantiate(obj, pos, rot) as GameObject;
         NetworkServer.SpawnWithClientAuthority(pass_over, connectionToClient);
+        if (child)
+        {
+            NetworkMethods.Instance.RpcSetParent(pass_over, gameObject, pos,rot);
+        }
         pass_over.GetComponent<Item>().client_user = this;
-        RpcSetPassOver(pass_over,child);
+        RpcSetPassOver(pass_over);
     }
 
     [Command]
     public void CmdEquipGun(GameObject g)
+    {
+        RpcEquipGun(g);
+    }
+
+    [ClientRpc]
+     void RpcEquipGun(GameObject g)
     {
         Gun = g;
         gun = g.GetComponent<Gun>();
     }
 
     [ClientRpc]
-    void RpcSetPassOver(GameObject g,bool child)
+    void RpcSetPassOver(GameObject g)
     {
         pass_over = g;
         pass_over.GetComponent<Item>().client_user = this;
-        if (child)
-        {
-            pass_over.transform.SetParent(transform);
-            gameObject.GetComponent<NetworkTransformChild>().target = g.transform;
-        }
     }
 
     [Command]
@@ -237,8 +216,8 @@ public class PlayerController : GenericController {
         catch(System.NullReferenceException e)
         {
             
-        }
         
+        }
     }
 
     [Command]
@@ -283,7 +262,7 @@ public class PlayerController : GenericController {
            
             if (Input.GetMouseButtonDown(0) && !cooldown_canvas_show)
             {
-                cooldown_canvas_show = Instantiate(cooldown_canvas, gun._item_image.transform.position + new Vector3(.25f, 0, 0), gun._item_image.transform.rotation) as Canvas;
+                cooldown_canvas_show = Instantiate(cooldown_canvas, gun._item_image.transform.position + new Vector3(.25f, 0, 0), gun._item_image.transform.rotation) as Canvas; 
                 cooldown_canvas_show.transform.SetParent(gun._item_image.transform);
                 StartCoroutine(Cooldown.NumericalCooldown(cooldown_canvas_show, gun.reload_time));
                 CmdShoot();

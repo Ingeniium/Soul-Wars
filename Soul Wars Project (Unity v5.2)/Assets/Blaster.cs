@@ -119,8 +119,8 @@ public class Blaster : Gun
     public override void SetBaseStats()
     {
         upper_bound_damage = 35;
-        lower_bound_damage = 20;
         asset_reference = Resources.Load("Blaster") as GameObject;
+        lower_bound_damage = 20;
         if (client_user)
         {
             layer = 13;

@@ -43,23 +43,55 @@ public partial class AIController : GenericController
 
         }
 
-        protected IEnumerator GenerateGradualThreat(Transform tr, NetworkInstanceId ID, int amount = 5)
+        bool bAffirmTarget(HealthDefence Target)
+        {
+            if (!Target)
+            {
+                Unit.UpdateAggro();
+            }
+            /*If target is an ally player,Check if he is dead.*/
+            else if (Target.type == HealthDefence.Type.Unit)
+            {
+                if (Target.HP <= 0)
+                {
+                    Unit.RemoveAggro(Target.netId);
+                }
+            }
+            /*If a spawn,check if its captured by comparing its collision
+             layer to that of the default enemy unit one */
+            else if (Target.type == HealthDefence.Type.Spawn_Point)
+            {
+                if (Target.gameObject.layer == 8)
+                {
+                    Unit.RemoveAggro(Target.netId);
+                }
+            }
+            else
+            {
+                return true;
+            }
+            return false;
+
+        }
+        
+
+        protected IEnumerator GenerateGradualThreat(HealthDefence target, NetworkInstanceId ID, int amount = 5)
         {
             //Debug.Log(Vector3.Distance(tr.position, Unit.ptr.position).ToString());
             /*Interestingly enough,Unity records that the distance is actually GREATER than the actual radius 
              whenever spawns enter the radius.Hence,w/o a subtraction of atleast ~.6f,the coroutine will never
              really function how it's supposed to.*/
-            while (tr != null && Vector3.Distance(Unit.ptr.position, tr.position) - .75f < Unit.enemy_attack_detection.radius)
+            while (bAffirmTarget(target) && Vector3.Distance(Unit.ptr.position, target.transform.position) - .75f < Unit.enemy_attack_detection.radius)
             {
                 Unit.UpdateAggro(amount, ID, false);
                 yield return new WaitForSeconds(1);
-               
             }
         }
 
         public ObjectiveState(AIController AI)
         {
             Unit = AI;
+            ResetHateList();
         }
     }
 
@@ -114,6 +146,7 @@ public partial class AIController : GenericController
                     return(v.index == (int)target.netId.Value);
                 }))
                 {
+                    Debug.Log("Called");
                     Unit.UpdateAggro(100, target.netId, false);
                 }
             }
@@ -121,7 +154,7 @@ public partial class AIController : GenericController
              10 units per second*/
             else if (target.type == HealthDefence.Type.Spawn_Point)
             {
-                Unit.StartCoroutine(GenerateGradualThreat(target.transform,target.netId,10));
+                Unit.StartCoroutine(GenerateGradualThreat(target,target.netId,10));
             }
            
         }
@@ -139,7 +172,7 @@ public partial class AIController : GenericController
             List<ValueGroup> Distances = new List<ValueGroup>();
             int i = 0;
             GameObject p;
-            foreach (uint u in PlayerController.PlayerIDList)
+            foreach (uint u in PlayersAlive.Instance.Players)
             {
                 /*Index information is stored in order to refer to the same SpawnManager*/
                 if (u != 100)
@@ -167,7 +200,7 @@ public partial class AIController : GenericController
             {
                 /*Insert or Update threat information.Closer units are given significantly more threat
                  than farther units.*/
-                Unit.UpdateAggro(n * 25, new NetworkInstanceId(PlayerController.PlayerIDList[Distances[i].index]), false);
+                Unit.UpdateAggro(n * 25, new NetworkInstanceId(PlayersAlive.Instance.Players[Distances[i].index]), false);
                 i++;
                 n--;
             }
@@ -191,7 +224,7 @@ public partial class AIController : GenericController
                     {
                         Unit.UpdateAggro(100, target.netId, false);
                     }
-                    Unit.StartCoroutine(GenerateGradualThreat(target.transform, target.netId));
+                    Unit.StartCoroutine(GenerateGradualThreat(target, target.netId));
                 }
                 /*Spawn Points will generate 20 aggro automatically upon entering 
                 aggro radius,but only if they're not on the list beforehand*/
@@ -265,7 +298,7 @@ public partial class AIController : GenericController
         /*An Empty call;It will have no threat info after
          death.*/
         public override void ResetHateList() { }                /*PLayers/Spawns within radius are given more priority         than those outside.*/        public override void UnitAggroReaction(Collider col)        {            HealthDefence target = col.gameObject.GetComponent<HealthDefence>();
-            Unit.StartCoroutine(GenerateGradualThreat(target.transform, target.netId, 15));        }
+            Unit.StartCoroutine(GenerateGradualThreat(target, target.netId, 15));        }
         public Guard(AIController AI) : base(AI) { }
     }
 
