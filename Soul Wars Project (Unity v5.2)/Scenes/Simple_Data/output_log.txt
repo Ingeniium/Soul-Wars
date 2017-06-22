@@ -22,20 +22,62 @@ Loading C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\UnityEngine.UI
 Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\UnityEngine.Networking.dll (this message is harmless)
 Loading C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\UnityEngine.Networking.dll into Unity Child Domain
 Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\System.Core.dll (this message is harmless)
-- Completed reload, in  0.179 seconds
+- Completed reload, in  0.224 seconds
 desktop: 1440x900 60Hz; virtual: 1440x900 at 0,0
 <RI> Initializing input.
 <RI> Input initialized.
+Initialize engine version: 5.2.0f3 (e7947df39b5c)
+GfxDevice: creating device client; threaded=1
+d3d11: failed to create D3D11 device (0x887a0004)
+GfxDevice: creating device client; threaded=1
+Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\System.dll (this message is harmless)
+Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\System.Xml.Linq.dll (this message is harmless)
+Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\System.Xml.dll (this message is harmless)
+Direct3D:
+    Version:  Direct3D 9.0c [nvd3dum.dll 7.15.11.7521]
+    Renderer: NVIDIA GeForce 6150SE nForce 430    
+    Vendor:   NVIDIA
+    VRAM:     472 MB (via DXGI)
+    Caps:     Shader=30 DepthRT=1 NativeDepth=0 NativeShadow=1 DF16=0 INTZ=0 NULL=1 RESZ=0 SlowINTZ=0
+Setting up 1 worker threads for Enlighten.
+  Thread -> id: 11dc -> priority: 1 
+Default GameObject Tag: Player already registered
+ 
+(Filename:  Line: 88)
+
+Begin MonoManager ReloadAssembly
+Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\UnityEngine.dll (this message is harmless)
+Loading C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\UnityEngine.dll into Unity Child Domain
+Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\Assembly-CSharp.dll (this message is harmless)
+Loading C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\Assembly-CSharp.dll into Unity Child Domain
+Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\UnityEngine.UI.dll (this message is harmless)
+Loading C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\UnityEngine.UI.dll into Unity Child Domain
+Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\UnityEngine.Networking.dll (this message is harmless)
+Loading C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\UnityEngine.Networking.dll into Unity Child Domain
+Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\System.Core.dll (this message is harmless)
+- Completed reload, in  0.115 seconds
+desktop: 1440x900 60Hz; virtual: 1440x900 at 0,0
+<RI> Initializing input.
+<RI> Input initialized.
+9
+ 
+(Filename: C:/buildslave/unity/build/artifacts/generated/common/runtime/UnityEngineDebugBindings.gen.cpp Line: 64)
+
+Parent of RectTransform is being set with parent property. Consider using the SetParent method instead, with the worldPositionStays argument set to false. This will retain local orientation and scale rather than world orientation and scale, which can prevent common UI scaling issues.
+ 
+(Filename: C:/buildslave/unity/build/artifacts/generated/common/runtime/UnityEngineDebugBindings.gen.cpp Line: 64)
+
+NullReferenceException: Object reference not set to an instance of an object
+  at PlayerController.Update () [0x00000] in <filename unknown>:0 
+ 
+(Filename:  Line: -1)
+
 Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\System.dll (this message is harmless)
 Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\System.Xml.Linq.dll (this message is harmless)
 Platform assembly: C:\Users\Andrew Olumbe\Desktop\Simple\Simple_Data\Managed\System.Xml.dll (this message is harmless)
 Setting up 1 worker threads for Enlighten.
-  Thread -> id: 11b0 -> priority: 1 
-Parent of RectTransform is being set with parent property. Consider using the SetParent method instead, with the worldPositionStays argument set to false. This will retain local orientation and scale rather than world orientation and scale, which can prevent common UI scaling issues.
- 
-(Filename: C:/buildslave/unity/build/artifacts/generated/common/runtime/UnityEngineDebugBindings.gen.cpp Line: 64)
-
-SendBytesToReady object EnemyInitialization (UnityEngine.GameObject) has not been spawned
+  Thread -> id: 5a8 -> priority: 1 
+11
  
 (Filename: C:/buildslave/unity/build/artifacts/generated/common/runtime/UnityEngineDebugBindings.gen.cpp Line: 64)
 
@@ -43,7 +85,46 @@ Parent of RectTransform is being set with parent property. Consider using the Se
  
 (Filename: C:/buildslave/unity/build/artifacts/generated/common/runtime/UnityEngineDebugBindings.gen.cpp Line: 64)
 
-SendBytesToReady object EnemyInitialization (UnityEngine.GameObject) has not been spawned
+Parent of RectTransform is being set with parent property. Consider using the SetParent method instead, with the worldPositionStays argument set to false. This will retain local orientation and scale rather than world orientation and scale, which can prevent common UI scaling issues.
  
 (Filename: C:/buildslave/unity/build/artifacts/generated/common/runtime/UnityEngineDebugBindings.gen.cpp Line: 64)
+
+Parent of RectTransform is being set with parent property. Consider using the SetParent method instead, with the worldPositionStays argument set to false. This will retain local orientation and scale rather than world orientation and scale, which can prevent common UI scaling issues.
+ 
+(Filename: C:/buildslave/unity/build/artifacts/generated/common/runtime/UnityEngineDebugBindings.gen.cpp Line: 64)
+
+Parent of RectTransform is being set with parent property. Consider using the SetParent method instead, with the worldPositionStays argument set to false. This will retain local orientation and scale rather than world orientation and scale, which can prevent common UI scaling issues.
+ 
+(Filename: C:/buildslave/unity/build/artifacts/generated/common/runtime/UnityEngineDebugBindings.gen.cpp Line: 64)
+
+Parent of RectTransform is being set with parent property. Consider using the SetParent method instead, with the worldPositionStays argument set to false. This will retain local orientation and scale rather than world orientation and scale, which can prevent common UI scaling issues.
+ 
+(Filename: C:/buildslave/unity/build/artifacts/generated/common/runtime/UnityEngineDebugBindings.gen.cpp Line: 64)
+
+NullReferenceException: Object reference not set to an instance of an object
+  at HealthDefence+<DetermineMezmerize>c__Iterator1D.MoveNext () [0x00000] in <filename unknown>:0 
+UnityEngine.MonoBehaviour:StartCoroutine_Auto(IEnumerator)
+UnityEngine.MonoBehaviour:StartCoroutine(IEnumerator)
+<Damage>c__Iterator11:MoveNext()
+UnityEngine.MonoBehaviour:StartCoroutine_Auto(IEnumerator)
+UnityEngine.MonoBehaviour:StartCoroutine(IEnumerator)
+BulletScript:OnCollisionEnter(Collision)
+ 
+(Filename:  Line: -1)
+
+NullReferenceException: Object reference not set to an instance of an object
+  at Gun.RpcLevelupIndication () [0x00000] in <filename unknown>:0 
+  at Gun.InvokeRpcRpcLevelupIndication (UnityEngine.Networking.NetworkBehaviour obj, UnityEngine.Networking.NetworkReader reader) [0x00000] in <filename unknown>:0 
+  at UnityEngine.Networking.NetworkBehaviour.InvokeRpcDelegate (Int32 cmdHash, UnityEngine.Networking.NetworkReader reader) [0x00000] in <filename unknown>:0 
+  at UnityEngine.Networking.NetworkBehaviour.InvokeRPC (Int32 cmdHash, UnityEngine.Networking.NetworkReader reader) [0x00000] in <filename unknown>:0 
+  at UnityEngine.Networking.NetworkIdentity.HandleRPC (Int32 cmdHash, UnityEngine.Networking.NetworkReader reader) [0x00000] in <filename unknown>:0 
+  at UnityEngine.Networking.ClientScene.OnRPCMessage (UnityEngine.Networking.NetworkMessage netMsg) [0x00000] in <filename unknown>:0 
+  at UnityEngine.Networking.NetworkConnection.HandleReader (UnityEngine.Networking.NetworkReader reader, Int32 receivedSize, Int32 channelId) [0x00000] in <filename unknown>:0 
+  at UnityEngine.Networking.NetworkConnection.HandleBytes (System.Byte[] buffer, Int32 receivedSize, Int32 channelId) [0x00000] in <filename unknown>:0 
+  at UnityEngine.Networking.NetworkConnection.TransportRecieve (System.Byte[] bytes, Int32 numBytes, Int32 channelId) [0x00000] in <filename unknown>:0 
+  at UnityEngine.Networking.NetworkClient.Update () [0x00000] in <filename unknown>:0 
+  at UnityEngine.Networking.NetworkClient.UpdateClients () [0x00000] in <filename unknown>:0 
+  at UnityEngine.Networking.NetworkIdentity.UNetStaticUpdate () [0x00000] in <filename unknown>:0 
+ 
+(Filename:  Line: -1)
 
