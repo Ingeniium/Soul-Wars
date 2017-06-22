@@ -29,13 +29,14 @@ public abstract partial class Gun : Item {
     [SyncVar] public bool can_pierce;
     [SyncVar] public double chill_strength;
     [SyncVar] public double burn_strength;
+    [SyncVar] public double mezmerize_strength;
     public Gun median;//for copy transfer
 	public Transform barrel_end;//Where bullets actually SPAWN from
-    public Color color;//color assigned to the BULLETS
+    [SyncVar] public Color color;//color assigned to the BULLETS
     public int layer;//Collision layer of the bullet
     public int home_layer;//Collision layer of the bullet's homing device
-    private int level = 0;//Level of the current gun
-    private int next_lvl = 40;//experience to next level
+    [SyncVar] public int level = 0;//Level of the current gun
+    [SyncVar] public int next_lvl = 40;//experience to next level
     /*Note that level and experience is limited to one script and not entire class
      (scripts are copied,but value isn't static) to allow player option of choosing
      different gun abilities within same type of gun*/
@@ -53,10 +54,7 @@ public abstract partial class Gun : Item {
                 _experience = 0;
                 level += 1;
                 next_lvl = level * 30 + next_lvl;
-                level_up_indication = Instantiate(client_user.cooldown_canvas, _item_image.transform.position + new Vector3(-.25f, 0, 0), client_user.cooldown_canvas.transform.rotation) as Canvas;
-                level_up_indication.GetComponentInChildren<Text>().text = "!";
-                level_up_indication.GetComponentInChildren<Text>().color = Color.green;
-                level_up_indication.transform.SetParent(_item_image.transform);
+                RpcLevelupIndication();
                 points += 1;
             }
             else
@@ -65,26 +63,40 @@ public abstract partial class Gun : Item {
             }
         }
     }
-    private int _experience = 0;
-    public uint points = 0;//points to spend on abilities unlocked by gun level ups
+    [SyncVar] public int _experience = 0;
+    [SyncVar] public uint points = 0;//points to spend on abilities unlocked by gun level ups
+    public int mez_threshold;
     protected Canvas level_up_indication;
-    protected List<int> claimed_gun_ability = new List<int>();//For determining which abilities have already been chosen
-    protected delegate IEnumerator Gun_Abilities(Gun gun,BulletScript script);
-    protected Gun_Abilities Claimed_Gun_Mods;//Abilities which have already been chosen
+    public List<int> claimed_gun_ability = new List<int>();//For determining which abilities have already been chosen
+    public delegate IEnumerator Gun_Abilities(Gun gun,BulletScript script);
+    public Gun_Abilities Claimed_Gun_Mods;//Abilities which have already been chosen
     /*Below are added to names of weapons as a result of getting abilities*/
     protected List<string> prefixes = new List<string>();
     protected List<string> suffixes = new List<string>();
     protected string last_suffix = "";
 
-    protected override void OnClientUserChange()    {        weapons_bar = _client_user.hpbar_show.GetComponentInChildren<VerticalLayoutGroup>().gameObject;
-        GunLevelUp = client_user.hpbar_show.GetComponentInChildren<MenuDisplay>().
-                    Guntable.gameObject;    }
+    [ClientRpc]
+    protected void RpcLevelupIndication()
+    {
+        if (PlayerController.Client.netId == client_user.netId && !level_up_indication)
+        {
+            level_up_indication = Instantiate(client_user.cooldown_canvas, _item_image.transform.position + new Vector3(-.25f, 0, 0), client_user.cooldown_canvas.transform.rotation) as Canvas;
+            level_up_indication.GetComponentInChildren<Text>().text = "!";
+            level_up_indication.GetComponentInChildren<Text>().color = Color.green;
+            level_up_indication.transform.SetParent(_item_image.transform);
+        }
+    }
+
+    protected override void OnClientUserChange()    {
+         weapons_bar = _client_user.hpbar_show.GetComponentInChildren<VerticalLayoutGroup>().gameObject;
+            GunLevelUp = client_user.hpbar_show.GetComponentInChildren<MenuDisplay>().
+                        Guntable.gameObject;    }
 
     
 
-    public bool HasReloaded()
+    public bool HasReloaded(float delay = 0)
     {
-        return (Time.time > next_time);       
+        return (Time.time > next_time + delay);       
     }
 
     [ClientRpc]
@@ -120,7 +132,7 @@ public abstract partial class Gun : Item {
     public virtual void Shoot()
     {
         bullet = Instantiate(Bullet, barrel_end.position, barrel_end.rotation) as GameObject;
-        NetworkServer.SpawnWithClientAuthority(bullet,client_user.connectionToClient);
+        NetworkServer.Spawn(bullet);
         ReadyWeaponForFire(ref bullet);
         RpcFire(barrel_end.forward,bullet);
     }
@@ -143,6 +155,7 @@ public abstract partial class Gun : Item {
         script.lower_bound_damage = lower_bound_damage;
         script.chill_strength = chill_strength;
         script.burn_strength = burn_strength;
+        script.mezmerize_strength = mezmerize_strength;
         script.gameObject.layer = layer;
         script.knockback_power = knockback_power;
         /*Homing script values passed for homing toggle*/
@@ -155,7 +168,15 @@ public abstract partial class Gun : Item {
         next_time = Time.time + reload_time;
         if (Claimed_Gun_Mods != null)//Apply chosen gun_abilities to each bullet
         {
-           foreach (Gun_Abilities g in Claimed_Gun_Mods.GetInvocationList()) { script.StartCoroutine(g(this,script)); }   
+            int i = 0;
+           foreach (Gun_Abilities g in Claimed_Gun_Mods.GetInvocationList()) 
+           {
+               if (i < level - mez_threshold)
+               {
+                   script.StartCoroutine(g(this, script));
+                   i++;
+               }
+           }   
         }
         
     }
@@ -423,7 +444,7 @@ public abstract partial class Gun : Item {
     }
     
 
-    protected abstract Gun_Abilities ClassGunMods(int index);//For getting a derived class's Gun_ability delegates
+    public abstract Gun_Abilities ClassGunMods(int index);//For getting a derived class's Gun_ability delegates
     protected abstract string ClassGunAbilityNames(int index);//For getting a derived class's Gun_ability string names 
     protected abstract void SetGunNameAddons(int index);//For getting a derived class's prefixes/suffixes
     protected abstract string GunAbilityDesc(int index);//For getting a derived class's descriptions

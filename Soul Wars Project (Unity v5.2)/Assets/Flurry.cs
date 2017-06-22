@@ -9,11 +9,29 @@ public class Flurry : Gun
     [SyncVar] public int num_bullets = 3;
     public List<ValueGroup[]> TrioList = new List<ValueGroup[]>();
     bool targ_recorded;
-    private readonly static string[] gun_ability_names = new string[3] { "Hunter", "Archer", null };
-    private readonly static string[] gun_name_addons = new string[3] { "Precision", "Archery", null };
-    private readonly static string[] gun_ability_desc = new string[3] {
+    private readonly static string[] gun_ability_names = new string[12] { "Hunter", "Archer", null,
+                                                                         null, null, null,
+                                                                         null, null, null,
+                                                                         null, null, null}; 
+    private readonly static string[] gun_name_addons = new string[12] { "Precision", "Archery", null, 
+                                                                         null, null, null,
+                                                                         null, null, null,
+                                                                         null, null, null};
+    private readonly static string[] gun_ability_desc = new string[12] {
         "Hunter" + "\n Causes bullets that aren't" + "\n homing in on a target to" + "\n to reroute to another flurry " + "\n bullet's target.",
-        "Archer" + "\n Bullets have a 30%" + "\n chance to penetrate its target.",
+        "Archer" + "\n Bullets have a 50%" + "\n chance to penetrate its target.",
+        null,
+
+        null,
+        null,
+        null,
+
+        null,
+        null,
+        null,
+
+        null,
+        null,
         null
     };
     /*This class's pool of gun_abilities.Use of a static container of static methods requiring explicit this
@@ -23,6 +41,18 @@ public class Flurry : Gun
     {
         Hunter,
         Archer,
+        null,
+
+        null,
+        null,
+        null,
+
+        null,
+        null,
+        null,
+
+        null,
+        null,
         null
     };
 
@@ -67,7 +97,7 @@ public class Flurry : Gun
     private static IEnumerator Archer(Gun gun, BulletScript script)
     {
         script.coroutines_running++;
-        if (rand.NextDouble() < .30)
+        if (rand.NextDouble() < .50)
         {
             script.can_pierce = true;
         }
@@ -94,7 +124,7 @@ public class Flurry : Gun
                 rot = GetComponentsInChildren<Transform>()[3].rotation;
             }
             bullet = Instantiate(Bullet, barrel_end.position, rot) as GameObject;
-            NetworkServer.SpawnWithClientAuthority(bullet, client_user.connectionToClient);
+            NetworkServer.Spawn(bullet);
             TrioList[TrioList.Count - 1][i].index = (int)bullet.GetComponent<NetworkIdentity>().netId.Value;
             ReadyWeaponForFire(ref bullet);
             RpcFire(bullet.transform.forward,bullet);
@@ -132,7 +162,7 @@ public class Flurry : Gun
         return gun_ability_names[index];
     }
 
-    protected override Gun_Abilities ClassGunMods(int index)
+    public override Gun_Abilities ClassGunMods(int index)
     {
         return Gun_Mods[index];
     }
@@ -179,12 +209,13 @@ public class Flurry : Gun
         {
             layer = 14;
             home_layer = 12;
+            color = Color.red;
         }
         range = 10;
         projectile_speed = 5;
         knockback_power = 5;
         crit_chance = .05;
-        reload_time = 1f;
+        reload_time = 1.5f;
         home_speed = 1.5f;
         home_radius = 3f;
         homes = true;

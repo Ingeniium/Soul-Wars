@@ -58,7 +58,7 @@ public class RespawnInterface : MonoBehaviour
 
     void Update()
     {
-        if (SpawnManager.AllySpawnPoints.Count == 0 && PlayerController.Client.HP.HP == 0)
+        if (SpawnManager.AllySpawnPoints.Count == 0 && PlayersAlive.Instance.Players.Count == 0)
         {
             if (wait_for_respawn_show)
             {
@@ -78,7 +78,7 @@ public class RespawnInterface : MonoBehaviour
             {
                 choose_respawn_location_show = Instantiate(choose_respawn_location, choose_respawn_location.transform.position, choose_respawn_location.transform.rotation) as Canvas;
                 choose_respawn_location_show.worldCamera = PlayerController.Client.cam_show;
-                PlayerController.Client.cam_show.transform.position = SpawnManager.AllySpawnPoints[spawn_index].transform.position + PlayerFollow.offset;
+                PlayerController.Client.cam_show.transform.position = SpawnManager.AllySpawnPoints[spawn_index].transform.position + PlayerController.Client.cam_show.GetComponent<PlayerFollow>()._offset;
                 Button[] buttons = choose_respawn_location_show.GetComponentsInChildren<Button>();
                 spawn_index_text = choose_respawn_location_show.GetComponentInChildren<Text>();
                 spawn_index_text.text = spawn_index.ToString();

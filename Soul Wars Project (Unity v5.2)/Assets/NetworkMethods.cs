@@ -39,9 +39,31 @@ public class NetworkMethods : NetworkBehaviour
     [ClientRpc]
     public void RpcSetEnabled(GameObject obj,string class_name,bool enabled)
     {
-        Type t = Type.GetType(class_name);
-        NetworkBehaviour c = obj.GetComponent(t) as NetworkBehaviour;
-        c.enabled = enabled;
+        if (class_name != "Collider")
+        {
+            Type t = Type.GetType(class_name);
+            MonoBehaviour c = obj.GetComponent(t) as MonoBehaviour;
+            c.enabled = enabled;
+        }
+        else
+        {
+            obj.GetComponent<Collider>().enabled = enabled;
+        }
+    }
+    /*For better position syncing*/
+    [ClientRpc]
+    public void RpcSetPosition(GameObject obj, Vector3 pos)
+    {
+        if (obj)
+        {
+            obj.transform.position = pos;
+        }
+    }
+
+    [ClientRpc]
+    public void RpcSetScale(GameObject Obj, Vector3 scale)
+    {
+        Obj.transform.localScale = scale;
     }
 
     [Command]
@@ -50,8 +72,29 @@ public class NetworkMethods : NetworkBehaviour
         RpcSetLayer(obj,layer);
     }
 
-    //[Command]
-    
+    [Command]
+    public void CmdSetColor(GameObject rend, Color color)
+    {
+        RpcSetColor(rend, color);
+    }
+
+    [Command]
+    public void CmdSetEnabled(GameObject obj, string class_name, bool enabled)
+    {
+        RpcSetEnabled(obj, class_name, enabled);
+    }
+
+    [Command]
+    public void CmdAddPlayerId(NetworkInstanceId ID)
+    {
+        PlayersAlive.Instance.Players.Add(ID.Value);
+    }
+
+    [Command]
+    public void CmdRemovePlayerId(NetworkInstanceId ID)
+    {
+        PlayersAlive.Instance.Players.Remove(ID.Value);
+    }
 
 }
 

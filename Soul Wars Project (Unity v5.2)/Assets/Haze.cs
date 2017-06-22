@@ -6,11 +6,29 @@ using UnityEngine.Networking;
 
 public class Haze : Gun
 {
-    private readonly static string[] gun_ability_names = new string[3] { "Fog", "Conflagration", null };
-    private readonly static string[] gun_name_addons = new string[3] { "Fog", "Conflagration", null };
-    private readonly static string[] gun_ability_desc = new string[3] {
-        "Fog" + "\n Adds +5 Chill power to bullets.",
-        "Conflagration" + "\n Adds +5 Burn power to bullets.",
+    private readonly static string[] gun_ability_names = new string[12] { "Fog", "Conflagration", null,
+                                                                         null,"Fume",null,
+                                                                         null,"Engulf",null,
+                                                                         null,"Cloud",null};
+    private readonly static string[] gun_name_addons = new string[12] { "Fog", "Conflagration", null,
+                                                                        null, "Toxic",null,
+                                                                        null, "Ominous",null,
+                                                                        null, "Cloudy", null};
+    private readonly static string[] gun_ability_desc = new string[12] {
+        "Fog" + "\n Adds +10 Chill strength to bullets.",
+        "Conflagration" + "\n Adds +10 Burn strenght to bullets.",
+        null,
+
+        null,
+        "Fume" + "\n Adds one to two points of damage" + "\n to the bullet upon hitting" + "\n new targets.",
+        null,
+
+        null,
+        "Engulf" + "\n Causes bullets to stick to their first target.",
+        null,
+
+        null,
+        "Cloud" + "\n Doubles the size of the bullets.",
         null
     };
     /*This class's pool of gun_abilities.Use of a static container of static methods requi"Markring explicit this
@@ -19,13 +37,25 @@ public class Haze : Gun
     {
         Fog,
         Conflagration,
+        null,
+
+        null,
+        Fume,
+        null,
+
+        null,
+        Engulf,
+        null,
+
+        null,
+        Cloud,
         null
     };
 
     private static IEnumerator Fog(Gun gun, BulletScript script)
     {
         script.coroutines_running++;
-        script.chill_strength += .05;
+        script.chill_strength += .10;
         script.coroutines_running--;
         yield return null;
     }
@@ -33,7 +63,65 @@ public class Haze : Gun
     private static IEnumerator Conflagration(Gun gun, BulletScript script)
     {
         script.coroutines_running++;
-        script.burn_strength += .05;
+        script.burn_strength += .10;
+        script.coroutines_running--;
+        yield return null;
+    }
+
+    private static IEnumerator Fume(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        while (script.has_collided == false)
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        script.coroutines_running--;
+        if (script.legit_target == false)//Check if target even is valid
+        {
+            yield return null;
+        }
+        else
+        {
+            List<HealthDefence> prevTargs = new List<HealthDefence>();
+            while(script)
+            {
+                if(script.Target && !prevTargs.Exists(delegate(HealthDefence h)
+                {
+                    return (h.netId == script.Target.netId);
+                }))
+                {
+                    prevTargs.Add(script.Target);
+                    script.upper_bound_damage += 2;
+                    script.lower_bound_damage++;
+                }
+                yield return new WaitForEndOfFrame();
+            }
+            
+        }
+    }
+
+    private static IEnumerator Engulf(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        while (!script.Target)
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        HealthDefence curTarg = script.Target;
+        script.coroutines_running--;
+        while (script)
+        {
+            NetworkMethods.Instance.RpcSetPosition(script.gameObject,new Vector3(curTarg.transform.position.x,script.transform.position.y,curTarg.transform.position.z));
+            yield return new WaitForSeconds(.2f);
+        }
+    }
+
+    private static IEnumerator Cloud(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        BoxCollider collider = script.gameObject.GetComponent<BoxCollider>();
+        collider.size = new Vector3(collider.size.x, collider.size.y * .5f, collider.size.z);
+        NetworkMethods.Instance.RpcSetScale(script.gameObject,new Vector3(4,4,4));
         script.coroutines_running--;
         yield return null;
     }
@@ -47,7 +135,7 @@ public class Haze : Gun
         return gun_ability_names[index];
     }
 
-    protected override Gun_Abilities ClassGunMods(int index)
+    public override Gun_Abilities ClassGunMods(int index)
     {
         return Gun_Mods[index];
     }
@@ -94,6 +182,7 @@ public class Haze : Gun
         {
             layer = 14;
             home_layer = 12;
+            color = Color.red;
         }
         range = 10;
         projectile_speed = 2;

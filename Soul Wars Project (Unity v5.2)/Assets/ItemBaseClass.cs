@@ -42,7 +42,7 @@ public abstract class Item : NetworkBehaviour,IRecordable
         set
         {
             _client_user = value;
-            if (_client_user != null)
+            if (_client_user != null && _client_user.hpbar_show)
             {
                 inv = _client_user.hpbar_show.GetComponentInChildren<MenuDisplay>().
                     Menu.GetComponent<Inventory>();

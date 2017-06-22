@@ -146,7 +146,6 @@ public partial class AIController : GenericController
                     return(v.index == (int)target.netId.Value);
                 }))
                 {
-                    Debug.Log("Called");
                     Unit.UpdateAggro(100, target.netId, false);
                 }
             }

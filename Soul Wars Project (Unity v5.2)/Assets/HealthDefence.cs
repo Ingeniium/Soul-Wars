@@ -23,6 +23,7 @@ public class HealthDefence : NetworkBehaviour {
                     if (shield_collider)
                     {
                         NetworkMethods.Instance.RpcSetEnabled(gameObject, "Collider", true);
+                        NetworkMethods.Instance.RpcSetColor(gameObject, Original_Color);
                     }
                     StopCoroutine(Regeneration());
                 }
@@ -59,6 +60,7 @@ public class HealthDefence : NetworkBehaviour {
                         }
                         hp_string.text = "<b>" + HP + "</b>";
                         regeneration = true;
+                        NetworkMethods.Instance.RpcSetColor(gameObject, Color.red);
                         StartCoroutine(Regeneration());
                         break;
 
@@ -94,8 +96,11 @@ public class HealthDefence : NetworkBehaviour {
     [SyncVar] public float knockback_resistance = 2.5f;
     [SyncVar] public double chill_resistance;
     [SyncVar] public double burn_resistance;
+    [SyncVar] public double mezmerize_resistance;
     [SyncVar] bool chilling;
     [SyncVar] bool burning;
+    [SyncVar] bool mezmerized;
+    [SyncVar] bool stunned;
     public float standing_power
     {
         get { return _standing_power; }
@@ -114,7 +119,16 @@ public class HealthDefence : NetworkBehaviour {
     public float max_standing_power = 10;
     public Rigidbody rb;
     public GenericController Controller;
-    public float scale_factor;
+    private float _scale_factor;
+    public float scale_factor
+    {
+        get { return _scale_factor; }
+        set
+        {
+            _scale_factor = value;
+            transform.localScale = new Vector3(transform.localScale.x, transform.localScale.y * scale_factor, transform.localScale.z * scale_factor);
+        }
+    }
     public float sec_till_regen;
     public Collider shield_collider;
     public bool regeneration = false;
@@ -125,7 +139,7 @@ public class HealthDefence : NetworkBehaviour {
     public float maxWidth;
     public bool has_drops;
     public bool has_exp = true;
-    public int exp_rate = 1;
+    public float exp_rate = .5f;
     public double gun_drop_chance;
     public GameObject ailment_display;
     private GameObject ailment_display_show;
@@ -147,7 +161,6 @@ public class HealthDefence : NetworkBehaviour {
         if (type == Type.Shield)
         {
             shield_collider = GetComponent<BoxCollider>();
-            transform.localScale = new Vector3(transform.localScale.x, transform.localScale.y * scale_factor, transform.localScale.z * scale_factor);
         }
         else
         {
@@ -172,24 +185,24 @@ public class HealthDefence : NetworkBehaviour {
         {
             maxWidth = hp_bar.rect.width;
         }
-        if (Controller && Controller is PlayerController)
+        if (Controller && Controller is PlayerController && isServer)
         {
-            PlayersAlive.Instance.Players.Add(netId.Value);
+            PlayersAlive.Instance.Players.Add(Controller.netId.Value);
         }
     }
 
     public IEnumerator DetermineChill(double chill)
     {
         double net_chill = chill - chill_resistance;
-        if (net_chill > 0 && rand.NextDouble() < net_chill * 8 && type == HealthDefence.Type.Unit && !chilling)
+        if (net_chill > 0 && type == HealthDefence.Type.Unit && !chilling && rand.NextDouble() < net_chill * 8)
         {
             chilling = true;
             float original = Controller.speed;
-            Controller.speed = (100 - (float)net_chill * 400) * (.01f * Controller.speed);
-            float time = (float)(net_chill * 150);
+            Controller.speed = (100 - (float)net_chill * 800) * (.01f * Controller.speed);
+            float time = (float)(net_chill * 200);
             float next_time = Time.time + time;
             RpcUpdateAilments("\r\n <color=cyan>Chill</color> ", time);
-            while (Time.time < next_time || HP == 0)
+            while (Time.time < next_time && HP != 0)
             {
                 yield return new WaitForEndOfFrame();
             }
@@ -201,14 +214,14 @@ public class HealthDefence : NetworkBehaviour {
     public IEnumerator DetermineBurn(double burn,int damage)
     {
         double net_burn = burn - burn_resistance;
-        if (net_burn > 0 && rand.NextDouble() < net_burn * 4 && type == HealthDefence.Type.Unit && !burning)
+        if (net_burn > 0 && !burning && type == HealthDefence.Type.Unit && rand.NextDouble() < net_burn * 4)
         {
             burning = true;
             int num = (damage / 3) + (int)net_burn * 100;
             float time = (float)(net_burn * 200);
             float next_time = Time.time + time;
             RpcUpdateAilments("\r\n <color=orange>Burn</color> ", time);
-            while (Time.time < next_time || HP == 0)
+            while (Time.time < next_time && HP != 0)
             {
                 HP -= num;
                 RpcDisplayHPChange(new Color(255, 150,0), num);
@@ -216,6 +229,47 @@ public class HealthDefence : NetworkBehaviour {
             }
             burning = false;
         }
+    }
+
+    public IEnumerator DetermineMezmerize(double mez)
+    {
+        double net_mez = mez - mezmerize_resistance;
+        if (net_mez > 0 && !mezmerized && type == HealthDefence.Type.Unit && rand.NextDouble() < net_mez * 6)
+        {
+            mezmerized = true;
+            Controller.gun.mez_threshold = (int)(net_mez * 100) / 2;
+            float time = (float)(net_mez * 150);
+            float next_time = Time.time + time;
+            RpcUpdateAilments("\r\n <color=purple>Mezmerize</color> ", time);
+            while (Time.time < next_time && HP != 0)
+            {
+                yield return new WaitForEndOfFrame();
+            }
+            Controller.gun.mez_threshold = 0;
+            mezmerized = false;
+        }
+    }
+
+    public void DetermineStun(float time)
+    {
+        if (Controller && !stunned)
+        {
+            RpcUpdateAilments("\r\n <color=yellow>Stun</color>", time);
+            if (Controller is PlayerController)
+            {
+                RpcStun(time);
+            }
+            else
+            {
+                StartCoroutine(Stun(time));
+            }
+        }
+    }
+
+    [ClientRpc]
+    void RpcStun(float time)
+    {
+        StartCoroutine(Stun(time));
     }
 
     [ClientRpc]
@@ -248,6 +302,19 @@ public class HealthDefence : NetworkBehaviour {
         foreach (string t in ailments)
         {
             ailment_text.text += t;
+        }
+    }
+
+
+    IEnumerator Stun(float time)
+    {
+        Controller.enabled = false;
+        stunned = true;
+        yield return new WaitForSeconds(time);
+        stunned = false;
+        if(HP > 0)
+        {
+            Controller.enabled = true;
         }
     }
 

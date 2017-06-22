@@ -21,8 +21,8 @@ public class PlayerController : GenericController {
     public GameObject NameDisplayShow;
     private Vector3 total_move;
     public static PlayerController Client;
+    public Text mod_text;
     private bool shooting = false;
-    public Gun gun;//The Equipped weapon that the player currently wields
     public List<Gun> equipped_weapons = new List<Gun>();
     public static List<uint> PlayerIDList = new List<uint>();
     public GameObject pass_over;//reference to cmd created objects
@@ -106,9 +106,30 @@ public class PlayerController : GenericController {
     public Canvas hpbar_show;
     public HealthDefence HP;
 
+
+    [ClientRpc]
+    void RpcSetShield(GameObject obj)
+    {
+        Shield = obj;
+    }
+
     void Awake()
     {
- 
+        NameDisplayShow = Instantiate(NameDisplay) as GameObject;
+    }
+
+	void Start() 
+    {
+       
+        max_weapon_num = 2;
+        if (!isLocalPlayer)
+        {
+            return;
+        }
+        else
+        {
+            
+              
             cam_show = Instantiate(cam) as Camera;
             if (cam_show.GetComponent<AudioListener>())
             {
@@ -116,33 +137,16 @@ public class PlayerController : GenericController {
             }
             HP = GetComponent<HealthDefence>();
             HP.Controller = this;
+            
             hpbar_show = Instantiate(hpbar) as Canvas;
             hpbar_show.worldCamera = cam_show;
-            NameDisplayShow = Instantiate(NameDisplay) as GameObject;
-            PlayerIDList.Add(netId.Value);
             cam_show.GetComponent<PlayerFollow>().Player = this;
-                      
-    }
-
-
-	void Start() 
-    {
-       
-        max_weapon_num = 2;
-        shield_collider = Shield.GetComponent<BoxCollider>();
-        
-        if (!isLocalPlayer)
-        {
-            cam_show.enabled = false;
-            return;
-        }
-        else
-        {
+            
             Client = this;
-            shield_collider = Shield.GetComponent<BoxCollider>();
+            
             rb = GetComponent<Rigidbody>();
             tr = GetComponent<Transform>();
-            if (cam_show.enabled)
+            if (cam_show && cam_show.enabled)
             {
                 cam_show.transform.rotation = cam.transform.rotation;
             }
@@ -151,15 +155,38 @@ public class PlayerController : GenericController {
             HP.hp_string = HP.health_bar_show.GetComponentInChildren<Text>();
             HP.hp_bar = HP.health_bar_show.GetComponentInChildren<Slider>().GetComponent<RectTransform
                 >();
-            HealthDefence SP = Shield.GetComponent<HealthDefence>();
-            SP.health_bar_show = hpbar_show.GetComponentsInChildren<Slider>()[3].gameObject as GameObject;
-            SP.hp_string = SP.health_bar_show.GetComponentInChildren<Text>();
-            SP.hp_bar = SP.health_bar_show.GetComponentInChildren<Slider>().GetComponent<RectTransform
-                >();
-            StartCoroutine(SetNameDisplay());
+            mod_text = hpbar_show.GetComponentInChildren<Text>();
+          
+            StartCoroutine(SetShield());
+         
         }
+        if (isServer)
+        {
+            Shield = Instantiate(Resources.Load("Bronze Shield"), Vector3.zero, Quaternion.identity) as GameObject;
+            NetworkServer.Spawn(Shield);
+            shield_collider = Shield.GetComponent<BoxCollider>();
+            Shield.GetComponent<HealthDefence>().scale_factor = 2.5f;
+            Shield.GetComponent<HealthDefence>().Controller = this;
+            RpcSetShield(Shield);
+            NetworkMethods.Instance.RpcSetParent(Shield, gameObject, new Vector3(1, 1, 0), new Quaternion(0, 0, 0, 0));
+        }
+        StartCoroutine(SetNameDisplay());
         
 	}
+
+    IEnumerator SetShield()
+    {
+        while (!Shield)
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        HealthDefence SP = Shield.GetComponent<HealthDefence>();
+        SP.health_bar_show = hpbar_show.GetComponentsInChildren<Slider>()[3].gameObject as GameObject;
+        SP.hp_string = SP.health_bar_show.GetComponentInChildren<Text>();
+        SP.hp_bar = SP.health_bar_show.GetComponentInChildren<Slider>().GetComponent<RectTransform
+            >();
+            
+    }
 
     IEnumerator SetNameDisplay()
     {
@@ -179,8 +206,8 @@ public class PlayerController : GenericController {
         {
             NetworkMethods.Instance.RpcSetParent(pass_over, gameObject, pos,rot);
         }
-        pass_over.GetComponent<Item>().client_user = this;
         RpcSetPassOver(pass_over);
+        pass_over.GetComponent<Item>().client_user = this;
     }
 
     [Command]
@@ -200,7 +227,10 @@ public class PlayerController : GenericController {
     void RpcSetPassOver(GameObject g)
     {
         pass_over = g;
-        pass_over.GetComponent<Item>().client_user = this;
+        if (PlayerController.Client.netId == netId)
+        {
+            g.GetComponent<Item>().client_user = this;
+        }
     }
 
     [Command]
@@ -208,7 +238,7 @@ public class PlayerController : GenericController {
     {
         try
         {
-            if (gun.HasReloaded() && !shield_collider.enabled)
+            if (gun.HasReloaded())
             {
                 gun.Shoot();
             }
@@ -260,7 +290,7 @@ public class PlayerController : GenericController {
         else
         {
            
-            if (Input.GetMouseButtonDown(0) && !cooldown_canvas_show)
+            if (Input.GetMouseButtonDown(0) && !cooldown_canvas_show && !blocking)
             {
                 cooldown_canvas_show = Instantiate(cooldown_canvas, gun._item_image.transform.position + new Vector3(.25f, 0, 0), gun._item_image.transform.rotation) as Canvas; 
                 cooldown_canvas_show.transform.SetParent(gun._item_image.transform);
@@ -268,7 +298,7 @@ public class PlayerController : GenericController {
                 CmdShoot();
                 
             }
-            else if (Input.GetMouseButton(1) && !shield_collider.enabled)
+            else if (Input.GetMouseButton(1) && !blocking)
             {
                 if (Gun == null)
                 {
@@ -276,9 +306,11 @@ public class PlayerController : GenericController {
                 }
                 StartShieldBlocking();
             }
-            if (Input.GetMouseButtonUp(1))
+            if (Input.GetMouseButtonUp(1) && blocking)                                
             {
-                EndShieldBlocking();
+                
+                    EndShieldBlocking();
+                
             }
 
             

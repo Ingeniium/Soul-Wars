@@ -13,6 +13,7 @@ public abstract partial class Gun : Item
         GunTable.gun_for_consideration = this;
         GunLevelUp.transform.SetParent(client_user.hpbar_show.transform);
         GunLevelUp.transform.localPosition = Vector3.zero;
+        GunLevelUp.transform.rotation *= new Quaternion(0, 0, 0, 0);
     }
 
     protected static class GunTable

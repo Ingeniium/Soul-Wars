@@ -12,6 +12,8 @@ public partial class AIController : GenericController {
     private Collider trig;
     private List<Collider> bullet_colliders = new List<Collider>();
     private float next_dodge = 0;
+    public float shoot_constant = 5;
+    public float shoot_delay;
     public float dodge_delay;
     public float dodge_cooldown;
     private Vector3 vec;
@@ -19,7 +21,6 @@ public partial class AIController : GenericController {
     [HideInInspector]
     public Transform gtr;
     public SphereCollider enemy_attack_detection;
-    public Gun gun;
     public float minimal_distance = 1f;
     private bool guarding = false;
     private static UniversalCommunicator TeamController = new UniversalCommunicator();
@@ -90,14 +91,35 @@ public partial class AIController : GenericController {
             TeamController.set = true;
         }
         prb = GetComponentInParent<Rigidbody>();
-        Gun = Instantiate(Resources.Load("Strike"), transform.position, transform.rotation) as GameObject;
+       
         //GetCOmponent In parent apparently isn't working for transform
-        gtr = Gun.GetComponent<Transform>();
-        gun = Gun.GetComponent<Gun>();
-        gun.SetBaseStats();
-        gun.barrel_end = Gun.transform.GetChild(0);
-        NetworkServer.Spawn(Gun);
-        NetworkMethods.Instance.RpcSetParent(Gun, ptr.gameObject, new Vector3(.004f, .005f, .794f),new Quaternion(0,0,0,0));
+      
+        StartCoroutine(WaitForPlayers());
+    }
+
+    [ServerCallback]
+    IEnumerator WaitForPlayers()
+    {
+        enabled = false;
+        while (PlayersAlive.Instance.Players.Count < 1)
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        uint[] array = new uint[PlayersAlive.Instance.Players.Count];
+        int i = 0;
+        foreach(uint u in PlayersAlive.Instance.Players)
+        {
+            array[i] = u;
+            i++;
+        }
+        while (!Array.Exists(array, delegate(uint u)
+        {  
+            return  (NetworkServer.FindLocalObject(new NetworkInstanceId(u)).GetComponent<PlayerController>().gun);
+        }))
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        enabled = true;
     }
 
     [ServerCallback]
@@ -109,9 +131,7 @@ public partial class AIController : GenericController {
             prb.velocity = move_dir.normalized * speed;
             if (Target && AttackFuncs[attack_func_index](this))
             {
-                GameObject g = Instantiate(Resources.Load("Bullet"),gun.barrel_end.position, gun.transform.rotation) as GameObject;
-                NetworkServer.Spawn(g);
-                gun.Shoot(g);
+                gun.Shoot();
             }
         
     }
@@ -553,14 +573,14 @@ public partial class AIController : GenericController {
 
    bool WildlyFire()
    {
-       return gun.HasReloaded();
+       return gun.HasReloaded(shoot_delay);
    }
 
    bool FireWhenInRange()
    {
        try
        {
-           if (gun.HasReloaded() && gun.range > Vector3.Distance(ptr.position, Target.transform.position))
+           if (gun.HasReloaded(shoot_delay) && gun.range > Vector3.Distance(ptr.position, Target.transform.position))
            {
                return true;
            }
@@ -579,7 +599,7 @@ public partial class AIController : GenericController {
    {
        try
        {
-           if (gun.HasReloaded() && Vector3.Distance(ptr.position, Target.transform.position) < gun.range - (1.5 * minimal_distance))
+           if (gun.HasReloaded(shoot_delay) && Vector3.Distance(ptr.position, Target.transform.position) < gun.range - (1.5 * minimal_distance))
            {
                return true;
            }
@@ -598,7 +618,7 @@ public partial class AIController : GenericController {
    {
        try
        {
-           if (gun.HasReloaded())
+           if (gun.HasReloaded(shoot_delay))
            {
                Vector3 proj = Target.GetComponent<Rigidbody>().velocity;
                if (proj.magnitude > 1)

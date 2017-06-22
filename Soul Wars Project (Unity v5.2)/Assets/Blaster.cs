@@ -6,12 +6,30 @@ using UnityEngine.Networking;
 
 public class Blaster : Gun
 {
-    private readonly static string[] gun_ability_names = new string[3] { "Brigadier", "Gunslinger", null };
-    private readonly static string[] gun_name_addons = new string[3] { "Punishment", "The Force", null };
-    private readonly static string[] gun_ability_desc = new string[3] {
+    private readonly static string[] gun_ability_names = new string[12] { "Brigadier", "Gunslinger", null,
+                                                                         null, null, null,
+                                                                         null, null, null,
+                                                                         null, null, null,};                           
+    private readonly static string[] gun_name_addons = new string[12] { "Punishment", "The Force", null,
+                                                                         null, null, null,
+                                                                         null, null, null,
+                                                                         null, null, null,};
+    private readonly static string[] gun_ability_desc = new string[12] {
         "Brigadier" + "\n Does 150% damage to" + "\n spawn points and shields.",
-        "Gunslinger" + "\n Knockbacks target 4 units" + "\n if there's space.",
-        null
+        "Gunslinger" + "\n Causes a 2 second stun.",
+        null,
+
+        null,
+        null,
+        null,
+
+        null,
+        null,
+        null,
+
+        null,
+        null,
+        null,
     };
     /*This class's pool of gun_abilities.Use of a static container of static methods requi"Markring explicit this
     pointers are used for onetime,pre-Awake() initialization of delegates*/
@@ -19,7 +37,17 @@ public class Blaster : Gun
     {
         Brigadier,
         Gunslinger,
-        null
+         null,
+        null,
+        null,
+
+        null,
+        null,
+        null,
+
+        null,
+        null,
+        null,
     };
 
     private static IEnumerator Brigadier(Gun gun, BulletScript script)
@@ -55,25 +83,12 @@ public class Blaster : Gun
         }
         if (script.Target.type == HealthDefence.Type.Unit)
         {
-            /*If there's no walls or players in the way,move 4 units in bullet direction(5 added for movement leeway)*/
-            string layer = "";
-            if (script.gameObject.layer == 13)
-            {
-                layer = "Ally";
-            }
-            else
-            {
-                layer = "Enemy";
-            }
-            if (!Physics.Raycast(script.Target.transform.position, script.transform.forward, 5,
-                LayerMask.GetMask(layer)))
-            {
-                script.Target.transform.Translate(script.transform.forward * 4,Space.World);
-            }
+            script.Target.DetermineStun(2);
         }
         script.coroutines_running--;
     }
 
+    
     protected override string GunAbilityDesc(int index)
     {
         return gun_ability_desc[index];
@@ -84,7 +99,7 @@ public class Blaster : Gun
         return gun_ability_names[index];
     }
 
-    protected override Gun_Abilities ClassGunMods(int index)
+    public override Gun_Abilities ClassGunMods(int index)
     {
         return Gun_Mods[index];
     }
@@ -131,6 +146,7 @@ public class Blaster : Gun
         {
             layer = 14;
             home_layer = 12;
+            color = Color.red;
         }
         range = 20;
         projectile_speed = 10;

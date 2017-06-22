@@ -6,11 +6,29 @@ using System.Collections.Generic;
 using UnityEngine.Networking;
 
 public class Strike : Gun {
-    private readonly static string[] gun_ability_names = new string[3] { "Marksman", "Sniper", null };
-    private readonly static string[] gun_name_addons = new string[3] { "Marksmanship","Accuracy",null };
-    private readonly static string[] gun_ability_desc = new string[3] {
+    private readonly static string[] gun_ability_names = new string[12] { "Marksman", "Sniper", null,
+                                                                         null, null, null,
+                                                                         null, null, null,
+                                                                         null, null, null};
+    private readonly static string[] gun_name_addons = new string[12] { "Marksmanship","Accuracy",null,
+                                                                          null, null, null,
+                                                                         null, null, null,
+                                                                         null, null, null};
+    private readonly static string[] gun_ability_desc = new string[12] {
         "Marksman" + "\n Can grant up to" + "\n 30% crit chance based on" + "\n how little the bullet turns.",
         "Sniper" + "\n Adds a seconds of" + "\n cooldown to the enemy's" + "\n current gun.",
+         null,
+
+        null,
+        null,
+        null,
+
+        null,
+        null,
+        null,
+
+        null,
+        null,
         null
     };
     /*This class's pool of gun_abilities.Use of a static container of static methods requiring explicit this
@@ -19,6 +37,18 @@ public class Strike : Gun {
     {
         {Marksman},
         {Sniper},
+         null,
+
+        null,
+        null,
+        null,
+
+        null,
+        null,
+        null,
+
+        null,
+        null,
         null
     };
    
@@ -96,7 +126,7 @@ public class Strike : Gun {
         return gun_ability_desc[index];
     }
 
-    protected override Gun_Abilities ClassGunMods(int index)
+    public override Gun_Abilities ClassGunMods(int index)
     {
         return Gun_Mods[index];
     }
@@ -142,12 +172,13 @@ public class Strike : Gun {
         {
             layer = 14;
             home_layer = 12;
+            color = Color.red;
         }
         range = 10f;
         projectile_speed = 5;
         knockback_power = 5;
         crit_chance = .05;
-        reload_time = .5f;
+        reload_time = 1f;
         home_speed = 2.5f;
         home_radius = 3f;
         homes = true;

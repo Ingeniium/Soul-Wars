@@ -61,17 +61,24 @@ public class SpawnManager : NetworkBehaviour {
                 {
                     yield return new WaitForEndOfFrame();
                 }
-                killed.transform.position = EnemySpawnPoints[0].transform.position + EnemySpawnPoints[0].spawn_direction;
+                NetworkMethods.Instance.RpcSetPosition(killed.gameObject, EnemySpawnPoints[0].transform.position + EnemySpawnPoints[0].spawn_direction);
             }
             else
             {
-                RespawnInterface.Instance.respawning = true;
+                if (SpawnManager.AllySpawnPoints.Count != 0)
+                {
+                    SpawnManager.AllySpawnPoints[0].RpcInterface(killed.netId);
+                }
+                else
+                {
+                    SpawnManager.EnemySpawnPoints[0].RpcInterface(killed.netId);
+                }
                 yield return new WaitForSeconds(ally_respawn_time);
                 while (AllySpawnPoints.Count < 1)
                 {
                     yield return new WaitForEndOfFrame();
                 }
-                killed.transform.position = AllySpawnPoints[0].transform.position + AllySpawnPoints[0].spawn_direction;
+                NetworkMethods.Instance.RpcSetPosition(killed.gameObject, AllySpawnPoints[0].transform.position + AllySpawnPoints[0].spawn_direction);
                 PlayersAlive.Instance.Players.Add(killed.netId.Value);
             }
             killed.HP = killed.maxHP;
@@ -88,6 +95,15 @@ public class SpawnManager : NetworkBehaviour {
         
         
    }
+
+    [ClientRpc]
+    void RpcInterface(NetworkInstanceId ID)
+    {
+        if (PlayerController.Client.netId == ID)
+        {
+            RespawnInterface.Instance.respawning = true;
+        }
+    }
 
     [ClientRpc]
     void RpcBlink(GameObject g)
@@ -208,7 +224,6 @@ public class SpawnManager : NetworkBehaviour {
 
     public static IEnumerator Blink(GameObject Respawned, float invis_time = 1.5f)
     {
-        int l = Respawned.layer;
         Respawned.layer = 15;
         Renderer rend = Respawned.GetComponent<Renderer>();
         Renderer[] child_rends = Respawned.GetComponentsInChildren<Renderer>();
@@ -244,7 +259,14 @@ public class SpawnManager : NetworkBehaviour {
         {
             r.enabled = true;
         }
-        Respawned.layer = l;
+        if (Respawned.gameObject.tag == "Player")
+        {
+            Respawned.layer = 9;
+        }
+        else
+        {
+            Respawned.layer = 8;
+        }
     }
 }
 	
