@@ -4,6 +4,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
+
 public partial class AIController : GenericController {
     private Rigidbody prb;
     public Transform ptr;
@@ -19,28 +20,21 @@ public partial class AIController : GenericController {
     private Vector3 vec;
     public float reaction_delay;    
     [HideInInspector]
-    public Transform gtr;
     public SphereCollider enemy_attack_detection;
-    public float minimal_distance = 1f;
+    public float minimal_distance = 4f;
     private bool guarding = false;
-    private static UniversalCommunicator TeamController = new UniversalCommunicator();
-    private FunctionChooser attack_func_chances = new FunctionChooser();
     private Vector3 move_dir;
     public Rigidbody rb;
+    float cost_point;
+    float dist_point;
 
     private static Dictionary<int, Func<AIController, Vector3>> MovementFuncs = new Dictionary<int, Func<AIController, Vector3>>()
     {
         {0,Charge},
         {1,MaintainDistance},
         {2,Intercept},
-        {3,AvoidConfrontation}           
-    };
-    private static Dictionary<int, Func<AIController, bool>> AttackFuncs = new Dictionary<int, Func<AIController, bool>>()
-    {
-        {0,WildyFire},
-        {1,FireWhenInRange},
-        {2,GuardFire},
-        {3,HaltFire}
+        {3,AvoidConfrontation}, 
+        {4,FollowPath}  
     };
     private static Dictionary<int, Func<AIController,IEnumerator>> EvasionFuncs = new Dictionary<int, Func<AIController,IEnumerator>>()
     {
@@ -62,39 +56,129 @@ public partial class AIController : GenericController {
         new ValueGroup(0,-1), new ValueGroup(0,-1), 
         new ValueGroup(0,-1), new ValueGroup(0,-1)   
     };
-    
-    private int attack_func_index = 1;
-    private int movement_func_index = 2;
+
+    public int[] attack_func_indexes = new int[]
+    {
+        1,
+        1
+    };
+    [HideInInspector] public int movement_func_index = 4;
     private int evasion_func_index = 1;
     private static System.Random rand = new System.Random();
     private ObjectiveState State;
-    private bool ally_in_range = false;
+    static readonly int max_iterations = 1000;
+    Coordinate Path;
+    Coordinate curCoord;
+    Bounds bounds;
+    float GetCoordinateDistFromTarget(Coordinate coord)
+    {
+        return Math.Abs(
+            Vector3.Distance(Map.Instance.GetCenter(coord), Target.transform.position));
+    }
+
+    int ComputeCost(Coordinate from,Coordinate to)
+    {
+        int costx;
+        int costz;
+        if (from.x > to.x)
+        {
+            costx = from.x - to.x;
+        }
+        else
+        {
+            costx = to.x - from.x;
+        }
+        if (from.z > to.z)
+        {
+            costz = from.z - to.z;
+        }
+        else
+        {
+            costz = to.z - from.z;
+        }
+        return costx + costz;
+    }
+
+    Coordinate GetPath()
+    {
+
+        if (Target)
+        {
+            Priority_Queue.SimplePriorityQueue<Coordinate> queue = new Priority_Queue.SimplePriorityQueue<Coordinate>();
+            Coordinate start = Map.Instance.GetPos(ptr.position);
+            Coordinate end = Map.Instance.GetPos(Target.transform.position);
+            if (ObstacleCoord.Coordinates.Contains(end))
+            {
+                List<Coordinate> child = end.GetChildren();
+                if (child.Count > 0)
+                {
+                    end = child[0];
+                }
+                else
+                {
+                    end.x -= 2;
+                }
+            }
+            List<Coordinate> visited = new List<Coordinate>();
+            int iterations = 0;
+            float tstart = Time.realtimeSinceStartup;
+            queue.Enqueue(start, GetCoordinateDistFromTarget(start));
+            while (iterations < max_iterations)
+            {
+                start = queue.Dequeue();
+                if (start == end)
+                {
+                   /* Debug.Log(Time.realtimeSinceStartup - tstart + " seconds : " +
+                         queue.Count + " end routes considered : " +
+                         start.GetNumParents() + " parents.");*/
+                    return start;
+                }
+                foreach (Coordinate coord in start.GetChildren())
+                {
+                        coord.traverse_cost = (float)ComputeCost(coord,end);
+                        coord.parent = start;
+                        if (!visited.Contains(coord))
+                        {
+                            queue.Enqueue(coord, coord.GetTotalCost());
+                            visited.Add(coord);
+                        }
+                        else if (queue.Contains(coord) && coord.GetTotalCost() < queue.GetPriority(coord))
+                        {
+                            queue.Remove(coord);
+                            queue.Enqueue(coord, coord.GetTotalCost());
+                        }
+                }
+                if (queue.Count != 0)
+                {
+                    start = queue.First;
+                }
+                else 
+                {
+                    Debug.Log(ObstacleCoord.Coordinates.Contains(end) + " : " + ObstacleCoord.Coordinates.Contains(start));
+                    break;
+                }
+                iterations++;
+            }
+        }
+        return null;
+    }
 
     [ServerCallback]
     void Awake()
     {
         GetComponentInParent<HealthDefence>().Controller = this;
-
     }
 
     [ServerCallback]
     void Start()
     {
+        
         enemy_attack_detection = GetComponent<SphereCollider>();
-        TeamController.Units.Add(this);
-        if (!TeamController.set)
-        {
-            TeamController.Start(new List<GroupCommunicator>()
-            {
-                new Conquor()
-            });
-            TeamController.set = true;
-        }
+		State = new Conquer (this);
         prb = GetComponentInParent<Rigidbody>();
-       
-        //GetCOmponent In parent apparently isn't working for transform
-      
+        bounds = GetComponentInParent<BoxCollider>().bounds;
         StartCoroutine(WaitForPlayers());
+       
     }
 
     [ServerCallback]
@@ -107,33 +191,71 @@ public partial class AIController : GenericController {
         }
         uint[] array = new uint[PlayersAlive.Instance.Players.Count];
         int i = 0;
-        foreach(uint u in PlayersAlive.Instance.Players)
+        foreach (uint u in PlayersAlive.Instance.Players)
         {
             array[i] = u;
             i++;
         }
         while (!Array.Exists(array, delegate(uint u)
-        {  
-            return  (NetworkServer.FindLocalObject(new NetworkInstanceId(u)).GetComponent<PlayerController>().gun);
+        {
+            return (NetworkServer.FindLocalObject(new NetworkInstanceId(u)).GetComponent<PlayerController>().main_gun);
         }))
         {
             yield return new WaitForEndOfFrame();
         }
         enabled = true;
     }
+      
+
+    Vector3 FollowPath()
+    {
+        if (target_focus)
+        {
+            ptr.LookAt(Target.transform);
+        }
+        if (Target && Map.Instance.GetPos(Target.transform.position) != Map.Instance.GetPos(ptr.position))
+        {
+            Path = GetPath();
+            if (Path != null)
+            {
+                List<Coordinate> list = Path.GetParents();
+                if (list[list.Count - 1] != Path && list[list.Count - 2] != null)
+                {
+                    return (Map.Instance.GetCenter(list[list.Count - 2]) - ptr.position).normalized;
+                }
+            }
+        }
+        Debug.Log(0);
+        return Vector3.zero;
+    }
 
     [ServerCallback]
     void FixedUpdate()
     {
         
-            State.AffirmTarget(Target);
+        State.AffirmTarget(Target);
+        ptr.LookAt(Target.transform);
+        bool hit = WillBulletHitObstacle(main_gun);
+        if (!hit)
+        {
+            move_dir =Target.transform.position - ptr.position;
+        }
+        else
+        {
             move_dir = MovementFuncs[movement_func_index](this);
-            prb.velocity = move_dir.normalized * speed;
-            if (Target && AttackFuncs[attack_func_index](this))
+        }
+        prb.velocity = move_dir.normalized * speed;
+        int i = 0;
+        foreach(Gun gun in weapons)
+        {
+            if(AttackFuncs[attack_func_indexes[i]](this,gun) && !hit)
             {
-                gun.Shoot();
+                main_gun = gun;
+                main_gun.Shoot();
             }
-        
+            i++;
+        }
+   
     }
 
     [ServerCallback]
@@ -150,7 +272,12 @@ public partial class AIController : GenericController {
         {
             bullet_colliders.Add(col);
             trig = GetClosestBullet();
-            EvasionFuncs[evasion_func_index](this);
+           /* if (!trig || Math.Abs(Vector3.Distance(col.gameObject.transform.position, ptr.position))
+                < Math.Abs(Vector3.Distance(trig.gameObject.transform.position, ptr.position)))
+            {
+                trig = col;
+            }*/
+            StartCoroutine(DetermineEvasion());
         }
     }
 
@@ -203,6 +330,11 @@ public partial class AIController : GenericController {
         return bullet_colliders[distances[0].index];      
     }
 
+    static Vector3 FollowPath(AIController AI)
+    {
+        return AI.FollowPath();
+    }
+
     static Vector3 Charge(AIController AI)
     {
         return AI.Charge();
@@ -223,25 +355,6 @@ public partial class AIController : GenericController {
         return AI.AvoidConfrontation();
     }
 
-    static bool WildyFire(AIController AI)
-    {
-        return AI.WildlyFire();
-    }
-
-    static bool FireWhenInRange(AIController AI)
-    {
-        return AI.FireWhenInRange();
-    }
-
-    static bool GuardFire(AIController AI)
-    {
-        return AI.GuardFire();
-    }
-
-    static bool HaltFire(AIController AI)
-    {
-        return AI.HaltFire();
-    }
 
     static IEnumerator Block(AIController AI)
     {
@@ -387,84 +500,7 @@ public partial class AIController : GenericController {
     }
 
 
-    private class FunctionChooser
-    {
-        public FunctionChance[] possibilities = new FunctionChance[4]
-        {
-            new FunctionChance(0,.25),
-            new FunctionChance(.25,.50),
-            new FunctionChance(.50,.75),
-            new FunctionChance(.75,1)
-        };
-
-        public int Roll(System.Random r)
-        {
-            double num = r.NextDouble();
-            for (int i = 0; i < possibilities.Length; i++)
-            {
-                if (num < possibilities[i].upper_bound && num > possibilities[i].lower_bound)
-                {
-                    return i;
-                }
-            }
-            return 0;
-        }
-
-        public void ModifyChances(int index, double num)
-        {
-            List<ValueGroup> values = new List<ValueGroup>();
-            for (int i = 0; i < possibilities.Length; i++)
-            {
-                values.Add(new ValueGroup(i, possibilities[i].success_rate));
-            }
-            values.Sort(delegate(ValueGroup lhs, ValueGroup rhs)
-            {
-                if (lhs.value < rhs.value)
-                {
-                    return -1;
-                }
-                else
-                {
-                    return 1;
-                }
-            });
-            if (values[0].index < index)
-            {
-                possibilities[index].lower_bound -= num;
-                for (int i = index; i > values[0].index; i--)
-                {
-                    possibilities[i].upper_bound -= num;
-                    possibilities[i].lower_bound -= num;
-                }
-                possibilities[values[0].index].upper_bound -= num;
-            }
-            else if(values[0].index > index)
-            {
-                possibilities[index].lower_bound += num;
-                for (int i = values[0].index; i > index; i--)
-                {
-                    possibilities[i].upper_bound += num;
-                    possibilities[i].lower_bound += num;
-                }
-                possibilities[values[0].index].lower_bound -= num;
-            }
-        }
-    }
-
-    private struct FunctionChance
-    {
-        public double lower_bound;
-        public double upper_bound;
-        public float success_rate;
-
-        public FunctionChance(double l, double u)
-        {
-            lower_bound = l;
-            upper_bound = u;
-            success_rate = 1;
-        }
-    }
-
+       
 
    Vector3 Charge()
    {
@@ -546,17 +582,27 @@ public partial class AIController : GenericController {
    {
        try
        {
-          
-               Vector3 dir = Target.transform.position - ptr.position;
-               if (target_focus && dir.magnitude < gun.range)
+           if (target_focus)
+           {
+               Vector3 dir = (Target.transform.position - ptr.transform.position);
+               ptr.LookAt(Target.transform);
+               if (dir.magnitude < minimal_distance * 1.5f)
                {
-                   ptr.LookAt(Target.transform);
+                   return dir * -1;
+               }
+               else if (dir.magnitude > minimal_distance * 2f)
+               {
                    return dir.normalized;
                }
                else
                {
                    return Vector3.zero;
                }
+           }
+           else
+           {
+               return Vector3.zero;
+           }
        }
        catch (System.Exception e)
        {
@@ -569,89 +615,66 @@ public partial class AIController : GenericController {
        return Vector3.zero;
    }
 
-   
 
-   bool WildlyFire()
+   IEnumerator DetermineEvasion()
    {
-       return gun.HasReloaded(shoot_delay);
-   }
-
-   bool FireWhenInRange()
-   {
-       try
+       yield return new WaitForSeconds(reaction_delay);
+       if (trig)
        {
-           if (gun.HasReloaded(shoot_delay) && gun.range > Vector3.Distance(ptr.position, Target.transform.position))
+           try
            {
-               return true;
-           }
-           else
+           if (!Shield.GetComponent<HealthDefence>().regeneration && !trig.GetComponent<BulletScript>().can_pierce && !bullet_colliders.Exists(delegate(Collider col)
            {
-               return false;
-           }
-       }
-       catch (System.Exception e)
-       {
-           return false;
-       }
-   }
-
-   bool GuardFire()
-   {
-       try
-       {
-           if (gun.HasReloaded(shoot_delay) && Vector3.Distance(ptr.position, Target.transform.position) < gun.range - (1.5 * minimal_distance))
-           {
-               return true;
-           }
-           else
-           {
-               return false;
-           }
-       }
-       catch (System.Exception e)
-       {
-           return false;
-       }
-   }
-
-   bool HaltFire()
-   {
-       try
-       {
-           if (gun.HasReloaded(shoot_delay))
-           {
-               Vector3 proj = Target.GetComponent<Rigidbody>().velocity;
-               if (proj.magnitude > 1)
+               if (col)
                {
-                   Vector3 dif = (Target.transform.position - ptr.transform.position);
-                   Vector3 dir = Vector3.Project(dif, proj);
-                   ptr.LookAt(dir);
+                   return (col.GetComponent<Rigidbody>().velocity.magnitude > (col.gameObject.transform.position - ptr.position).magnitude &&
+                       (Math.Abs(Vector3.Angle(col.gameObject.transform.position, trig.gameObject.transform.position)) > 30));
                }
-               return true;               
+               else
+               {
+                   return false;
+               }
+           }))
+           {
+               StartCoroutine(Block());
            }
            else
            {
-               return false;
+               StartCoroutine(EvasionFuncs[evasion_func_index](this));
            }
-       }
-       catch (System.Exception e)
-       {
-           return false;
+           }
+           catch(System.Exception e)
+           {
+               trig = null;
+               Debug.Log(e);
+           }
+           
        }
    }
 
    IEnumerator Block()
    {
-       yield return new WaitForSeconds(reaction_delay);
-       if (trig)
-       {
-           target_focus = false; 
-           ptr.LookAt(trig.gameObject.transform);        
-           StartShieldBlocking();
-           yield return new WaitForSeconds(reaction_delay / 2);
-           target_focus = true;
-           EndShieldBlocking();
-       }
+       
+     
+           while (trig && Math.Abs(trig.transform.position.magnitude - ptr.position.magnitude) > .5f)
+           {
+               yield return new WaitForEndOfFrame();
+           }
+           if (trig)
+           {
+               blocking = true;
+               target_focus = false;
+               ptr.LookAt(trig.gameObject.transform);
+               StartShieldBlocking();
+               while (trig)
+               {
+                   yield return new WaitForEndOfFrame();
+               }
+               yield return new WaitForSeconds(.5f);
+               target_focus = true;
+               EndShieldBlocking();
+               blocking = false;
+           }
    }
 
    IEnumerator SideStep()
@@ -661,62 +684,25 @@ public partial class AIController : GenericController {
        while (trig)
        {
            yield return new WaitForFixedUpdate();
-           Vector3 dif =  trig.gameObject.transform.position - ptr.position;
-           if (sign == 0)
+           try
            {
-               move_dir += Quaternion.AngleAxis(90, Vector3.up) * dif.normalized;
+               Vector3 dif = trig.gameObject.transform.position - ptr.position;
+               if (sign == 0)
+               {
+                   move_dir += Quaternion.AngleAxis(90, Vector3.up) * dif.normalized;
+               }
+               else
+               {
+                   move_dir += Quaternion.AngleAxis(-90, Vector3.up) * dif.normalized;
+               }
            }
-           else
+           catch (System.Exception e)
            {
-               move_dir += Quaternion.AngleAxis(-90, Vector3.up) * dif.normalized;
+               Debug.Log(e);
            }
        }
    }
-
-    IEnumerator Evasion()
-    {
-        yield return new WaitForSeconds(reaction_delay);
-      if(trig != null)
-      {
-        if((next_dodge > Time.time || Vector3.Distance(trig.gameObject.transform.position,ptr.position) < 2) && Shield.GetComponent<HealthDefence>().regeneration == false)
-        {
-            target_focus = false;
-            int turn = 0;
-            while(turn != 90 && trig != null)
-            {
-                ptr.LookAt(trig.transform);
-                Shield.transform.rotation *= Quaternion.AngleAxis(-45,Vector3.up);
-                turn += 45;
-                yield return new WaitForEndOfFrame();
-            }
-            Shield.transform.localPosition = new Vector3(.09f, .37f, .80f);
-            gtr.localPosition = new Vector3(.87f, 0, -.071f);
-            yield return new WaitForSeconds(.5f);
-            target_focus = true;
-            while (turn != 0)
-            {
-                Shield.transform.rotation *= Quaternion.AngleAxis(45,Vector3.up);
-                turn -= 45;
-                yield return new WaitForEndOfFrame();
-            }
-            Shield.transform.localPosition = new Vector3(.87f, .37f, -.071f);
-            gtr.localPosition = new Vector3(.09f, 0, .80f);
-        }
-        else if(next_dodge < Time.time)
-        {
-                next_dodge = Time.time + dodge_cooldown;
-                yield return new WaitForSeconds(dodge_delay);
-                if (trig != null)
-                {
-                    vec = Quaternion.AngleAxis(90, trig.gameObject.transform.up) * trig.gameObject.transform.forward;
-                }
-                prb.AddForce(vec * 10, ForceMode.Impulse);
-        }
-
-     }
-      enemy_attack_detection.enabled = true;
-      enemy_attack_detection.isTrigger = true;
-    }
+    
 
     
    

@@ -1,33 +1,32 @@
 ﻿using UnityEngine;
-using System;
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine.Networking;
+
 
 public class Haze : Gun
 {
     private readonly static string[] gun_ability_names = new string[12] { "Fog", "Conflagration", null,
-                                                                         null,"Fume",null,
-                                                                         null,"Engulf",null,
-                                                                         null,"Cloud",null};
+                                                                         "Resistance","Fume",null,
+                                                                         "Debilitate","Engulf",null,
+                                                                         "Infect","Cloud",null};
     private readonly static string[] gun_name_addons = new string[12] { "Fog", "Conflagration", null,
-                                                                        null, "Toxic",null,
-                                                                        null, "Ominous",null,
-                                                                        null, "Cloudy", null};
+                                                                        "Insulant", "Toxic",null,
+                                                                        "Debilitating", "Ominous",null,
+                                                                        "Infectious", "Cloudy", null};
     private readonly static string[] gun_ability_desc = new string[12] {
         "Fog" + "\n Adds +10 Chill strength to bullets.",
         "Conflagration" + "\n Adds +10 Burn strenght to bullets.",
         null,
 
-        null,
+        "Resistance" + "\n Enemy bullets that pass thru" + "\n this bullet will have half power" + "\n to most status effects.",
         "Fume" + "\n Adds one to two points of damage" + "\n to the bullet upon hitting" + "\n new targets.",
         null,
 
-        null,
+        "Debilitate" + "\n Bullets ignore half target resistance" + "\n to most status effects.",
         "Engulf" + "\n Causes bullets to stick to their first target.",
         null,
 
-        null,
+        "Infect" + "\n Bullets from allies and yourself will" + "\n have +5 resistance to most status effects" + "\n upon crossing bullets from this gun.",
         "Cloud" + "\n Doubles the size of the bullets.",
         null
     };
@@ -39,15 +38,15 @@ public class Haze : Gun
         Conflagration,
         null,
 
-        null,
+        Resistance,
         Fume,
         null,
 
-        null,
+        Debilitate,
         Engulf,
         null,
 
-        null,
+        Infect,
         Cloud,
         null
     };
@@ -100,6 +99,109 @@ public class Haze : Gun
         }
     }
 
+    private static IEnumerator Resistance(Gun gun, BulletScript script)
+    {
+        string layer = null;
+        List<uint> IDs = new List<uint>();
+        if (script.gameObject.layer == 13)
+        {
+            layer = "EnemyAttack";
+        }
+        else
+        {
+            layer = "AllyAttack";
+        }
+        while (script)
+        {
+            Collider[] bullet_colliders = Physics.OverlapSphere(script.gameObject.transform.position, 2,
+                LayerMask.GetMask(layer), QueryTriggerInteraction.Collide);
+            foreach (Collider col in bullet_colliders)
+            {
+                BulletScript b = col.gameObject.GetComponent<BulletScript>();
+                if (b && !IDs.Contains(b.netId.Value))
+                {
+                    IDs.Add(b.netId.Value);
+                    b.chill_strength /= 2;
+                    b.burn_strength /= 2;
+                    b.mezmerize_strength /= 2;
+                    b.sunder_strength /= 2;
+                }
+            }
+            yield return new WaitForEndOfFrame();
+        }
+    }
+
+    private static IEnumerator Debilitate(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        while (script.has_collided == false)
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        List<uint> IDs = new List<uint>();
+        double chill = 0;
+        double burn = 0;
+        double mez = 0;
+        double sunder = 0;
+        script.coroutines_running--;
+        while(script)
+        {
+        
+        if(script.Target && !IDs.Contains(script.Target.netId.Value))
+        {
+            script.chill_strength -= chill;
+            script.chill_strength -= burn;
+            script.mezmerize_strength -= mez;
+            script.sunder_strength -= sunder;
+
+            chill = script.Target.chill_resistance /= 2;
+            burn = script.Target.burn_resistance /= 2;
+            mez = script.Target.mezmerize_resistance /= 2;
+            sunder = script.Target.sunder_resistance /= 2;
+
+            script.chill_strength += chill;
+            script.chill_strength += burn;
+            script.mezmerize_strength += mez;
+            script.sunder_strength += sunder;
+
+            IDs.Add(script.Target.netId.Value);
+        }
+        yield return new WaitForEndOfFrame();
+        }
+    }
+
+    private static IEnumerator Infect(Gun gun, BulletScript script)
+    {
+        string layer = null;
+        List<uint> IDs = new List<uint>();
+        if (script.gameObject.layer == 13)
+        {
+            layer = "AllyAttack";
+        }
+        else
+        {
+            layer = "EnemyAttack";
+        }
+        while (script)
+        {
+            Collider[] bullet_colliders = Physics.OverlapSphere(script.gameObject.transform.position, 2,
+                LayerMask.GetMask(layer), QueryTriggerInteraction.Collide);
+            foreach (Collider col in bullet_colliders)
+            {
+                BulletScript b = col.gameObject.GetComponent<BulletScript>();
+                if (b && !IDs.Contains(b.netId.Value))
+                {
+                    IDs.Add(b.netId.Value);
+                    b.chill_strength += .05;
+                    b.burn_strength += .05;
+                    b.mezmerize_strength += .05;
+                    b.sunder_strength += .05;
+                }
+            }
+            yield return new WaitForEndOfFrame();
+        }
+    }
+
     private static IEnumerator Engulf(Gun gun, BulletScript script)
     {
         script.coroutines_running++;
@@ -107,12 +209,19 @@ public class Haze : Gun
         {
             yield return new WaitForEndOfFrame();
         }
-        HealthDefence curTarg = script.Target;
+        Rigidbody rb = script.GetComponent<Rigidbody>();
+        Rigidbody trb = script.Target.GetComponent<Rigidbody>();
+        rb.freezeRotation = true;
+        script.transform.position = new Vector3(script.Target.transform.position.x,
+            script.transform.position.y,
+            script.Target.transform.position.z);
         script.coroutines_running--;
         while (script)
         {
-            NetworkMethods.Instance.RpcSetPosition(script.gameObject,new Vector3(curTarg.transform.position.x,script.transform.position.y,curTarg.transform.position.z));
-            yield return new WaitForSeconds(.2f);
+            rb.velocity = new Vector3(trb.velocity.x,
+                0,
+                trb.velocity.z);
+            yield return new WaitForFixedUpdate();
         }
     }
 
@@ -129,7 +238,8 @@ public class Haze : Gun
     protected override string GunAbilityDesc(int index)
     {
         return gun_ability_desc[index];
-    }
+    }
+
     protected override string ClassGunAbilityNames(int index)
     {
         return gun_ability_names[index];
@@ -162,7 +272,7 @@ public class Haze : Gun
         return "Emits a slow but large," + " \n lingering projectile.";
     }
 
-    protected override string GetBaseName()
+    public override string GetBaseName()
     {
         return "Haze";
     }
@@ -171,7 +281,6 @@ public class Haze : Gun
     {
         upper_bound_damage = 8;
         lower_bound_damage = 6;
-        asset_reference = Resources.Load("Haze") as GameObject;
         if (client_user)
         {
             layer = 13;
@@ -194,10 +303,6 @@ public class Haze : Gun
         homes = false;
         can_pierce = true;
         /*Resources.Load seems to only work for getting prefabs as only game objects.*/
-        GameObject g = Resources.Load("Drop Item Name Box") as GameObject;
-        drop_canvas = g.GetComponent<Canvas>();
-        g = Resources.Load("WeaponOptions") as GameObject;
-        item_options = g.GetComponent<Canvas>();
         Bullet = Resources.Load("Cloud") as GameObject;
     }
 

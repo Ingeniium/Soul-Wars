@@ -1,9 +1,10 @@
-﻿using UnityEngine;
+﻿
+using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
-using System.Reflection;
+using System;
 
 public class PlayerController : GenericController {
     public string player_name
@@ -22,75 +23,14 @@ public class PlayerController : GenericController {
     private Vector3 total_move;
     public static PlayerController Client;
     public Text mod_text;
-    private bool shooting = false;
-    public List<Gun> equipped_weapons = new List<Gun>();
-    public static List<uint> PlayerIDList = new List<uint>();
     public GameObject pass_over;//reference to cmd created objects
 
-    public int max_weapon_num
-    {
-        get { return _max_weapon_num; }
-        set
-        {
-            _max_weapon_num = value;
-            GameObject weapons_bar = GameObject.FindGameObjectWithTag("Weapons");
-            RectTransform r;
-            int n = equipped_weapons.Count;
-            /*if there's more weapons equipped than the current maximum,put them in inventory
-            /Note,later on in development,a need to halt the operation or dropped items upon changing when the inventory
-             becomes full itself*/
-
-            if (n > value)
-            {
-                for (int i = value; i < n; i++)
-                {
-                    GameObject.FindGameObjectWithTag("Inventory").GetComponent<Inventory>().InsertItem(ref equipped_weapons[i]._item_image);
-                }
-                equipped_weapons.RemoveRange(value,n - (value - 1));
-            }
-            else if (n < value)
-            {
-                for (int i = n; i < value; i++)
-                {
-                    equipped_weapons.Add(null);
-                }
-            }
-
-            
-        }
-    }
-    private int _max_weapon_num;
-    private int _main_weapon_index = 0;
-    public int main_weapon_index
-    {
-        get { return _main_weapon_index; }
-        set
-        {
-            if (equipped_weapons[value] != null && _main_weapon_index != value)
-            {
-                gun = equipped_weapons[value];
-                if (equipped_weapons[_main_weapon_index] != null)
-                {
-                    equipped_weapons[_main_weapon_index].current_reference.GetComponent<Renderer>().enabled = false;
-                    equipped_weapons[_main_weapon_index]._item_image.GetComponentInChildren<RectTransform>().sizeDelta /= 2;
-                    gun._item_image.GetComponentInChildren<RectTransform>().sizeDelta *= 2;
-                }
-                gun.current_reference.GetComponent<Renderer>().enabled = true;
-                _main_weapon_index = value;
-            }
-            else
-            {
-                _main_weapon_index = value;
-            }
-        }
-    }
     private float moveHorizontal;
     private float moveVertical;
     public Rigidbody rb;
-	private Transform tr;
+    private Transform tr;
     public Canvas cooldown_canvas;
-    public Canvas cooldown_canvas_show;
-    private Canvas not_homing;
+    private Canvas cooldown_canvas_show;
     public Camera cam;
     public Camera cam_show
     {
@@ -106,262 +46,181 @@ public class PlayerController : GenericController {
     public Canvas hpbar_show;
     public HealthDefence HP;
 
+    [Command]
+    void CmdSetShield()
+    {
+        RpcSetShield();
+    }
 
     [ClientRpc]
-    void RpcSetShield(GameObject obj)
+    void RpcSetShield()
     {
-        Shield = obj;
+        StartCoroutine(SetShield());
+    }
+
+
+    IEnumerator SetShield()
+    {
+        while (GetComponentsInChildren<HealthDefence>().Length < 2)
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        Shield = GetComponentsInChildren<HealthDefence>()[1].gameObject;
+        HealthDefence SP = Shield.GetComponent<HealthDefence>();
+        SP.scale_factor = 2.5f;
+        SP.Controller = this;
+        if (hpbar_show)
+        {
+            SP.health_bar_show = hpbar_show.GetComponentsInChildren<Slider>()[3].gameObject as GameObject;
+            SP.hp_string = SP.health_bar_show.GetComponentInChildren<Text>();
+            SP.hp_string.text = "<b>" + SP.HP + "</b>";
+            SP.hp_bar = SP.health_bar_show.GetComponentInChildren<Slider>().GetComponent<RectTransform
+                >();
+            SP.maxWidth = SP.hp_bar.rect.width;
+        }
+
     }
 
     void Awake()
     {
         NameDisplayShow = Instantiate(NameDisplay) as GameObject;
+        HP = GetComponent<HealthDefence>();
+        HP.Controller = this;
     }
 
-	void Start() 
+    void Start()
     {
-       
-        max_weapon_num = 2;
+
         if (!isLocalPlayer)
         {
             return;
         }
         else
         {
-            
-              
             cam_show = Instantiate(cam) as Camera;
             if (cam_show.GetComponent<AudioListener>())
             {
                 Destroy(cam_show.GetComponent<AudioListener>());
             }
             HP = GetComponent<HealthDefence>();
-            HP.Controller = this;
-            
+
             hpbar_show = Instantiate(hpbar) as Canvas;
             hpbar_show.worldCamera = cam_show;
             cam_show.GetComponent<PlayerFollow>().Player = this;
-            
+
             Client = this;
-            
+
             rb = GetComponent<Rigidbody>();
             tr = GetComponent<Transform>();
             if (cam_show && cam_show.enabled)
             {
                 cam_show.transform.rotation = cam.transform.rotation;
             }
-            
+
             HP.health_bar_show = hpbar_show.GetComponentsInChildren<Slider>()[1].gameObject as GameObject;
             HP.hp_string = HP.health_bar_show.GetComponentInChildren<Text>();
+            HP.hp_string.text = "<b>" + HP.HP + "</b>";
             HP.hp_bar = HP.health_bar_show.GetComponentInChildren<Slider>().GetComponent<RectTransform
                 >();
+            HP.maxWidth = HP.hp_bar.rect.width;
             mod_text = hpbar_show.GetComponentInChildren<Text>();
-          
-            StartCoroutine(SetShield());
-         
-        }
-        if (isServer)
-        {
-            Shield = Instantiate(Resources.Load("Bronze Shield"), Vector3.zero, Quaternion.identity) as GameObject;
-            NetworkServer.Spawn(Shield);
-            shield_collider = Shield.GetComponent<BoxCollider>();
-            Shield.GetComponent<HealthDefence>().scale_factor = 2.5f;
-            Shield.GetComponent<HealthDefence>().Controller = this;
-            RpcSetShield(Shield);
-            NetworkMethods.Instance.RpcSetParent(Shield, gameObject, new Vector3(1, 1, 0), new Quaternion(0, 0, 0, 0));
+            NetworkMethods.Instance.CmdSpawn(Resources.Load("Bronze Shield") as GameObject,
+                gameObject,
+                new Vector3(.87f, .134f, 0),
+                new Quaternion(0, 0, 0, 0));
+            CmdSetShield();
         }
         StartCoroutine(SetNameDisplay());
-        
-	}
 
-    IEnumerator SetShield()
-    {
-        while (!Shield)
-        {
-            yield return new WaitForEndOfFrame();
-        }
-        HealthDefence SP = Shield.GetComponent<HealthDefence>();
-        SP.health_bar_show = hpbar_show.GetComponentsInChildren<Slider>()[3].gameObject as GameObject;
-        SP.hp_string = SP.health_bar_show.GetComponentInChildren<Text>();
-        SP.hp_bar = SP.health_bar_show.GetComponentInChildren<Slider>().GetComponent<RectTransform
-            >();
-            
     }
+
 
     IEnumerator SetNameDisplay()
     {
         yield return new WaitForSeconds(.3f);
-        CmdNameChange(true,_player_name);
+        CmdNameChange(true, _player_name);
     }
 
-
-
-    [Command]
-    public void CmdSpawnItem(string asset_reference,Vector3 pos,Quaternion rot,bool child)
-    {
-        GameObject obj = Resources.Load(asset_reference) as GameObject;
-        pass_over = Instantiate(obj, pos, rot) as GameObject;
-        NetworkServer.SpawnWithClientAuthority(pass_over, connectionToClient);
-        if (child)
-        {
-            NetworkMethods.Instance.RpcSetParent(pass_over, gameObject, pos,rot);
-        }
-        RpcSetPassOver(pass_over);
-        pass_over.GetComponent<Item>().client_user = this;
-    }
-
-    [Command]
-    public void CmdEquipGun(GameObject g)
-    {
-        RpcEquipGun(g);
-    }
-
-    [ClientRpc]
-     void RpcEquipGun(GameObject g)
-    {
-        Gun = g;
-        gun = g.GetComponent<Gun>();
-    }
-
-    [ClientRpc]
-    void RpcSetPassOver(GameObject g)
-    {
-        pass_over = g;
-        if (PlayerController.Client.netId == netId)
-        {
-            g.GetComponent<Item>().client_user = this;
-        }
-    }
 
     [Command]
     void CmdShoot()
     {
         try
         {
-            if (gun.HasReloaded())
+            if (main_gun.HasReloaded())
             {
-                gun.Shoot();
+                main_gun.Shoot();
             }
         }
-        catch(System.NullReferenceException e)
+        catch (System.NullReferenceException e)
         {
-            
-        
+
+
         }
     }
 
     [Command]
-    public void CmdSetGun(GameObject g,int _level,uint _points, int _experience,int _next_level, int[] indeces)
+    public void CmdSetGun(GameObject g, int _level, uint _points, int _experience, int _next_level, int[] indeces)
     {
         g.GetComponent<Gun>().RpcSetGun(_level, _points, _experience, _next_level, indeces);
     }
-   
+
     [Command]
     public void CmdDestroy(GameObject g)
     {
         NetworkServer.Destroy(g);
     }
 
-   
+
     [Command]
-    void CmdNameChange(bool again,string name)
+    void CmdNameChange(bool again, string name)
     {
-        RpcNameChange(again,name);
+        RpcNameChange(again, name);
     }
 
 
     [ClientRpc]
-    void RpcNameChange(bool again,string name)
+    void RpcNameChange(bool again, string name)
     {
         NameDisplayShow.GetComponentInChildren<Text>().text = name;
         NameDisplayShow.GetComponent<HPbar>().Object = this.gameObject;
         if (again)
         {
-            PlayerController.Client.CmdNameChange(false,name);
+            Client.CmdNameChange(false, name);
         }
     }
 
-	void Update() 
+    void Update()
     {
         if (!isLocalPlayer || !equip_action)
         {
             return;
         }
-        else
+        if ((Input.inputString.Contains("q") || (Input.GetMouseButton(0) && Input.inputString.Contains("")) && !blocking))
         {
-           
-            if (Input.GetMouseButtonDown(0) && !cooldown_canvas_show && !blocking)
+            int index = Array.FindIndex(weapons, delegate (Gun g)
+             { 
+                 return (g && g.button == Input.inputString);    
+             });
+            if (index != -1)
             {
-                cooldown_canvas_show = Instantiate(cooldown_canvas, gun._item_image.transform.position + new Vector3(.25f, 0, 0), gun._item_image.transform.rotation) as Canvas; 
-                cooldown_canvas_show.transform.SetParent(gun._item_image.transform);
-                StartCoroutine(Cooldown.NumericalCooldown(cooldown_canvas_show, gun.reload_time));
+                CmdEquipGun(weapons[index].gameObject);
+                StartCoroutine(weapons[index].item_image_show.GetComponentInChildren<ItemImage>().Cooldown(weapons[index].reload_time));
                 CmdShoot();
-                
             }
+        }
             else if (Input.GetMouseButton(1) && !blocking)
             {
-                if (Gun == null)
-                {
-                    Gun = pass_over;
-                }
                 StartShieldBlocking();
             }
             if (Input.GetMouseButtonUp(1) && blocking)                                
             {
-                
-                    EndShieldBlocking();
-                
+                EndShieldBlocking();   
             }
-
             
-            if (Input.GetKeyDown("q") && max_weapon_num > 1)
-            {
-                do
-                {
-                    if (main_weapon_index == 0)
-                    {
-                        main_weapon_index = equipped_weapons.Count - 1;
-                    }
-                    else
-                    {
-                        main_weapon_index -= 1;
-                    }
-                } while (equipped_weapons[main_weapon_index] == null);
-            }
-            else if (Input.GetKeyDown("e") && max_weapon_num > 1)
-            {
-                do
-                {
-                    if (main_weapon_index == equipped_weapons.Count - 1)
-                    {
-                        main_weapon_index = 0;
-                    }
-                    else
-                    {
-                        main_weapon_index += 1;
-                    }
-                } while (equipped_weapons[main_weapon_index] == null);
-            }
-
-            if (Input.GetKeyDown("space"))
-            {
-                ToggleGunHoming(gun);
-                if (!gun.homes)
-                {
-                    not_homing = Instantiate(cooldown_canvas, gun._item_image.transform.position, cooldown_canvas.transform.rotation) as Canvas;
-                    Text t = not_homing.GetComponentInChildren<Text>();
-                    t.text = "NH";
-                    t.color = Color.black;
-                    not_homing.transform.parent = gun._item_image.transform;
-                }
-                else if (not_homing)
-                {
-                    Destroy(not_homing.gameObject);
-                }
-            }
         }
         
-	}
+	
 	
 	// Update is called once per frame
 	void FixedUpdate ()

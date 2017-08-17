@@ -7,28 +7,28 @@ using UnityEngine.Networking;
 public class Blaster : Gun
 {
     private readonly static string[] gun_ability_names = new string[12] { "Brigadier", "Gunslinger", null,
-                                                                         null, null, null,
-                                                                         null, null, null,
-                                                                         null, null, null,};                           
+                                                                        "Sunder", "Curve", null,
+                                                                         "Quake", "Tremor", null,
+                                                                         "Meteor", "Comet", null,};                           
     private readonly static string[] gun_name_addons = new string[12] { "Punishment", "The Force", null,
-                                                                         null, null, null,
-                                                                         null, null, null,
-                                                                         null, null, null,};
+                                                                        "Sundering", "Homing", null,
+                                                                         "Robust", "Intense", null,
+                                                                         "Meteor", "Comet", null,};
     private readonly static string[] gun_ability_desc = new string[12] {
         "Brigadier" + "\n Does 150% damage to" + "\n spawn points and shields.",
         "Gunslinger" + "\n Causes a 2 second stun.",
         null,
 
-        null,
-        null,
-        null,
-
-        null,
-        null,
+       "Sunder" + "\n + 10 Sunder Power.",
+        "Curve" + "\n Grants slight homing ability.",
         null,
 
+        "Quake" + "\n Does moderate damage " + "\n that's based on the gun to nearby targets.",
+        "Tremor" + "\n Stuns nearby foes for 1 second.",
         null,
-        null,
+
+        "Meteor" + "\n Triples the size of your bullets.",
+        "Comet" + "\n Triples the speed of your bullets.",
         null,
     };
     /*This class's pool of gun_abilities.Use of a static container of static methods requi"Markring explicit this
@@ -37,18 +37,22 @@ public class Blaster : Gun
     {
         Brigadier,
         Gunslinger,
-         null,
-        null,
         null,
 
-        null,
-        null,
+        Sunder,
+        Curve,
         null,
 
+        Quake,
+        Tremor,
         null,
-        null,
+
+        Meteor,
+        Comet,
         null,
     };
+
+   
 
     private static IEnumerator Brigadier(Gun gun, BulletScript script)
     {
@@ -88,6 +92,105 @@ public class Blaster : Gun
         script.coroutines_running--;
     }
 
+    private static IEnumerator Sunder(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        script.sunder_strength += .10;
+        script.coroutines_running--;
+        yield return null;
+    }
+
+    private static IEnumerator Curve(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        while (!script.homer)
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        script.homer.GetComponent<SphereCollider>().radius = 1;
+        script.homer.GetComponent<HomingScript>().home_speed = 1;
+        script.coroutines_running--;    
+    }
+
+    private static IEnumerator Tremor(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        while (!script.has_collided && !script.Target)//Wait for collision and check target validity
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        string layer = "";
+        if (script.Target.gameObject.layer == 9)
+        {
+            layer = "Ally";
+        }
+        else
+        {
+            layer = "Enemy";
+        }
+        Collider[] target_colliders = Physics.OverlapSphere(script.gameObject.transform.position, 7,
+            LayerMask.GetMask(layer), QueryTriggerInteraction.Collide);
+        foreach (Collider col in target_colliders)
+        {
+            HealthDefence HP = col.GetComponent<HealthDefence>();
+            if (HP && script.Target.netId != HP.netId && HP.type == HealthDefence.Type.Unit)
+            {
+                HP.DetermineStun(1);
+            }
+        }
+        script.coroutines_running--;
+    }
+
+    private static IEnumerator Quake(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        while (!script.has_collided && !script.Target)//Wait for collision and check target validity
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        string layer = "";
+        if (script.Target.gameObject.layer == 9)
+        {
+            layer = "Ally";
+        }
+        else
+        {
+            layer = "Enemy";
+        }
+        Collider[] target_colliders = Physics.OverlapSphere(script.gameObject.transform.position, 7,
+            LayerMask.GetMask(layer), QueryTriggerInteraction.Collide);
+        foreach (Collider col in target_colliders)
+        {
+            HealthDefence HP = col.GetComponent<HealthDefence>();
+            if (HP && script.Target.netId != HP.netId)
+            {
+                int d = rand.Next(script.lower_bound_damage, script.upper_bound_damage) / 2;
+                HP.RpcDisplayHPChange(Color.red, d);
+                HP.HP -= d;
+            }
+        }
+        script.coroutines_running--;
+    }
+
+    private static IEnumerator Meteor(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        SphereCollider collider = script.gameObject.GetComponent<SphereCollider>();
+        script.transform.position = new Vector3(script.transform.position.x, script.transform.position.y + 1.5f, script.transform.position.z);
+        NetworkMethods.Instance.RpcSetScale(script.gameObject, new Vector3(2.4f, 2.4f, 2.4f));
+        script.coroutines_running--;
+        yield return null;
+    }
+
+    private static IEnumerator Comet(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        Rigidbody rb = script.GetComponent<Rigidbody>();
+        yield return new WaitForFixedUpdate();
+        rb.velocity *= 3;
+        script.coroutines_running--;
+        yield return null;
+    }
     
     protected override string GunAbilityDesc(int index)
     {
@@ -126,7 +229,7 @@ public class Blaster : Gun
         return "Shoots a fast,large bullet";
     }
 
-    protected override string GetBaseName()
+    public override string GetBaseName()
     {
         return "Blaster";
     }
@@ -134,7 +237,6 @@ public class Blaster : Gun
     public override void SetBaseStats()
     {
         upper_bound_damage = 35;
-        asset_reference = Resources.Load("Blaster") as GameObject;
         lower_bound_damage = 20;
         if (client_user)
         {
@@ -157,10 +259,6 @@ public class Blaster : Gun
         home_radius = 0;
         homes = false;
         /*Resources.Load seems to only work for getting prefabs as only game objects.*/
-        GameObject g = Resources.Load("Drop Item Name Box") as GameObject;
-        drop_canvas = g.GetComponent<Canvas>();
-        g = Resources.Load("WeaponOptions") as GameObject;
-        item_options = g.GetComponent<Canvas>();
         Bullet = Resources.Load("CanonBall") as GameObject;
     }
 

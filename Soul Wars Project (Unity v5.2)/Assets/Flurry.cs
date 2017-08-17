@@ -14,24 +14,24 @@ public class Flurry : Gun
                                                                          null, null, null,
                                                                          null, null, null}; 
     private readonly static string[] gun_name_addons = new string[12] { "Precision", "Archery", null, 
-                                                                         null, null, null,
+                                                                         "ook", null, null,
                                                                          null, null, null,
                                                                          null, null, null};
     private readonly static string[] gun_ability_desc = new string[12] {
         "Hunter" + "\n Causes bullets that aren't" + "\n homing in on a target to" + "\n to reroute to another flurry " + "\n bullet's target.",
-        "Archer" + "\n Bullets have a 50%" + "\n chance to penetrate its target.",
+        "Archer" + "\n Bullets have a 50%" + "\n chance to be target piercing.",
         null,
 
-        null,
-        null,
-        null,
-
-        null,
-        null,
+        "Debris" + "\n Causes bullets to enlarge and" + "\n stop moving after 1.5 seconds.",
+        "Boomerang" + "\n Causes bullets to pierce" + "\n its first target and" + "\n return to its firing position.",
         null,
 
+        "Shadow" + "\n Bullets have a 25% chance" + "\n to teleport behind target." ,
+        "Arrows" + "\n +2 Arrows fired.",
         null,
-        null,
+
+        "Randomizer" + "\n Bullets disappear until either" + "\n a random amount of time passes" + "\n or a target enters homing range." ,
+        "Seeker" + "\n Each bullet gains a 20% speed" +" \n and homing radius boost each time" + "\n it homes in on a new target.",
         null
     };
     /*This class's pool of gun_abilities.Use of a static container of static methods requiring explicit this
@@ -43,16 +43,16 @@ public class Flurry : Gun
         Archer,
         null,
 
-        null,
-        null,
-        null,
-
-        null,
-        null,
+        Debris,
+        Boomerang,
         null,
 
+        Shadow,
+        Arrows,
         null,
-        null,
+
+        Randomizer,
+        Seeker,
         null
     };
 
@@ -97,7 +97,7 @@ public class Flurry : Gun
     private static IEnumerator Archer(Gun gun, BulletScript script)
     {
         script.coroutines_running++;
-        if (rand.NextDouble() < .50)
+        if (rand.NextDouble() < .30+ (double)gun.level / 10)
         {
             script.can_pierce = true;
         }
@@ -105,7 +105,110 @@ public class Flurry : Gun
         yield return null;
     }
 
-    
+    private static IEnumerator Boomerang(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        while(!script.Target)
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        script.transform.Rotate(new Vector3(0, 180, 0));
+        Rigidbody rb = script.GetComponent<Rigidbody>();
+        rb.velocity = rb.velocity.magnitude * script.transform.forward;
+        if(!script.can_pierce)
+        {
+            script.can_pierce = true;
+            yield return new WaitForFixedUpdate();
+            script.can_pierce = false;
+        }
+        script.coroutines_running--;
+    }
+
+    private static IEnumerator Debris(Gun gun, BulletScript script)
+    {
+        script.lasting_time *= 2;
+        yield return new WaitForSeconds(1.5f);
+        Destroy(script.homer);
+        NetworkMethods.Instance.RpcSetScale(script.gameObject, Vector3.one * 2);
+        script.GetComponent<Rigidbody>().velocity = Vector3.zero;
+    }
+
+
+    private static IEnumerator Arrows(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        (gun as Flurry).num_bullets += 2;
+        yield return new WaitForEndOfFrame();
+        (gun as Flurry).num_bullets -= 2;
+        script.coroutines_running--;
+    }
+
+    private static IEnumerator Seeker(Gun gun, BulletScript script)
+    {
+        while (!script.Target)
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        List<HealthDefence> hp = new List<HealthDefence>();
+        Rigidbody rb = script.GetComponent<Rigidbody>();
+        SphereCollider home_col = script.homer.GetComponent<SphereCollider>();
+        float speed_boost = rb.velocity.magnitude * .2f;
+        float home_boost = home_col.radius * .2f;
+        while (script)
+        {
+            if (!hp.Contains(script.Target))
+            {
+                hp.Add(script.Target);
+                rb.velocity = script.transform.forward * (rb.velocity.magnitude + speed_boost);
+                home_col.radius += home_boost;
+            }
+            yield return new WaitForEndOfFrame();
+        }
+    }
+
+    private static IEnumerator Shadow(Gun gun, BulletScript script)
+    {
+        while(!script.homer)
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        HomingScript h = script.homer.GetComponent<HomingScript>();
+        while (!h.homing)
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        if(rand.NextDouble() < .25)
+        {
+            Vector3 path = h.main_col.transform.position - script.transform.position;
+            script.transform.position += (path * 1.5f);
+        }
+    }
+
+    private static IEnumerator Randomizer(Gun gun, BulletScript script)
+    {
+        float num = UnityEngine.Random.Range(.5f, 2.5f);
+        while (!script.homer)
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        HomingScript h = script.homer.GetComponent<HomingScript>();
+        if (!script.Target || !h.main_col)
+        {
+            NetworkMethods.Instance.RpcSetEnabled(script.gameObject, "Renderer", false);
+            NetworkMethods.Instance.RpcSetLayer(script.gameObject, 16);
+            Rigidbody rb = script.GetComponent<Rigidbody>();
+            Vector3 speed = rb.velocity;
+            rb.velocity = Vector3.zero;
+            float start_time = Time.time;
+            while (start_time + num > Time.time || !h.main_col || !script.Target)
+            {
+                yield return new WaitForEndOfFrame();
+            }
+            NetworkMethods.Instance.RpcSetEnabled(script.gameObject, "Renderer", true);
+            NetworkMethods.Instance.RpcSetLayer(script.gameObject, gun.layer);
+            rb.velocity = speed.magnitude * script.transform.forward;
+        }
+    }
 
     public override void Shoot()
     {
@@ -189,7 +292,7 @@ public class Flurry : Gun
         return "Shoots 3 homing arrows.";
     }
 
-    protected override string GetBaseName()
+    public override string GetBaseName()
     {
         return "Flurry";
     }
@@ -198,7 +301,6 @@ public class Flurry : Gun
     {
         upper_bound_damage = 7;
         lower_bound_damage = 4;
-        asset_reference = Resources.Load("Flurry") as GameObject;
         if (client_user)
         {
             layer = 13;
@@ -220,10 +322,6 @@ public class Flurry : Gun
         home_radius = 3f;
         homes = true;
         /*Resources.Load seems to only work for getting prefabs as only game objects.*/
-        GameObject g = Resources.Load("Drop Item Name Box") as GameObject;
-        drop_canvas = g.GetComponent<Canvas>();
-        g = Resources.Load("WeaponOptions") as GameObject;
-        item_options = g.GetComponent<Canvas>();
         Bullet = Resources.Load("Bullet") as GameObject;
     }
 

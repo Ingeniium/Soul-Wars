@@ -20,6 +20,27 @@ class Record : MonoBehaviour
     public Canvas weapon_choose;
     private Canvas weapon_choose_show;
     private string player_name;
+    private char[] forbidden_chars = new char[]
+    {
+        '+',
+        '=',
+        '&',
+        '^',
+        '%',
+        '$',
+        '#',
+        '@',
+        '~',
+        '<',
+        '>',
+        '/',
+        '{',
+        '}',
+        '[',
+        ']',
+        '?',
+        ' '
+    };
 
 
     public void SaveToFile()
@@ -38,11 +59,8 @@ class Record : MonoBehaviour
                 {
                     element.Add(i.RecordValuesToSaveFile());
                 }
-                foreach (Item i in PlayerController.Client.gun.inv.GetComponentsInChildren<Item>())
-                {
-                    element.Add(i.RecordValuesToSaveFile());
-                }
                 file.Save("SoulWars.xml");
+      
             }
             catch (FileNotFoundException e)
             {
@@ -66,7 +84,7 @@ class Record : MonoBehaviour
             return;   
     }
 
-    void LoadFromFile()
+    IEnumerator LoadFromFile()
     {
         try
         {
@@ -76,31 +94,32 @@ class Record : MonoBehaviour
             PlayerController.Client.player_name = player_name;
             XElement parent = file.Root.Element(player_name);
             GameObject image_canvas = Resources.Load("ItemImageCanvas") as GameObject;
-            Type t;
+            int i = 0;
             foreach (XElement e in parent.Elements())
             {
-                if (e.Attribute("Index") != null)
-                {
-                    t = Type.GetType(e.Name.ToString());
-                    GameObject image_canvas_show = Instantiate(image_canvas, PlayerController.Client.hpbar_show.GetComponentInChildren<VerticalLayoutGroup>().gameObject.transform.position, image_canvas.transform.rotation) as GameObject;
-                    image_canvas_show.AddComponent(t);
-                    Item i = image_canvas_show.GetComponent(t) as Item;
-                    i._item_image = image_canvas_show;
-                    i.in_inventory = true;
-                    i.RecordValuesFromSaveFile(e);
-                    i.set = true;
-                    image_canvas_show.GetComponentInChildren<ItemImage>().item_script = i;
-                    i.client_user = PlayerController.Client;
-               
-                    if (Int32.Parse(e.Attribute("Index").Value) < 0)
+                    GameObject image_canvas_show = Instantiate(image_canvas,
+                        PlayerController.Client.hpbar_show.GetComponentInChildren<HorizontalLayoutGroup>().gameObject.transform.position,
+                        image_canvas.transform.rotation) as GameObject;
+
+                    NetworkMethods.Instance.CmdSpawn(
+                        Resources.Load(e.Name.ToString()) as GameObject,
+                        PlayerController.Client.gameObject,
+                        new Vector3(.21f, .11f, .902f),
+                        new Quaternion(0, 0, 0, 0));
+
+                    while (PlayerController.Client.GetComponentsInChildren<Item>().Length == i)
                     {
-                        PlayerController.Client.gun.inv.InsertItem(ref image_canvas_show);
+                        yield return new WaitForEndOfFrame();
                     }
-                    else
-                    {
-                       StartCoroutine(i.PrepareItemForUse());
-                    }
-                }
+                    Item item = PlayerController.Client.GetComponentsInChildren<Item>()[i];
+                    item.item_image_show = image_canvas_show;
+                    item.in_inventory = true;
+                    item.RecordValuesFromSaveFile(e);
+                    image_canvas_show.GetComponentInChildren<ItemImage>().item_script = item;
+                    item.client_user = PlayerController.Client;
+                    item.PrepareItemForUse();
+                    i++;
+                
             }
             PlayerController.Client.loaded = true;
             
@@ -121,8 +140,18 @@ class Record : MonoBehaviour
         InputField f = name_input_show.GetComponentInChildren<InputField>();
         f.onEndEdit.AddListener(delegate(string s)
         {
-            if (s == "Type Your Name Here" || s == "")
+            bool invalid = false;
+            foreach(char c in s)
             {
+                if(forbidden_chars.Contains(c))
+                {
+                    invalid = true;
+                    break;
+                }
+            }
+            if (invalid)
+            {
+                f.text = "No spaces/special chars.";
                 f.ActivateInputField();
             }
             else
@@ -151,7 +180,6 @@ class Record : MonoBehaviour
         script = strike.GetComponent<Strike>();
         script.SetBaseStats();
         script.in_inventory = true;
-        script._item_image = strike;
         script.client_user = PlayerController.Client;
         strike.GetComponentInChildren<ItemImage>().item_script = script;
 
@@ -162,7 +190,6 @@ class Record : MonoBehaviour
         script = flurry.GetComponent<Flurry>();
         script.SetBaseStats();
         script.in_inventory = true;
-        script._item_image = flurry;
         script.client_user = PlayerController.Client;
         flurry.GetComponentInChildren<ItemImage>().item_script = script;
 
@@ -173,7 +200,6 @@ class Record : MonoBehaviour
         script = haze.GetComponent<Haze>();
         script.SetBaseStats();
         script.in_inventory = true;
-        script._item_image = haze;
         script.client_user = PlayerController.Client;
         haze.GetComponentInChildren<ItemImage>().item_script = script;
 
@@ -184,13 +210,54 @@ class Record : MonoBehaviour
         script = blaster.GetComponent<Blaster>();
         script.SetBaseStats();
         script.in_inventory = true;
-        script._item_image = blaster;
         script.client_user = PlayerController.Client;
         blaster.GetComponentInChildren<ItemImage>().item_script = script;
 
-        while (!PlayerController.Client.pass_over)
+        for (int i = 0; i < 2; i++)
         {
-            yield return new WaitForEndOfFrame();
+            weapon_choose_show.GetComponentInChildren<Text>().text = "Choose weapon " + (i + 1).ToString();
+            Gun[] weapons = weapon_choose_show.GetComponentsInChildren<Gun>();
+            int j = -1;
+            while (j == -1)
+            {
+                yield return new WaitForEndOfFrame();
+                j = Array.FindIndex(weapons, delegate (Gun g)
+                {
+                    return (g.in_inventory == false);
+                });
+            }
+            NetworkMethods.Instance.CmdSpawn(Resources.Load(weapons[j].GetBaseName()) as GameObject,
+                PlayerController.Client.gameObject,
+                 new Vector3(.004f, .005f, .794f),
+                 new Quaternion(0, 0, 0, 0));
+            while (PlayerController.Client.GetComponentsInChildren<Gun>().Length == i)
+            {
+                yield return new WaitForEndOfFrame();
+            }
+            Gun gun = PlayerController.Client.GetComponentsInChildren<Gun>()[i];
+            GameObject image = weapons[j].gameObject;
+            Destroy(weapons[j]);
+            image.GetComponentInChildren<ItemImage>().item_script = gun;
+            gun.client_user = PlayerController.Client;
+            gun.item_image_show = image;
+            if (i == 0)
+            {
+                /*Apparently INput.inputstring is blank for leftmouse clicks*/
+                gun.button = "";
+            }
+            else if (i == 1)
+            {
+                gun.button = "q";
+            }
+            gun.PrepareItemForUse();
+            if(i > 0)
+            {
+                NetworkMethods.Instance.CmdSetEnabled(gun.gameObject, "Renderer", false);
+            }
+            else
+            {
+                PlayerController.Client.CmdEquipGun(gun.gameObject);
+            }
         }
         NetworkMethods.Instance.CmdSetLayer(PlayerController.Client.gameObject, 9);
         NetworkMethods.Instance.CmdSetEnabled(PlayerController.Client.gameObject, "PlayerController", true);          
@@ -207,10 +274,9 @@ class Record : MonoBehaviour
     {
         if (PlayerController.Client && !PlayerController.Client.loaded)
         {
-            Debug.Log(PlayerController.Client.netId);
             if (File.Exists("SoulWars.xml"))
             {
-                LoadFromFile();
+                StartCoroutine(LoadFromFile());
             }
             else
             {

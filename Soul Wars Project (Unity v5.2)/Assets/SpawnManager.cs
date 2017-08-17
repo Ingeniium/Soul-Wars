@@ -61,7 +61,6 @@ public class SpawnManager : NetworkBehaviour {
                 {
                     yield return new WaitForEndOfFrame();
                 }
-                NetworkMethods.Instance.RpcSetPosition(killed.gameObject, EnemySpawnPoints[0].transform.position + EnemySpawnPoints[0].spawn_direction);
             }
             else
             {
@@ -78,7 +77,6 @@ public class SpawnManager : NetworkBehaviour {
                 {
                     yield return new WaitForEndOfFrame();
                 }
-                NetworkMethods.Instance.RpcSetPosition(killed.gameObject, AllySpawnPoints[0].transform.position + AllySpawnPoints[0].spawn_direction);
                 PlayersAlive.Instance.Players.Add(killed.netId.Value);
             }
             killed.HP = killed.maxHP;
@@ -111,50 +109,7 @@ public class SpawnManager : NetworkBehaviour {
         StartCoroutine(Blink(g));
     }
 
-    /*[ClientRpc]
-    public void RpcOnClientDeath(GameObject g)
-    {
-        if (PlayerController.Client.netId == g.GetComponent<NetworkIdentity>().netId)
-        {
-            StartCoroutine(OnClientDeath(g));
-        }
-    }
-
-    public static IEnumerator OnClientDeath(GameObject g)
-    {
-        if (SpawnManager.AllySpawnPoints.Count != 0)
-        {
-            SpawnManager.AllySpawnPoints[0].RpcDisableScripts(g);
-        }
-        else
-        {
-            SpawnManager.EnemySpawnPoints[0].RpcDisableScripts(g);
-        }
-        HealthDefence killed = g.GetComponent<HealthDefence>();
-        (killed.Controller as PlayerController).cam_show.GetComponent<PlayerFollow>().Player = null;
-        RespawnInterface.Instance.respawning = true;
-        yield return new WaitForSeconds(ally_respawn_time);
-        while (AllySpawnPoints.Count < 1)
-        {
-             yield return new WaitForEndOfFrame();
-        }
-        while (RespawnInterface.Instance.respawning)
-        {
-             yield return new WaitForEndOfFrame();
-        }
-        if (SpawnManager.AllySpawnPoints.Count != 0)
-        {
-            SpawnManager.AllySpawnPoints[0].RpcEnableScripts(killed.gameObject);
-        }
-        else
-        {
-            SpawnManager.EnemySpawnPoints[0].RpcEnableScripts(killed.gameObject);
-        }
-        killed.HP = killed.maxHP;
-        killed.transform.position = AllySpawnPoints[RespawnInterface.Instance.spawn_index].transform.position + AllySpawnPoints[RespawnInterface.Instance.spawn_index].spawn_direction;
-        (killed.Controller as PlayerController).cam_show.GetComponent<PlayerFollow>().Player = killed.Controller as PlayerController;
-        
-    }*/
+   
 
     [ClientRpc]
     private void RpcDisableScripts(GameObject killed)

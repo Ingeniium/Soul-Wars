@@ -16,12 +16,14 @@ public class BulletScript : NetworkBehaviour {
     [SyncVar] public double chill_strength;
     [SyncVar] public double burn_strength;
     [SyncVar] public double mezmerize_strength;
+    [SyncVar] public double sunder_strength;
     public Gun gun_reference;
     [SyncVar] public bool has_collided = false;
     [SyncVar] public bool legit_target = false;
     public bool homes = false;
     [SyncVar] public int coroutines_running = 0;
     [SyncVar] public bool can_pierce;
+    [HideInInspector] public float lasting_time = 3f;
     public bool damaging = false;
     public HealthDefence Target;
 	// Use this for initialization
@@ -43,40 +45,48 @@ public class BulletScript : NetworkBehaviour {
         GetComponent<Collider>().isTrigger = can_pierce;
         HomingScript script = homer.GetComponent<HomingScript>();
         script.home_speed = home_speed;
-        if (!homes)
-        {
-            homer.GetComponent<HomingScript>().enabled = true;
-        }
-        StartCoroutine(WaitForNetworkDestruction(gameObject));
+        StartCoroutine(WaitForNetworkDestruction());
     }
 
-    IEnumerator WaitForNetworkDestruction(GameObject g,float num = 3f)
+    [ServerCallback]
+    public IEnumerator WaitForNetworkDestruction()
     {
-       
-        yield return new WaitForSeconds(num);
-        if (isServer)
+        float start_time = Time.time;
+        /*WaitForEndOfFrame used instead of wait for seconds in situations
+         where lastng time changes dynamically(IE, gun abilities)*/
+        while (Time.time < start_time + lasting_time)
         {
-            NetworkServer.Destroy(g);
+            yield return new WaitForEndOfFrame();
         }
+        NetworkServer.Destroy(gameObject);
     }
 
     IEnumerator Pierce(Collision hit)
     {
-        Collider first = GetComponent<Collider>();
-        Collider second = hit.gameObject.GetComponent<Collider>();
-        Collider third = null;
-        if (homer)
-        {
-            third = homer.GetComponent<Collider>();
-            Physics.IgnoreCollision(third, second);
-        }
-        Physics.IgnoreCollision(first, second);
-        yield return new WaitForEndOfFrame();
-        Physics.IgnoreCollision(first, second, false);
-        if (homer)
-        {
-            Physics.IgnoreCollision(third, second, false);
-        }
+            Collider first = GetComponent<Collider>();
+            Collider second = null;
+            Collider third = null;
+            if (hit != null)
+            {
+                 second = hit.gameObject.GetComponent<Collider>();
+                 third = null;
+                if (homer)
+                {
+                    third = homer.GetComponent<Collider>();
+                    Physics.IgnoreCollision(third, second);
+                }
+            }
+           
+             yield return new WaitForSeconds(1);
+             if (second)
+             {
+                 Physics.IgnoreCollision(first, second, false);
+                 if (homer)
+                 {
+                     Physics.IgnoreCollision(third, second, false);
+                 }
+             }
+    
     }
 
     IEnumerator Pierce(Collider hit)
@@ -84,14 +94,17 @@ public class BulletScript : NetworkBehaviour {
         Collider first = GetComponent<Collider>();
         Collider second = hit;
         Collider third = null;
-        if (homer)
+        if (hit)
         {
-            third = homer.GetComponent<Collider>();
-            Physics.IgnoreCollision(third, second);
+            if (homer)
+            {
+                third = homer.GetComponent<Collider>();
+                Physics.IgnoreCollision(third, second);
+            }
+            Physics.IgnoreCollision(first, second);
         }
-        Physics.IgnoreCollision(first, second);
         yield return new WaitForSeconds(1);
-        if (second.enabled)
+        if (second && second.enabled)
         {
             Physics.IgnoreCollision(first, second, false);
             if (homer)
@@ -157,6 +170,13 @@ public class BulletScript : NetworkBehaviour {
              *If a player is hit,run the code only on whoever got hit*/
             if (Target != null)
             {
+                legit_target = true;
+                has_collided = true;
+                //Wait until all coroutines operating on the bullet finish
+                while (coroutines_running > 0)
+                {
+                    yield return new WaitForFixedUpdate();
+                }
                 if (can_pierce)
                 {
                     if (hit != null)
@@ -168,13 +188,6 @@ public class BulletScript : NetworkBehaviour {
                         StartCoroutine(Pierce(col));
                     }
 
-                }
-                legit_target = true;
-                has_collided = true;
-                //Wait until all coroutines operating on the bullet finish
-                while (coroutines_running > 0)
-                {
-                    yield return new WaitForFixedUpdate();
                 }
                 int damage = rand.Next(lower_bound_damage, upper_bound_damage);
                 int d = (damage - Target.defence);
@@ -189,6 +202,7 @@ public class BulletScript : NetworkBehaviour {
                     Target.StartCoroutine(Target.DetermineChill(chill_strength));
                     Target.StartCoroutine(Target.DetermineBurn(burn_strength, d));
                     Target.StartCoroutine(Target.DetermineMezmerize(mezmerize_strength));
+                    Target.StartCoroutine(Target.DetermineSunder(sunder_strength, d));
                     if (crit)
                     {
                         Target.RpcDisplayHPChange(new Color(114, 0, 198), d);//Violet

@@ -7,7 +7,9 @@ using UnityEngine.Networking;
 public class NetworkMethods : NetworkBehaviour
 {
     public static NetworkMethods Instance;
-
+    /*pass_over is used as a reference for setting
+     network instantiated objects as local 
+     client values.*/
     void Awake()
     {
         Instance = this;
@@ -39,32 +41,40 @@ public class NetworkMethods : NetworkBehaviour
     [ClientRpc]
     public void RpcSetEnabled(GameObject obj,string class_name,bool enabled)
     {
-        if (class_name != "Collider")
+        if (class_name != "Collider" && class_name != "Renderer")
         {
             Type t = Type.GetType(class_name);
-            MonoBehaviour c = obj.GetComponent(t) as MonoBehaviour;
-            c.enabled = enabled;
+            if (t != null)
+            {
+                MonoBehaviour c = obj.GetComponent(t) as MonoBehaviour;
+                c.enabled = enabled;
+            }
+            else
+            {
+                Debug.Log(class_name + obj.ToString());
+            }
         }
-        else
+        else if (class_name == "Collider")
         {
             obj.GetComponent<Collider>().enabled = enabled;
         }
-    }
-    /*For better position syncing*/
-    [ClientRpc]
-    public void RpcSetPosition(GameObject obj, Vector3 pos)
-    {
-        if (obj)
+        else
         {
-            obj.transform.position = pos;
+            obj.GetComponent<Renderer>().enabled = enabled;
+            foreach(Renderer rend in obj.GetComponentsInChildren<Renderer>())
+            {
+                rend.enabled = enabled;
+            }
         }
     }
+    
 
     [ClientRpc]
     public void RpcSetScale(GameObject Obj, Vector3 scale)
     {
         Obj.transform.localScale = scale;
     }
+
 
     [Command]
     public void CmdSetLayer(GameObject obj,int layer)
@@ -85,6 +95,12 @@ public class NetworkMethods : NetworkBehaviour
     }
 
     [Command]
+    public void CmdSetScale(GameObject Obj, Vector3 scale)
+    {
+        RpcSetScale(Obj, scale);
+    }
+
+    [Command]
     public void CmdAddPlayerId(NetworkInstanceId ID)
     {
         PlayersAlive.Instance.Players.Add(ID.Value);
@@ -96,6 +112,16 @@ public class NetworkMethods : NetworkBehaviour
         PlayersAlive.Instance.Players.Remove(ID.Value);
     }
 
+    [Command]
+    public void CmdSpawn(GameObject Obj,GameObject parent,Vector3 pos,Quaternion rot)
+    {
+        GameObject obj = Instantiate(Obj, pos, rot) as GameObject;
+        NetworkServer.Spawn(obj);
+        if (parent)
+        {
+            RpcSetParent(obj, parent, pos, rot);
+        }
+    }
 }
 
     

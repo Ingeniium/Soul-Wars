@@ -13,3 +13,15 @@ public struct ValueGroup//Unity doesn't support Tuple
         value = v;
     }
 }
+
+public struct ValueGroup<I,T>
+{
+    public I index;
+    public T value;
+    public ValueGroup(I i,T t)
+    {
+       index = i;
+       value = t;
+    }
+
+}

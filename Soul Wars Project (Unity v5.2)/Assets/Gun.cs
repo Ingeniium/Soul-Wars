@@ -3,9 +3,6 @@ using UnityEngine.Networking;
 using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
-using System.Text;
-using System.Xml;
-using System.Xml.Schema;
 using System.Xml.Linq;
 using System.Linq;
 using System;
@@ -30,6 +27,7 @@ public abstract partial class Gun : Item {
     [SyncVar] public double chill_strength;
     [SyncVar] public double burn_strength;
     [SyncVar] public double mezmerize_strength;
+    [SyncVar] public double sunder_strength;
     public Gun median;//for copy transfer
 	public Transform barrel_end;//Where bullets actually SPAWN from
     [SyncVar] public Color color;//color assigned to the BULLETS
@@ -37,6 +35,15 @@ public abstract partial class Gun : Item {
     public int home_layer;//Collision layer of the bullet's homing device
     [SyncVar] public int level = 0;//Level of the current gun
     [SyncVar] public int next_lvl = 40;//experience to next level
+    protected static readonly int[] next_lvl_exp = new int[]
+    {
+        40,
+        70,
+        130,
+        210,
+        330
+    };
+
     /*Note that level and experience is limited to one script and not entire class
      (scripts are copied,but value isn't static) to allow player option of choosing
      different gun abilities within same type of gun*/
@@ -45,7 +52,7 @@ public abstract partial class Gun : Item {
         get { return _experience; }
         set 
         {
-            if (level == 5)
+            if (level >= 5)
             {
                 return;
             }
@@ -53,7 +60,10 @@ public abstract partial class Gun : Item {
             {
                 _experience = 0;
                 level += 1;
-                next_lvl = level * 30 + next_lvl;
+                if (level < 5)
+                {
+                    next_lvl = next_lvl_exp[level];
+                }
                 RpcLevelupIndication();
                 points += 1;
             }
@@ -74,23 +84,50 @@ public abstract partial class Gun : Item {
     protected List<string> prefixes = new List<string>();
     protected List<string> suffixes = new List<string>();
     protected string last_suffix = "";
+    protected string _button = "";
+    public string button
+    {
+        get { return _button; }
+        set
+        {
+            if (!buttons.Contains(value))
+            {
+                if (buttons.Contains(_button))
+                {
+                    buttons.Remove(_button);
+                }
+                _button = value;
+                buttons.Add(_button);
+                if (_button != "")
+                {
+                    item_image_show.GetComponentInChildren<ItemImage>().AddSetting("<color=white><size=7>" + _button + "</size></color>", 0);
+                }
+                else
+                {
+                     item_image_show.GetComponentInChildren<ItemImage>().AddSetting("<color=white><size=5>" + "Left \n" + " Mouse" + "</size></color>", 0); 
+                }
+            }
+        }
+    }
+    public static List<String> buttons = new List<string>();   
 
     [ClientRpc]
     protected void RpcLevelupIndication()
     {
         if (PlayerController.Client.netId == client_user.netId && !level_up_indication)
         {
-            level_up_indication = Instantiate(client_user.cooldown_canvas, _item_image.transform.position + new Vector3(-.25f, 0, 0), client_user.cooldown_canvas.transform.rotation) as Canvas;
+            level_up_indication = Instantiate(client_user.cooldown_canvas, item_image_show.transform.position + new Vector3(-.25f, 0, 0), client_user.cooldown_canvas.transform.rotation) as Canvas;
             level_up_indication.GetComponentInChildren<Text>().text = "!";
             level_up_indication.GetComponentInChildren<Text>().color = Color.green;
-            level_up_indication.transform.SetParent(_item_image.transform);
+            level_up_indication.transform.SetParent(item_image_show.transform);
         }
     }
 
-    protected override void OnClientUserChange()    {
-         weapons_bar = _client_user.hpbar_show.GetComponentInChildren<VerticalLayoutGroup>().gameObject;
-            GunLevelUp = client_user.hpbar_show.GetComponentInChildren<MenuDisplay>().
-                        Guntable.gameObject;    }
+    protected override void OnClientUserChange()
+    {
+        weapons_bar = _client_user.hpbar_show.GetComponentInChildren<HorizontalLayoutGroup>().gameObject;
+        GunLevelUp = UIHide.obj.gameObject;
+    }
 
     
 
@@ -123,8 +160,7 @@ public abstract partial class Gun : Item {
     {
         if (weapon_fire)
         {
-            weapon_fire.GetComponent<Rigidbody>().AddForce(dir * projectile_speed, ForceMode.Impulse);
-           // weapon_fire.transform.rotation = Quaternion.Euler(weapon_fire.transform.rotation.x, weapon_fire.transform.rotation.y, weapon_fire.transform.rotation.z);
+            weapon_fire.GetComponent<Rigidbody>().velocity = dir * projectile_speed; 
         }
     }
     
@@ -156,6 +192,7 @@ public abstract partial class Gun : Item {
         script.chill_strength = chill_strength;
         script.burn_strength = burn_strength;
         script.mezmerize_strength = mezmerize_strength;
+        script.sunder_strength = sunder_strength;
         script.gameObject.layer = layer;
         script.knockback_power = knockback_power;
         /*Homing script values passed for homing toggle*/
@@ -171,7 +208,7 @@ public abstract partial class Gun : Item {
             int i = 0;
            foreach (Gun_Abilities g in Claimed_Gun_Mods.GetInvocationList()) 
            {
-               if (i < level - mez_threshold)
+               if (i <= level - mez_threshold)
                {
                    script.StartCoroutine(g(this, script));
                    i++;
@@ -241,168 +278,116 @@ public abstract partial class Gun : Item {
         home_layer = 10;
         barrel_end = transform.GetChild(0);
         in_inventory = false;
-        current_reference = gameObject;
     }
 
-    public override IEnumerator PrepareItemForUse()
+    public override void PrepareItemForUse()
     {
-
-        if (in_inventory)
+        in_inventory = false;
+        if (item_image_show)
         {
-                _item_image.transform.SetParent(weapons_bar.transform);     
-                PlayerController.Client.CmdSpawnItem(GetBaseName(),new Vector3(0.21f,.11f,.902f),new Quaternion(0,0,0,0),true);
-                while (!client_user.pass_over)
+            item_image_show.transform.SetParent(weapons_bar.transform);
+            buttons.Add(button);
+            int[] indeces = new int[claimed_gun_ability.Count];
+            int n = 0;
+            foreach (int i in claimed_gun_ability)
+            {
+                indeces[n] = i;
+                n++;
+            }
+            client_user.CmdSetGun(gameObject, level, points, experience, next_lvl, indeces);
+            for(int i = 0;i < client_user.weapons.Length;i++)
+            {
+                if(!client_user.weapons[i])
                 {
-                    yield return new WaitForEndOfFrame();
+                    client_user.weapons[i] = this;
+                    break;
                 }
-                Gun median = client_user.pass_over.GetComponent<Gun>();
-                int[] index = new int[claimed_gun_ability.Count()];
-                for (int i = 0; i < claimed_gun_ability.Count(); i++)
-                {
-                    index[i] = claimed_gun_ability[i];
-                }
-                client_user.CmdSetGun(client_user.pass_over, level, points, experience, next_lvl, index);
-                while (!median.current_reference)
-                {
-                    yield return new WaitForEndOfFrame();
-                }
-                _item_image.GetComponentInChildren<ItemImage>().item_script = median;
-                median._item_image = _item_image;
-                if (inv)
-                {
-                    inv.RemoveItem(ref _item_image);
-                }
-                if (median.index > -1)
-                {
-                    median.EquipAtSlot(median.index);
-                }
-                else
-                {
-                    int i = PlayerController.Client.equipped_weapons.IndexOf(null);
-                    /*If there isn't an empty slot within equipped weapons, assign the newly instanced gun
-                    to the index of the gun which the Player is currently wielding,sending the previous weapon
-                    to the Inventory by storing the Item Image*/
-                    if (i == -1)
-                    {
-                        median.EquipAtSlot(PlayerController.Client.main_weapon_index);
-                    }
-                    /*Otherwise,disable rendering of the newly created instance and put it somewhere
-                     in which there is an empty slot*/
-                    else
-                    {
-                        median.current_reference.GetComponent<Renderer>().enabled = false;
-                        PlayerController.Client.equipped_weapons[i] = median;
-                        median.index = i;
-                    }
-                }
-                median = null;
-                
-            Destroy(this);
-            
+            }
         }
-    }
-    public override void Options()
+    }
+
+    public override Options GetOptionsFuncs()
     {
-        item_options_show = Instantiate(item_options, _item_image.transform.position + new Vector3(0, 2, 2), item_options.transform.rotation) as Canvas;
-        item_options_show.GetComponent<HPbar>().Object = _item_image.gameObject;
-        Button[] buttons = item_options_show.GetComponentsInChildren<Button>();
-        for (int i = buttons.Length - 3; i > PlayerController.Client.max_weapon_num; i--)
-        {
-            //Adjust the location of the Allocate LvlUP points button
-            buttons[buttons.Length - 2].transform.localPosition = buttons[buttons.Length - 1].transform.localPosition;
-            //Adjust the location of the Drop Item button
-            buttons[buttons.Length - 1].transform.localPosition = buttons[i].transform.localPosition;
-            Destroy(buttons[i].gameObject);
-        }
-        for (int i = 0; i < buttons.Length - 2; i++)
-        {
-            //print(i.ToString());//For some reason,the value of 'i' changes from here
-            int temp = i;
-            if (index != i)
-            {
-                buttons[i].onClick.AddListener(delegate
-                {
-                    //print("int i is " + i.ToString());//to here
-                    EquipAtSlot(temp);
-                    _item_image.GetComponentInChildren<ItemImage>().option_showing = false;
-                    PlayerController.Client.equip_action = true;
-                    if (item_options_show)
-                    {
-                        Destroy(item_options_show.gameObject);
-                    }
-
-                });
-            }
-            else
-            {
-                buttons[buttons.Length - 2].transform.localPosition = buttons[buttons.Length - 1].transform.localPosition;
-                buttons[buttons.Length - 1].transform.localPosition = buttons[i].transform.localPosition;
-                Destroy(buttons[i].gameObject);
-            }
-        }
-        
-        buttons[buttons.Length - 2].onClick.AddListener(delegate 
-        {
-            if (PlayerController.Client.equipped_weapons.Count > 1)//Can't drop a weapon if its the only one you have
-            {
-                DropItem();
-            }
-            _item_image.GetComponentInChildren<ItemImage>().option_showing = false;
-            PlayerController.Client.equip_action = true;
-            if (item_options_show)
-            {
-                Destroy(item_options_show.gameObject);
-            }
-        });
-
-        buttons[buttons.Length - 1].onClick.AddListener(delegate
+        Options options = delegate
         {
             BringUpLevelUpTable();
-            PlayerController.Client.equip_action = true;
-            _item_image.GetComponentInChildren<ItemImage>().option_showing = false;
-            if (item_options_show)
+        };
+        if (button != "")
+        {
+            options += delegate
+            { 
+                button = "";
+            };
+        }
+        if (button != "q")
+        {
+            options += delegate
             {
-                Destroy(item_options_show.gameObject);
-            }
-        });
-        
-            
-        
-
-        
+                button = "q";
+            };
+        }
+        if (button != "e")
+        {
+            options += delegate
+            { 
+                button = "e";
+            };
+        }
+        if (button != "f")
+        {
+            options += delegate
+            {
+                button = "f";
+            };
+        }
+        if (button != "c")
+        {
+            options += delegate
+            {
+                button = "c";
+            };
+        }
+        return options;
     }
 
-   
-
-    public void EquipAtSlot(int Index)
+    public override List<string> GetOptionsStrings()
     {
-        
-            if (PlayerController.Client.equipped_weapons[Index])//if there's already equipped gun in slot
-            {
-                PlayerController.Client.equipped_weapons[Index].index = -1;//Secondhand indicator that it isn't equipped by a player
-                inv.InsertItem(ref PlayerController.Client.equipped_weapons[Index]._item_image);//Put item in inventory
-                /*transfer the script from the weapon to the item image before destroying the weapon instance*/
-                CopyComponent<Gun>(PlayerController.Client.equipped_weapons[Index].current_reference.GetComponent<Gun>(), PlayerController.Client.equipped_weapons[Index]._item_image);
-                PlayerController.Client.equipped_weapons[Index]._item_image.GetComponentInChildren<ItemImage>().item_script = PlayerController.Client.equipped_weapons[Index]._item_image.GetComponent<Gun>();
-                Destroy(PlayerController.Client.equipped_weapons[Index].current_reference);
-            }
-            PlayerController.Client.equipped_weapons[index] = null;
-            index = Index;
-            if (Index == PlayerController.Client.main_weapon_index)//Set it up to be main gun if the index is equivalent to the current equipped gun
-            {
-                client_user.CmdEquipGun(current_reference);
-                current_reference.GetComponent<Renderer>().enabled = true;
-            }
-            PlayerController.Client.equipped_weapons[Index] = this;
-     }
+        List<string> options = new List<string>();
+        options.Add("Allocate Gun Points");
+        if(button != "" )
+        {
+            options.Add("Set Button as Left Click");
+        }
+        if(button != "q")
+        {
+            options.Add("Set Button as Q");
+        }
+        if (button != "e")
+        {
+            options.Add("Set Button as E");
+        }
+        if (button != "f")
+        {
+            options.Add("Set Button as F");
+        }
+        if (button != "c")
+        {
+            options.Add("Set Button as C");
+        }
+        return options;
+    }
+
+
+   
 
     public override XElement RecordValuesToSaveFile()
     {
         XElement element = new XElement(GetBaseName());
-        element.SetAttributeValue("Index",index);
         XElement value_setter = new XElement("Level",level.ToString());
         element.Add(value_setter);
         value_setter = new XElement("Points",points.ToString());
+        element.Add(value_setter);
+        value_setter = new XElement("Button", button);
         element.Add(value_setter);
         if (claimed_gun_ability.Count != 0)
         {
@@ -429,14 +414,17 @@ public abstract partial class Gun : Item {
             value_retriever = element.Element("Points") as XElement;
             points = UInt32.Parse(value_retriever.Value);
         }
+        if(element.Descendants("Button").Any())
+        {
+            value_retriever = element.Element("Button") as XElement;
+            button = value_retriever.Value;
+        }
         if (element.Descendants("MethodIndex").Any())
         {
             int num;
             foreach (XElement e in element.Elements("MethodIndex").Elements("Index"))
             {
                 num = Int32.Parse(e.Value);
-                SetGunNameAddons(num);
-                Claimed_Gun_Mods += ClassGunMods(num);
                 claimed_gun_ability.Add(num);
             }
         }
@@ -451,16 +439,6 @@ public abstract partial class Gun : Item {
     
     /*Functions below are virtual as to allow derived classes their own static variables for keeping track of assignment*/
     protected abstract bool AreGunLevelUpButtonsAssignedForClass();
-
-    protected void Start()
-    {
-       
-        unit_reference = GetComponent<GenericController>();
-        if (!unit_reference)
-        {
-            unit_reference = GetComponentInParent<GenericController>();
-        }
-    }
     
     
 

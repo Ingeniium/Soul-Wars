@@ -6,10 +6,25 @@ using UnityEngine.Networking;
 
 public abstract class GenericController : NetworkBehaviour
 {
-    [HideInInspector]public float total_damage_to_units = 0;
-    [HideInInspector]public float num_of_deaths = 0;
-    [HideInInspector]public float num_shot_that_hit = 0;
-    public Gun gun;
+    public Gun main_gun
+    {
+        get { return _main_gun; }
+        set
+        {
+            if (value != _main_gun && value != null)
+            {
+                if (Gun)
+                {
+                    Gun.GetComponent<Renderer>().enabled = false;
+                }
+                value.gameObject.GetComponent<Renderer>().enabled = true;              
+                Gun = value.gameObject;
+                _main_gun = value;
+            }
+        }
+    }
+    protected Gun _main_gun;
+    public Gun[] weapons = new Gun[2];
     public GameObject Gun;
     public GameObject Shield;
     [SyncVar] public float speed = 20f;
@@ -18,7 +33,14 @@ public abstract class GenericController : NetworkBehaviour
     protected void StartShieldBlocking()
     {
         blocking = true;
-        NetworkMethods.Instance.CmdSetEnabled(Shield, "Collider", true);
+        if (isServer)
+        {
+            NetworkMethods.Instance.RpcSetEnabled(Shield, "Collider", true);
+        }
+        else
+        {
+            NetworkMethods.Instance.CmdSetEnabled(Shield, "Collider", true);
+        }
         Quaternion rot = Quaternion.AngleAxis(-90, Vector3.up);
         Shield.transform.rotation *= rot;
         Gun.transform.rotation *= rot;
@@ -28,12 +50,32 @@ public abstract class GenericController : NetworkBehaviour
         speed /= 2;
     }
 
+    [Command]
+    public void CmdEquipGun(GameObject g)
+    {
+        RpcEquipGun(g);
+    }
+
+    [ClientRpc]
+    protected void RpcEquipGun(GameObject g)
+    {
+        main_gun = g.GetComponent<Gun>();
+    }
+
+
     protected void EndShieldBlocking()
     {
         blocking = false;
         Quaternion rot = Quaternion.AngleAxis(90, Vector3.up);
         Shield.transform.rotation *= rot;
-        NetworkMethods.Instance.CmdSetEnabled(Shield, "Collider", false);
+        if (isServer)
+        {
+            NetworkMethods.Instance.RpcSetEnabled(Shield, "Collider", false);
+        }
+        else
+        {
+            NetworkMethods.Instance.CmdSetEnabled(Shield, "Collider", false);
+        }
         Gun.transform.rotation *= rot;
         Vector3 temp = Gun.transform.position;
         Gun.transform.position = Shield.transform.position;
@@ -60,5 +102,6 @@ public abstract class GenericController : NetworkBehaviour
             }
         }
     }
+
 
 }

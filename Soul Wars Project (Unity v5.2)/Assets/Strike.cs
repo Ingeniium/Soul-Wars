@@ -7,28 +7,28 @@ using UnityEngine.Networking;
 
 public class Strike : Gun {
     private readonly static string[] gun_ability_names = new string[12] { "Marksman", "Sniper", null,
-                                                                         null, null, null,
-                                                                         null, null, null,
-                                                                         null, null, null};
+                                                                         "Accelerate", "Camofluage", null,
+                                                                         "Momentum", "Barrier", null,
+                                                                         "Arcane Quiver", "Mythril Quiver", null};
     private readonly static string[] gun_name_addons = new string[12] { "Marksmanship","Accuracy",null,
-                                                                          null, null, null,
-                                                                         null, null, null,
-                                                                         null, null, null};
+                                                                         "Accelerating", "Hidden", null,
+                                                                         "Mighty", "Adamant", null,
+                                                                         "Arcane", "Mythril", null};
     private readonly static string[] gun_ability_desc = new string[12] {
         "Marksman" + "\n Can grant up to" + "\n 30% crit chance based on" + "\n how little the bullet turns.",
         "Sniper" + "\n Adds a seconds of" + "\n cooldown to the enemy's" + "\n current gun.",
          null,
 
-        null,
-        null,
-        null,
-
-        null,
-        null,
+        "Accelerate" + "\n Increases speed as bullet travels.",
+        "Camoflauge" + "\n 30% chance to make bullets" + "\n less visible to enemies.",
         null,
 
+        "Momentum" + "\n Increases damage as bullet travels.",
+        "Barrier" + "\n Allows collisions between" +"\n enemy and ally bullets.",
         null,
-        null,
+
+        "Arcane Quiver" + "\n 20% chance for a chosen" + "\n gun ability to reapply itself," +"\n potentially doubling its effectiveness.",
+        "Mythril Quiver" + "\n +10 Mezmerize power.",
         null
     };
     /*This class's pool of gun_abilities.Use of a static container of static methods requiring explicit this
@@ -39,16 +39,16 @@ public class Strike : Gun {
         {Sniper},
          null,
 
-        null,
-        null,
-        null,
-
-        null,
-        null,
+        {Accelerate},
+        {Camoflauge},
         null,
 
+        {Momentum},
+        {Barrier},
         null,
-        null,
+
+        {ArcaneQuiver},
+        {MythrilQuiver},
         null
     };
    
@@ -82,7 +82,6 @@ public class Strike : Gun {
                 }
                 script.crit_chance += (30 - ang) * .01;
             }
-            print(ang.ToString());
             script.coroutines_running--;
             yield return null;
         }
@@ -115,6 +114,117 @@ public class Strike : Gun {
             script.coroutines_running--;
         }
     }
+
+    private static IEnumerator Momentum(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        Vector3 start_pos = script.transform.position;
+        while (!script.Target)
+        {
+            yield return new WaitForFixedUpdate();
+        }
+        if (script.legit_target == false)//Check if target even is valid
+        {
+            script.coroutines_running--;
+            yield return null;
+        }
+        else
+        {
+            int bonus = (int)Math.Abs(
+                Vector3.Distance(start_pos, script.transform.position));
+            script.upper_bound_damage += bonus;
+            script.lower_bound_damage += bonus;
+            script.coroutines_running--;
+        }
+    }
+
+    private static IEnumerator Accelerate(Gun gun, BulletScript script)
+    {
+        Vector3 start_pos = script.transform.position;
+        Rigidbody rb = script.GetComponent<Rigidbody>();
+        while (!script.homer)
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        HomingScript hm = script.homer.GetComponent<HomingScript>();
+        while(script)
+        {
+            if (!hm.homing)
+            {
+                rb.velocity = rb.velocity.normalized *
+                    (rb.velocity.magnitude +
+                    Math.Abs(
+                    Vector3.Distance(start_pos, script.transform.position)) / 10);
+            }
+            yield return new WaitForFixedUpdate();
+        }
+    }
+
+    
+
+    private static IEnumerator MythrilQuiver(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        script.mezmerize_strength += .1;
+        script.coroutines_running--;
+        yield return null;
+    }
+
+    public static IEnumerator ArcaneQuiver(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        if (!script.Target)
+        {
+            foreach (Gun_Abilities g in gun.Claimed_Gun_Mods.GetInvocationList())
+            {
+                if (rand.NextDouble() < .2)
+                {
+                    script.StartCoroutine(g(gun, script));
+                }
+            }
+        }
+        script.coroutines_running--;
+        yield return null;
+    }
+
+    private static IEnumerator Barrier(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        if (gun.layer == 13)
+        {
+            script.gameObject.layer = 6;
+        }
+        else if(gun.layer == 14)
+        {
+            script.gameObject.layer = 7;
+        }
+        script.coroutines_running--;
+        yield return null;
+    }
+
+    private static IEnumerator Camoflauge(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        Renderer rend = script.GetComponent<Renderer>();
+        Color origin = rend.material.color;
+        if (rand.NextDouble() < .3)
+        {
+            if (gun.layer == 13)
+            {
+                /*Undetectable ally layer added to make it seems like enemies
+                 can't respond(block or dodge) it due to it not colliding with
+                 defensive detection.*/
+                script.gameObject.layer = 16;
+                rend.material.color = new Color(origin.r, origin.g, origin.b, .3f);
+            }
+            else if (gun.layer == 14)
+            {
+                rend.material.color = new Color(origin.r, origin.g, origin.b, .2f);
+            }
+        }
+        script.coroutines_running--;
+        yield return null;
+    }
     
     protected override string ClassGunAbilityNames(int index)
     {
@@ -131,7 +241,8 @@ public class Strike : Gun {
         return Gun_Mods[index];
     }
 
-    protected override void SetGunNameAddons(int index)     {
+    protected override void SetGunNameAddons(int index) 
+    {
         Debug.Log(index);
         if (index < 4 || index > 12)
         {
@@ -140,7 +251,9 @@ public class Strike : Gun {
         else
         {
             prefixes.Add(gun_name_addons[index]);
-        }    }
+        }
+    }
+
 
     protected override bool AreGunLevelUpButtonsAssignedForClass()
     {
@@ -152,7 +265,7 @@ public class Strike : Gun {
         return "Launches a powerful arrow.";
     }
 
-    protected override string GetBaseName()
+    public override string GetBaseName()
     {
         return "Strike";
     }
@@ -161,7 +274,6 @@ public class Strike : Gun {
     {
         upper_bound_damage = 15;
         lower_bound_damage = 7;
-        asset_reference = Resources.Load("Strike") as GameObject;
         if (client_user)
         {
             layer = 13;
@@ -183,15 +295,14 @@ public class Strike : Gun {
         home_radius = 3f;
         homes = true;
         /*Resources.Load seems to only work for getting prefabs as only game objects.*/
-        GameObject g = Resources.Load("Drop Item Name Box") as GameObject;
-        drop_canvas = g.GetComponent<Canvas>();
-        g = Resources.Load("WeaponOptions") as GameObject;
-        item_options = g.GetComponent<Canvas>();
         Bullet = Resources.Load("Bullet") as GameObject;
     }
 
     public override string GetImagePreviewString()
     {
         return "StrikeImage";
-    }
+    }
+
+
+
 }

@@ -97,8 +97,10 @@ public partial class AIController : GenericController
 
     private partial class Conquer : ObjectiveState
     {
-        public override void ResetHateList()        {
-            UpdateSpawnAggro();        }
+        public override void ResetHateList()
+        {
+            UpdateSpawnAggro();
+        }
 
         void UpdateSpawnAggro()
         {
@@ -240,7 +242,8 @@ public partial class AIController : GenericController
             }
         
         public HuntPlayers(AIController AI) : base(AI) { }
-        
+        
+
     }
 
 
@@ -265,10 +268,15 @@ public partial class AIController : GenericController
              spawn.*/
             if (target.type == HealthDefence.Type.Unit)
             {
-                if (AIController.AttackFuncs[Unit.attack_func_index](Unit))
+                int i = 0;
+                foreach (Gun gun in Unit.weapons)
                 {
-                    Unit.ptr.LookAt(target.gameObject.transform);
-                    Unit.gun.Shoot();
+                    if (AttackFuncs[Unit.attack_func_indexes[i]](Unit, gun) && !Unit.WillBulletHitObstacle(gun))
+                    {
+                        Unit.main_gun = gun;
+                        Unit.main_gun.Shoot();
+                    }
+                    i++;
                 }
             }
 
@@ -296,8 +304,16 @@ public partial class AIController : GenericController
     {
         /*An Empty call;It will have no threat info after
          death.*/
-        public override void ResetHateList() { }                /*PLayers/Spawns within radius are given more priority         than those outside.*/        public override void UnitAggroReaction(Collider col)        {            HealthDefence target = col.gameObject.GetComponent<HealthDefence>();
-            Unit.StartCoroutine(GenerateGradualThreat(target, target.netId, 15));        }
+        public override void ResetHateList() { }
+        
+        /*PLayers/Spawns within radius are given more priority
+         than those outside.*/
+        public override void UnitAggroReaction(Collider col)
+        {
+            HealthDefence target = col.gameObject.GetComponent<HealthDefence>();
+            Unit.StartCoroutine(GenerateGradualThreat(target, target.netId, 15));
+        }
+
         public Guard(AIController AI) : base(AI) { }
     }
 

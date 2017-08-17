@@ -43,10 +43,6 @@ public class HealthDefence : NetworkBehaviour {
                 switch (type)
                 {
                     case Type.Unit:
-                        if (has_drops)
-                        {
-                            GetComponentInChildren<AIController>().gun.DropItem(ref gun_drop_chance);
-                        }
                         if (Controller is PlayerController)
                         {
                             PlayersAlive.Instance.Players.Remove(netId.Value);
@@ -97,10 +93,12 @@ public class HealthDefence : NetworkBehaviour {
     [SyncVar] public double chill_resistance;
     [SyncVar] public double burn_resistance;
     [SyncVar] public double mezmerize_resistance;
+    [SyncVar] public double sunder_resistance;
     [SyncVar] bool chilling;
     [SyncVar] bool burning;
     [SyncVar] bool mezmerized;
     [SyncVar] bool stunned;
+    [SyncVar] bool sundered;
     public float standing_power
     {
         get { return _standing_power; }
@@ -176,15 +174,6 @@ public class HealthDefence : NetworkBehaviour {
     void Start()
     {
         rb = GetComponent<Rigidbody>();
-        _standing_power = max_standing_power;
-        if (hp_string)
-        {
-            hp_string.text = "<b>" + HP + "</b>";
-        }
-        if (hp_bar)
-        {
-            maxWidth = hp_bar.rect.width;
-        }
         if (Controller && Controller is PlayerController && isServer)
         {
             PlayersAlive.Instance.Players.Add(Controller.netId.Value);
@@ -214,7 +203,7 @@ public class HealthDefence : NetworkBehaviour {
     public IEnumerator DetermineBurn(double burn,int damage)
     {
         double net_burn = burn - burn_resistance;
-        if (net_burn > 0 && !burning && type == HealthDefence.Type.Unit && rand.NextDouble() < net_burn * 4)
+        if (net_burn > 0 && !burning && type == HealthDefence.Type.Unit && rand.NextDouble() < net_burn * 6)
         {
             burning = true;
             int num = (damage / 3) + (int)net_burn * 100;
@@ -237,7 +226,13 @@ public class HealthDefence : NetworkBehaviour {
         if (net_mez > 0 && !mezmerized && type == HealthDefence.Type.Unit && rand.NextDouble() < net_mez * 6)
         {
             mezmerized = true;
-            Controller.gun.mez_threshold = (int)(net_mez * 100) / 2;
+            foreach (Gun gun in Controller.weapons)
+            {
+                if (gun)
+                {
+                    gun.mez_threshold = (int)(net_mez * 100) / 2;
+                }
+            }
             float time = (float)(net_mez * 150);
             float next_time = Time.time + time;
             RpcUpdateAilments("\r\n <color=purple>Mezmerize</color> ", time);
@@ -245,7 +240,13 @@ public class HealthDefence : NetworkBehaviour {
             {
                 yield return new WaitForEndOfFrame();
             }
-            Controller.gun.mez_threshold = 0;
+            foreach(Gun gun in Controller.weapons)
+            {
+                if (gun)
+                {
+                    gun.mez_threshold = 0;
+                }
+            }
             mezmerized = false;
         }
     }
@@ -263,6 +264,26 @@ public class HealthDefence : NetworkBehaviour {
             {
                 StartCoroutine(Stun(time));
             }
+        }
+    }
+
+    public IEnumerator DetermineSunder(double sunder, int damage)
+    {
+        double net_sunder = sunder - sunder_resistance;
+        if (net_sunder > 0 && !sundered && rand.NextDouble() < net_sunder * 4)
+        {
+            sundered = true;
+            int num = ((int)net_sunder * 100 + damage) / 5;
+            defence -= num;
+            float time = (float)(net_sunder * 200);
+            float next_time = Time.time + time;
+            RpcUpdateAilments("\r\n <color=brown>Sunder</color>", time);
+            while (Time.time < next_time && HP != 0)
+            {
+                yield return new WaitForEndOfFrame();
+            }
+            defence += num;
+            sundered = false;
         }
     }
 
