@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Xml.Serialization;
+﻿
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UI;
@@ -26,11 +24,18 @@ public abstract partial class Gun : Item
             set
             {
                 _gun_for_consideration = value;
-                if (GunTable.buttons == null)
+                if (buttons == null)
                 {
                     InitGunTable();
                 }
-
+                NetworkMethods.Instance.CmdSetEnabled(
+                    PlayerController.Client.gameObject,
+                    "PlayerController",
+                    false);
+                PlayersAlive.Instance.CmdPause();
+                NetworkMethods.Instance.CmdSetLayer(
+                    _gun_for_consideration.client_user.gameObject,
+                    LayerMask.NameToLayer("Invincible"));
                 SetGunTable();
                 
             }

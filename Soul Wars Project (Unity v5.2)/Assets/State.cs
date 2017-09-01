@@ -19,7 +19,6 @@ public partial class AIController : GenericController
              determined.*/
             if (!Target)
             {
-                
                 Unit.UpdateAggro();
                 return;
             }
@@ -40,6 +39,7 @@ public partial class AIController : GenericController
                     Unit.RemoveAggro(Target.netId);
                 }
             }
+            
 
         }
 

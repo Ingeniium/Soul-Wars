@@ -124,7 +124,7 @@ public class PlayerController : GenericController {
                 >();
             HP.maxWidth = HP.hp_bar.rect.width;
             mod_text = hpbar_show.GetComponentInChildren<Text>();
-            NetworkMethods.Instance.CmdSpawn(Resources.Load("Bronze Shield") as GameObject,
+            NetworkMethods.Instance.CmdSpawn("Bronze Shield",
                 gameObject,
                 new Vector3(.87f, .134f, 0),
                 new Quaternion(0, 0, 0, 0));

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -15,55 +14,72 @@ public class NetworkMethods : NetworkBehaviour
         Instance = this;
     }
 
+   
     [ClientRpc]
     public void RpcSetParent(GameObject tr, GameObject ptr,Vector3 pos,Quaternion rot)
     {
-        tr.transform.SetParent(ptr.transform);
-        if(pos != Vector3.zero)
+        if (tr && ptr)
         {
-            tr.transform.localPosition = pos;
+            tr.transform.SetParent(ptr.transform);
+            if (pos != Vector3.zero)
+            {
+                tr.transform.localPosition = pos;
+            }
+            tr.transform.rotation *= rot;
         }
-        tr.transform.rotation *= rot;
+        else
+        {
+            Debug.Log(false);
+        }
     }
 
     [ClientRpc]
     public void RpcSetColor(GameObject rend, Color color)
     {
-        rend.GetComponent<Renderer>().material.color = color;
+        if (rend)
+        {
+            rend.GetComponent<Renderer>().material.color = color;
+        }
     }
 
     [ClientRpc]
     public void RpcSetLayer(GameObject obj, int layer)
     {
-        obj.layer = layer;
+        if (obj)
+        {
+            obj.layer = layer;
+        }
     }
 
     [ClientRpc]
     public void RpcSetEnabled(GameObject obj,string class_name,bool enabled)
     {
-        if (class_name != "Collider" && class_name != "Renderer")
+        if (obj)
         {
-            Type t = Type.GetType(class_name);
-            if (t != null)
+            if (class_name != "Collider" && class_name != "Renderer")
             {
-                MonoBehaviour c = obj.GetComponent(t) as MonoBehaviour;
-                c.enabled = enabled;
+                Type t = Type.GetType(class_name);
+                if (t != null)
+                {
+                    MonoBehaviour c = obj.GetComponent(t) as MonoBehaviour;
+                    c.enabled = enabled;
+                }
+                else
+                {
+                    Debug.Log(class_name + obj.ToString());
+                }
+            }
+            else if (class_name == "Collider")
+            {
+                obj.GetComponent<Collider>().enabled = enabled;
             }
             else
             {
-                Debug.Log(class_name + obj.ToString());
-            }
-        }
-        else if (class_name == "Collider")
-        {
-            obj.GetComponent<Collider>().enabled = enabled;
-        }
-        else
-        {
-            obj.GetComponent<Renderer>().enabled = enabled;
-            foreach(Renderer rend in obj.GetComponentsInChildren<Renderer>())
-            {
-                rend.enabled = enabled;
+                obj.GetComponent<Renderer>().enabled = enabled;
+                foreach (Renderer rend in obj.GetComponentsInChildren<Renderer>())
+                {
+                    rend.enabled = enabled;
+                }
             }
         }
     }
@@ -72,7 +88,10 @@ public class NetworkMethods : NetworkBehaviour
     [ClientRpc]
     public void RpcSetScale(GameObject Obj, Vector3 scale)
     {
-        Obj.transform.localScale = scale;
+        if (Obj)
+        {
+            Obj.transform.localScale = scale;
+        }
     }
 
 
@@ -113,9 +132,10 @@ public class NetworkMethods : NetworkBehaviour
     }
 
     [Command]
-    public void CmdSpawn(GameObject Obj,GameObject parent,Vector3 pos,Quaternion rot)
+    public void CmdSpawn(string Obj,GameObject parent,Vector3 pos,Quaternion rot)
     {
-        GameObject obj = Instantiate(Obj, pos, rot) as GameObject;
+        GameObject obj = Instantiate(Resources.Load(Obj) as GameObject
+            , pos, rot) as GameObject;
         NetworkServer.Spawn(obj);
         if (parent)
         {

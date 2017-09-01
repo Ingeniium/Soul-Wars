@@ -5,6 +5,9 @@ using System.Xml.Linq;
 using System.Collections.Generic;
 public abstract class Item : NetworkBehaviour,IRecordable
 {
+    /*Note that the following method (CopyComponent) WAS NOT CREATED BY ME!
+     * THE CREDIT GOES TO Shaffe
+     */ // http://answers.unity3d.com/questions/458207/copy-a-component-at-runtime.html
     public static T CopyComponent<T>(T original, GameObject destination) where T : Component
     {
         System.Type type = original.GetType();
@@ -54,9 +57,9 @@ public abstract class Item : NetworkBehaviour,IRecordable
             drop_canvas_show = Instantiate(drop_canvas, transform.position + new Vector3(0, 0, .5f), drop_canvas.transform.rotation) as Canvas;
             drop_canvas_show.GetComponentInChildren<Text>().text = name;
         }*/
-    }
+}
 
-    public void OnPointerClick()
+public void OnPointerClick()
     {
            /* if (dropped)
             {

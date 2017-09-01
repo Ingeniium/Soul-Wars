@@ -162,6 +162,7 @@ public abstract partial class Gun : Item {
         {
             weapon_fire.GetComponent<Rigidbody>().velocity = dir * projectile_speed; 
         }
+        
     }
     
     

@@ -34,6 +34,7 @@ public class RespawnInterface : MonoBehaviour
                 _spawn_index = value;
             }
             PlayerController.Client.cam_show.transform.position = SpawnManager.AllySpawnPoints[spawn_index].transform.position + PlayerController.Client.cam_show.GetComponent<PlayerFollow>()._offset;
+            PlayerController.Client.transform.position = SpawnManager.AllySpawnPoints[spawn_index].transform.position + SpawnManager.AllySpawnPoints[spawn_index].spawn_direction;
         }
     }
     public bool respawning

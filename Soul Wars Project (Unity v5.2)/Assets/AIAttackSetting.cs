@@ -46,8 +46,9 @@ public partial class AIController : GenericController
 
     bool WillBulletHitObstacle(Gun gun)
     {
-        return Physics.Raycast(gun.barrel_end.position,
-            gun.transform.position - Target.transform.position,
+        return Physics.Raycast(ptr.position,
+            Target.transform.position - gun.transform.position,
+            Vector3.Distance(gun.transform.position,Target.transform.position),
             LayerMask.GetMask("Obstacle","Default"));
     }
 

@@ -1,6 +1,5 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
-using System.Collections;
 
 public class ExitButton : MonoBehaviour {
     private Button button;
@@ -14,5 +13,14 @@ public class ExitButton : MonoBehaviour {
     void HideMenu()
     {
         transform.parent.SetParent(null);
+        PlayersAlive.Instance.CmdUnpause();
+        NetworkMethods.Instance.CmdSetLayer(
+            PlayerController.Client.gameObject,
+            LayerMask.NameToLayer("Ally")
+            );
+        NetworkMethods.Instance.CmdSetEnabled(
+                    PlayerController.Client.gameObject,
+                    "PlayerController",
+                    true);
     }
 }

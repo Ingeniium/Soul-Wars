@@ -1,9 +1,7 @@
 ﻿using UnityEngine;
-using UnityEngine.UI;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine.Networking;
 
 public class Strike : Gun {
     private readonly static string[] gun_ability_names = new string[12] { "Marksman", "Sniper", null,
@@ -19,11 +17,11 @@ public class Strike : Gun {
         "Sniper" + "\n Adds a seconds of" + "\n cooldown to the enemy's" + "\n current gun.",
          null,
 
-        "Accelerate" + "\n Increases speed as bullet travels.",
-        "Camoflauge" + "\n 30% chance to make bullets" + "\n less visible to enemies.",
+        "Accelerate" + "\n Gradually increases speed while" + "\n the bullet isn't homing on a target.",
+        "Camouflage" + "\n 30% chance to make bullets" + "\n less visible to enemies.",
         null,
 
-        "Momentum" + "\n Increases damage as bullet travels.",
+        "Momentum" + "\n Increases damage as bullet" +" \n displacement increases.",
         "Barrier" + "\n Allows collisions between" +"\n enemy and ally bullets.",
         null,
 
@@ -40,7 +38,7 @@ public class Strike : Gun {
          null,
 
         {Accelerate},
-        {Camoflauge},
+        {Camouflage},
         null,
 
         {Momentum},
@@ -102,7 +100,7 @@ public class Strike : Gun {
         else
         {
             script.Target.RpcUpdateAilments("\r\n <color=yellow>+ 1 sec cooldown on gun </color>", 1);
-            Gun targ = script.Target.Controller.Gun.GetComponent<Gun>();
+            Gun targ = script.Target.Controller.main_gun;
             if (targ.HasReloaded())
             {
                 targ.next_time = Time.time + 1f;
@@ -175,11 +173,13 @@ public class Strike : Gun {
         script.coroutines_running++;
         if (!script.Target)
         {
+            int i = 0;
             foreach (Gun_Abilities g in gun.Claimed_Gun_Mods.GetInvocationList())
             {
-                if (rand.NextDouble() < .2)
+                if (i <= gun.level - gun.mez_threshold && rand.NextDouble() < .20)
                 {
                     script.StartCoroutine(g(gun, script));
+                    i++;
                 }
             }
         }
@@ -202,7 +202,7 @@ public class Strike : Gun {
         yield return null;
     }
 
-    private static IEnumerator Camoflauge(Gun gun, BulletScript script)
+    private static IEnumerator Camouflage(Gun gun, BulletScript script)
     {
         script.coroutines_running++;
         Renderer rend = script.GetComponent<Renderer>();

@@ -23,6 +23,7 @@ public partial class AIController : GenericController {
     public SphereCollider enemy_attack_detection;
     public float minimal_distance = 4f;
     private bool guarding = false;
+    public float time_until_next_pathfind;
     private Vector3 move_dir;
     public Rigidbody rb;
     float cost_point;
@@ -33,8 +34,7 @@ public partial class AIController : GenericController {
         {0,Charge},
         {1,MaintainDistance},
         {2,Intercept},
-        {3,AvoidConfrontation}, 
-        {4,FollowPath}  
+        {3,AvoidConfrontation},  
     };
     private static Dictionary<int, Func<AIController,IEnumerator>> EvasionFuncs = new Dictionary<int, Func<AIController,IEnumerator>>()
     {
@@ -66,64 +66,58 @@ public partial class AIController : GenericController {
     private int evasion_func_index = 1;
     private static System.Random rand = new System.Random();
     private ObjectiveState State;
-    static readonly int max_iterations = 1000;
     Coordinate Path;
     Coordinate curCoord;
-    Bounds bounds;
     float GetCoordinateDistFromTarget(Coordinate coord)
     {
         return Math.Abs(
             Vector3.Distance(Map.Instance.GetCenter(coord), Target.transform.position));
     }
 
-    int ComputeCost(Coordinate from,Coordinate to)
+
+    IEnumerator Travel()
     {
-        int costx;
-        int costz;
-        if (from.x > to.x)
+        while(this)
         {
-            costx = from.x - to.x;
+            /*The wait for end of frame limits each run of the pathfinding algorithm
+             to one execution per frame.The time_until_next_pathfind variable
+             serves to spread out its execution between many AI,thereby
+             hopefully increasing overall game performance by reducing how much times
+             it executes in a single frame.*/
+            yield return new WaitForEndOfFrame();
+            yield return new WaitForSecondsRealtime(time_until_next_pathfind);
+            if (Target)
+            {
+                Path = GetPath();
+                if (Path != null)
+                {
+                    List<Coordinate> list = Path.GetParents();
+                    if (list.Count > 1 && list[list.Count - 2] != null)
+                    {
+                        move_dir = Map.Instance.GetCenter(list[list.Count - 2]) - ptr.position;
+                       
+                    }
+                    else
+                    {
+                        move_dir = Vector3.zero;
+                    }
+                }
+            }
         }
-        else
-        {
-            costx = to.x - from.x;
-        }
-        if (from.z > to.z)
-        {
-            costz = from.z - to.z;
-        }
-        else
-        {
-            costz = to.z - from.z;
-        }
-        return costx + costz;
     }
 
     Coordinate GetPath()
     {
-
+        List<Coordinate> visited = new List<Coordinate>();
         if (Target)
         {
             Priority_Queue.SimplePriorityQueue<Coordinate> queue = new Priority_Queue.SimplePriorityQueue<Coordinate>();
-            Coordinate start = Map.Instance.GetPos(ptr.position);
+            Coordinate start = Map.Instance.GetPos(main_gun.barrel_end.position);
+            start.parent = null;
             Coordinate end = Map.Instance.GetPos(Target.transform.position);
-            if (ObstacleCoord.Coordinates.Contains(end))
-            {
-                List<Coordinate> child = end.GetChildren();
-                if (child.Count > 0)
-                {
-                    end = child[0];
-                }
-                else
-                {
-                    end.x -= 2;
-                }
-            }
-            List<Coordinate> visited = new List<Coordinate>();
-            int iterations = 0;
             float tstart = Time.realtimeSinceStartup;
             queue.Enqueue(start, GetCoordinateDistFromTarget(start));
-            while (iterations < max_iterations)
+            while (Time.realtimeSinceStartup < tstart + .01f)
             {
                 start = queue.Dequeue();
                 if (start == end)
@@ -135,34 +129,47 @@ public partial class AIController : GenericController {
                 }
                 foreach (Coordinate coord in start.GetChildren())
                 {
-                        coord.traverse_cost = (float)ComputeCost(coord,end);
+                   coord.traverse_cost = GetCoordinateDistFromTarget(coord);
+                   /* if(coord.status == Coordinate.Status.Hazard)
+                    {
+                        coord.traverse_cost += 1000f;
+                    }
+                    int index =  (BulletScript.BulletCoords.FindIndex(delegate (ValueGroup<Coordinate, BulletScript> v)
+                     {
+                         return (v.index == coord);
+                     })) ;
+                    if(index != -1)
+                    {
+                        coord.traverse_cost += BulletScript.BulletCoords[index].value.upper_bound_damage * 3;
+                    }*/
+                    if (!visited.Contains(coord))
+                    {
                         coord.parent = start;
-                        if (!visited.Contains(coord))
-                        {
-                            queue.Enqueue(coord, coord.GetTotalCost());
-                            visited.Add(coord);
-                        }
-                        else if (queue.Contains(coord) && coord.GetTotalCost() < queue.GetPriority(coord))
-                        {
-                            queue.Remove(coord);
-                            queue.Enqueue(coord, coord.GetTotalCost());
-                        }
+                        queue.Enqueue(coord, coord.GetTotalCost());
+                        visited.Add(coord);
+                    }
+                    else if (queue.Contains(coord) && coord.GetTotalCost(start) < queue.GetPriority(coord))
+                    {
+                        coord.parent = start;
+                        queue.UpdatePriority(coord, coord.GetTotalCost());
+                    }
+
+
                 }
                 if (queue.Count != 0)
                 {
                     start = queue.First;
                 }
-                else 
+                else
                 {
-                    Debug.Log(ObstacleCoord.Coordinates.Contains(end) + " : " + ObstacleCoord.Coordinates.Contains(start));
-                    break;
+                    return null;
                 }
-                iterations++;
             }
         }
         return null;
     }
 
+   
     [ServerCallback]
     void Awake()
     {
@@ -174,9 +181,9 @@ public partial class AIController : GenericController {
     {
         
         enemy_attack_detection = GetComponent<SphereCollider>();
+        PlayersAlive.Instance.Units.Add(this);
 		State = new Conquer (this);
         prb = GetComponentInParent<Rigidbody>();
-        bounds = GetComponentInParent<BoxCollider>().bounds;
         StartCoroutine(WaitForPlayers());
        
     }
@@ -184,11 +191,11 @@ public partial class AIController : GenericController {
     [ServerCallback]
     IEnumerator WaitForPlayers()
     {
-        enabled = false;
-        while (PlayersAlive.Instance.Players.Count < 1)
+        while(PlayersAlive.Instance.Players.Count < 1)
         {
             yield return new WaitForEndOfFrame();
         }
+        yield return new WaitForSeconds(.2f);
         uint[] array = new uint[PlayersAlive.Instance.Players.Count];
         int i = 0;
         foreach (uint u in PlayersAlive.Instance.Players)
@@ -196,64 +203,43 @@ public partial class AIController : GenericController {
             array[i] = u;
             i++;
         }
+        PlayersAlive.Instance.CmdPause();
         while (!Array.Exists(array, delegate(uint u)
         {
-            return (NetworkServer.FindLocalObject(new NetworkInstanceId(u)).GetComponent<PlayerController>().main_gun);
+            return (NetworkServer.FindLocalObject(new NetworkInstanceId(u)).GetComponent<PlayerController>().enabled);
         }))
         {
             yield return new WaitForEndOfFrame();
         }
-        enabled = true;
+        PlayersAlive.Instance.CmdUnpause();
+        StartCoroutine(Travel());
     }
       
 
-    Vector3 FollowPath()
-    {
-        if (target_focus)
-        {
-            ptr.LookAt(Target.transform);
-        }
-        if (Target && Map.Instance.GetPos(Target.transform.position) != Map.Instance.GetPos(ptr.position))
-        {
-            Path = GetPath();
-            if (Path != null)
-            {
-                List<Coordinate> list = Path.GetParents();
-                if (list[list.Count - 1] != Path && list[list.Count - 2] != null)
-                {
-                    return (Map.Instance.GetCenter(list[list.Count - 2]) - ptr.position).normalized;
-                }
-            }
-        }
-        Debug.Log(0);
-        return Vector3.zero;
-    }
+    
 
     [ServerCallback]
     void FixedUpdate()
     {
-        
         State.AffirmTarget(Target);
-        ptr.LookAt(Target.transform);
-        bool hit = WillBulletHitObstacle(main_gun);
-        if (!hit)
+        if (Target)
         {
-            move_dir =Target.transform.position - ptr.position;
-        }
-        else
-        {
-            move_dir = MovementFuncs[movement_func_index](this);
-        }
-        prb.velocity = move_dir.normalized * speed;
-        int i = 0;
-        foreach(Gun gun in weapons)
-        {
-            if(AttackFuncs[attack_func_indexes[i]](this,gun) && !hit)
+            if (target_focus)
             {
-                main_gun = gun;
-                main_gun.Shoot();
+                ptr.LookAt(Target.transform);
             }
-            i++;
+            bool hit = WillBulletHitObstacle(main_gun);
+            prb.velocity = move_dir.normalized * speed;
+            int i = 0;
+            foreach (Gun gun in weapons)
+            {
+                if (AttackFuncs[attack_func_indexes[i]](this, gun) && !hit)
+                {
+                    main_gun = gun;
+                    gun.Shoot();
+                }
+                i++;
+            }
         }
    
     }
@@ -272,12 +258,8 @@ public partial class AIController : GenericController {
         {
             bullet_colliders.Add(col);
             trig = GetClosestBullet();
-           /* if (!trig || Math.Abs(Vector3.Distance(col.gameObject.transform.position, ptr.position))
-                < Math.Abs(Vector3.Distance(trig.gameObject.transform.position, ptr.position)))
-            {
-                trig = col;
-            }*/
-            StartCoroutine(DetermineEvasion());
+           
+            //StartCoroutine(DetermineEvasion());
         }
     }
 
@@ -328,11 +310,6 @@ public partial class AIController : GenericController {
             }
         });
         return bullet_colliders[distances[0].index];      
-    }
-
-    static Vector3 FollowPath(AIController AI)
-    {
-        return AI.FollowPath();
     }
 
     static Vector3 Charge(AIController AI)

@@ -1,11 +1,12 @@
 ﻿using UnityEngine;
 using System.Collections;
-using UnityEngine.UI;
+using System.Collections.Generic;
 using UnityEngine.Networking;
 
 public class BulletScript : NetworkBehaviour {
 	[SyncVar] public int upper_bound_damage;
     [SyncVar] public int lower_bound_damage;
+    Vector3 last_pos;
     static System.Random rand = new System.Random();
 	public GameObject home;
     public GameObject homer;
@@ -23,14 +24,21 @@ public class BulletScript : NetworkBehaviour {
     public bool homes = false;
     [SyncVar] public int coroutines_running = 0;
     [SyncVar] public bool can_pierce;
-    [HideInInspector] public float lasting_time = 3f;
+    public float lasting_time = 3f;
     public bool damaging = false;
     public HealthDefence Target;
+    public Rigidbody rb;
+    public static List<ValueGroup<Coordinate, BulletScript>> BulletCoords = new List<ValueGroup<Coordinate, BulletScript>>();
+    private List<Coordinate> last_coords = new List<Coordinate>();
+    private float start_time = 0;
 	// Use this for initialization
 
 	void Start () 
     {
+        last_pos = transform.position;
+        rb = GetComponent<Rigidbody>();
         StartCoroutine(WaitForGunReference());
+        PlayersAlive.Instance.Bullets.Add(this);
 	}
 
     IEnumerator WaitForGunReference()
@@ -46,12 +54,16 @@ public class BulletScript : NetworkBehaviour {
         HomingScript script = homer.GetComponent<HomingScript>();
         script.home_speed = home_speed;
         StartCoroutine(WaitForNetworkDestruction());
+        if(gun_reference.client_user)
+        {
+        //    StartCoroutine(UpdateCoord());
+        }
     }
 
     [ServerCallback]
     public IEnumerator WaitForNetworkDestruction()
     {
-        float start_time = Time.time;
+        start_time = Time.time;
         /*WaitForEndOfFrame used instead of wait for seconds in situations
          where lastng time changes dynamically(IE, gun abilities)*/
         while (Time.time < start_time + lasting_time)
@@ -59,6 +71,32 @@ public class BulletScript : NetworkBehaviour {
             yield return new WaitForEndOfFrame();
         }
         NetworkServer.Destroy(gameObject);
+    }
+
+    [ServerCallback]
+    IEnumerator UpdateCoord()
+    {
+        Rigidbody rb = GetComponent<Rigidbody>();
+
+        float t = Time.realtimeSinceStartup;
+        //while(this)
+        //{
+            yield return new WaitForFixedUpdate();
+            Map.Instance.GetPos(transform.position).status = Coordinate.Status.Hazard;
+            foreach(Coordinate c in Map.Instance.GetPos(transform.position).GetChildren())
+            {
+                c.status = Coordinate.Status.Hazard;
+                if (c.GetChildren().Count > 0)
+                {
+                    foreach (Coordinate cc in c.GetChildren())
+                    {
+                        cc.status = Coordinate.Status.Hazard;
+                        
+                    }
+                }
+            }
+
+        //}
     }
 
     IEnumerator Pierce(Collision hit)
@@ -81,7 +119,7 @@ public class BulletScript : NetworkBehaviour {
              if (second)
              {
                  Physics.IgnoreCollision(first, second, false);
-                 if (homer)
+                 if (third)
                  {
                      Physics.IgnoreCollision(third, second, false);
                  }
@@ -113,6 +151,7 @@ public class BulletScript : NetworkBehaviour {
             }
         }
     }
+
 
    [ServerCallback]
     void OnCollisionEnter(Collision hit)
@@ -217,11 +256,11 @@ public class BulletScript : NetworkBehaviour {
                     {
                         if (d >= Target.HP)
                         {
-                            gun_reference.experience += (int)((float)Target.HP * Target.exp_rate);
+                            gun_reference.experience += (int)(Target.HP * Target.exp_rate);
                         }
                         else
                         {
-                            gun_reference.experience += (int)((float)d * Target.exp_rate);
+                            gun_reference.experience += (int)(d * Target.exp_rate);
                         }
                     }
                     if (Target.Controller)
@@ -231,7 +270,7 @@ public class BulletScript : NetworkBehaviour {
                     AIController AI = Target.Controller as AIController;
                     if (AI != null)
                     {
-                        AI.UpdateAggro(d, gun_reference.client_user.netId);
+                        AI.UpdateAggro(d, gun_reference.transform.parent.gameObject.GetComponent<NetworkBehaviour>().netId);
                     }
                     Target.HP -= d;
                 }
@@ -252,8 +291,6 @@ public class BulletScript : NetworkBehaviour {
             damaging = false;
         }
     }
-
-
        
 
    

@@ -39,6 +39,7 @@ class Record : MonoBehaviour
         '[',
         ']',
         '?',
+        '!',
         ' '
     };
 
@@ -102,7 +103,7 @@ class Record : MonoBehaviour
                         image_canvas.transform.rotation) as GameObject;
 
                     NetworkMethods.Instance.CmdSpawn(
-                        Resources.Load(e.Name.ToString()) as GameObject,
+                        e.Name.ToString(),
                         PlayerController.Client.gameObject,
                         new Vector3(.21f, .11f, .902f),
                         new Quaternion(0, 0, 0, 0));
@@ -121,6 +122,7 @@ class Record : MonoBehaviour
                     i++;
                 
             }
+           
             PlayerController.Client.loaded = true;
             
               
@@ -137,6 +139,7 @@ class Record : MonoBehaviour
 
     void SetUpNameInputField()
     {
+        Debug.Log(2);
         InputField f = name_input_show.GetComponentInChildren<InputField>();
         f.onEndEdit.AddListener(delegate(string s)
         {
@@ -226,7 +229,7 @@ class Record : MonoBehaviour
                     return (g.in_inventory == false);
                 });
             }
-            NetworkMethods.Instance.CmdSpawn(Resources.Load(weapons[j].GetBaseName()) as GameObject,
+            NetworkMethods.Instance.CmdSpawn(weapons[j].GetBaseName(),
                 PlayerController.Client.gameObject,
                  new Vector3(.004f, .005f, .794f),
                  new Quaternion(0, 0, 0, 0));

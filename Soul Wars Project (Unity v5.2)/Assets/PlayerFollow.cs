@@ -1,6 +1,5 @@
 ﻿using UnityEngine;
-using UnityEngine.Networking;
-using System.Collections;
+
 
 public class PlayerFollow : MonoBehaviour
 {
@@ -23,7 +22,10 @@ public class PlayerFollow : MonoBehaviour
         _offset = new Vector3(0, 20, 0);
     }
 
-
+    void Update()
+    {
+        //Debug.Log(1 / Time.deltaTime);
+    }
     void FixedUpdate()
     {
         if (Player != null && Player.isLocalPlayer)

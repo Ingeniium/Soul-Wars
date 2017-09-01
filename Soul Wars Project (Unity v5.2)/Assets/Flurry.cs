@@ -137,9 +137,29 @@ public class Flurry : Gun
     private static IEnumerator Arrows(Gun gun, BulletScript script)
     {
         script.coroutines_running++;
-        (gun as Flurry).num_bullets += 2;
-        yield return new WaitForEndOfFrame();
-        (gun as Flurry).num_bullets -= 2;
+        Quaternion rot = Quaternion.LookRotation(
+            gun.barrel_end.forward
+            ) *
+            Quaternion.Euler(0,90,0);
+        Flurry Gun = (Flurry)gun;
+        GameObject b = Instantiate(Gun.Bullet, gun.barrel_end.position,rot) as GameObject;
+        NetworkServer.Spawn(b);
+        Gun.Claimed_Gun_Mods -= Arrows;
+        Gun.ReadyWeaponForFire(ref b);
+        Gun.RpcFire(b.transform.forward, b);
+        rot = Quaternion.LookRotation(
+           gun.barrel_end.forward
+           ) *
+           Quaternion.Euler(0, -90, 0);
+        b = Instantiate(Gun.Bullet, gun.barrel_end.position, rot) as GameObject;
+        NetworkServer.Spawn(b);
+        Gun.ReadyWeaponForFire(ref b);
+        Gun.RpcFire(b.transform.forward, b);
+        while (!script.Target && !Gun.HasReloaded(-.2f))
+        {
+            yield return new WaitForFixedUpdate();
+        }
+        Gun.Claimed_Gun_Mods += Arrows;
         script.coroutines_running--;
     }
 
@@ -192,7 +212,7 @@ public class Flurry : Gun
             yield return new WaitForEndOfFrame();
         }
         HomingScript h = script.homer.GetComponent<HomingScript>();
-        if (!script.Target || !h.main_col)
+        if (!script.Target && !h.main_col)
         {
             NetworkMethods.Instance.RpcSetEnabled(script.gameObject, "Renderer", false);
             NetworkMethods.Instance.RpcSetLayer(script.gameObject, 16);
@@ -200,7 +220,7 @@ public class Flurry : Gun
             Vector3 speed = rb.velocity;
             rb.velocity = Vector3.zero;
             float start_time = Time.time;
-            while (start_time + num > Time.time || !h.main_col || !script.Target)
+            while (start_time + num > Time.time && !h.main_col && !script.Target)
             {
                 yield return new WaitForEndOfFrame();
             }

@@ -75,17 +75,18 @@ public class EnemyInitialization : NetworkBehaviour
 
     private List<Action<AIController>> MiscMods = new List<Action<AIController>>()
     {
-        {AddLevel},
-        {AddLevel},
-        {AddExp},
-        {AddBurnResistance},
-        {AddSunderResistance},
-        {AddChillResistance},
-        {AddMezmerizeResistance},
-        {AddCriticalResistance},
+        {AddLevel}
     };
 
-    
+    void Awake()
+    {
+       /* EnemyGroup e = GetComponent<EnemyGroup>();
+        for(int i = 0;i < 30;i++)
+        {
+            Item.CopyComponent(e, gameObject);
+        }*/
+    }
+
 
     [ServerCallback]
      void Start()
@@ -94,6 +95,7 @@ public class EnemyInitialization : NetworkBehaviour
         GameObject Weapon;
         GameObject Shield;
         GameObject[] Weapons;
+        float time = .1f;
         foreach (EnemyGroup e in GetComponents<EnemyGroup>())
         {
             Enemy = Instantiate(e.Enemy, e.pos, Quaternion.identity) as GameObject;
@@ -116,8 +118,9 @@ public class EnemyInitialization : NetworkBehaviour
                 i++;
             }
             Unit.main_gun = Weapons[0].GetComponent<Gun>();
-            Unit.GetComponentInParent<HealthDefence>().Controller = Unit;          
-            Unit.movement_func_index = e.movement_type;
+            Unit.GetComponentInParent<HealthDefence>().Controller = Unit;
+            Unit.time_until_next_pathfind = time;
+            time += .05f;
             NetworkServer.Spawn(Enemy);
             NetworkServer.Spawn(Shield);
             StartCoroutine(WaitForMethodsRef(Enemy,Weapons,Shield));

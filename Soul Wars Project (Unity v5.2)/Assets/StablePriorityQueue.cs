@@ -2,7 +2,11 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-
+/*I WAS IN NO WAY INVOLVED IN THE CREATION OF THIS CODE.
+ ALL CREDIT GOES TO BlueRaja
+ http://www.blueraja.com/blog/356
+ https://github.com/BlueRaja/High-Speed-Priority-Queue-for-C-Sharp
+ */
 namespace Priority_Queue
 {
     /// <summary>

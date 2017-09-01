@@ -7,7 +7,7 @@ public class SpawnManager : NetworkBehaviour {
     public static List<SpawnManager> AllySpawnPoints = new List<SpawnManager>();
     public static List<SpawnManager> EnemySpawnPoints = new List<SpawnManager>() ;
     public static List<SpawnManager> UnclaimedSpawnPoints = new List<SpawnManager>();
-    public static float enemy_respawn_time = 5;
+    public static float enemy_respawn_time = 10f;
     public static float ally_respawn_time = 3;
     public GameObject stand;
     public Vector3 spawn_direction;
@@ -61,9 +61,11 @@ public class SpawnManager : NetworkBehaviour {
                 {
                     yield return new WaitForEndOfFrame();
                 }
+            killed.transform.position = EnemySpawnPoints[0].transform.position + EnemySpawnPoints[0].spawn_direction;
             }
             else
             {
+                PlayersAlive.Instance.Players.Remove(killed.netId.Value);
                 if (SpawnManager.AllySpawnPoints.Count != 0)
                 {
                     SpawnManager.AllySpawnPoints[0].RpcInterface(killed.netId);
@@ -90,6 +92,7 @@ public class SpawnManager : NetworkBehaviour {
                 SpawnManager.EnemySpawnPoints[0].RpcEnableScripts(killed.gameObject);
                 SpawnManager.EnemySpawnPoints[0].RpcBlink(killed.gameObject);
             }
+           
         
         
    }
@@ -190,7 +193,7 @@ public class SpawnManager : NetworkBehaviour {
         invis_time += Time.time;
         while (Time.time < invis_time)
         {
-            yield return new WaitForEndOfFrame();
+            yield return new WaitForSecondsRealtime(.2f);
             switch (rend.enabled)
             {
                 case true:
