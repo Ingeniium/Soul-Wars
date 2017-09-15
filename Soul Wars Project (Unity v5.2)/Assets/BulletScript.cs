@@ -23,14 +23,24 @@ public class BulletScript : NetworkBehaviour {
     [SyncVar] public bool legit_target = false;
     public bool homes = false;
     [SyncVar] public int coroutines_running = 0;
-    [SyncVar] public bool can_pierce;
+    public bool can_pierce
+    {
+        get { return _can_pierce; }
+        set
+        {
+            _can_pierce = value;
+            GetComponent<Collider>().isTrigger = value;
+        }
+    }
+    bool _can_pierce;
     public float lasting_time = 3f;
-    public bool damaging = false;
+    bool damaging = false;
     public HealthDefence Target;
     public Rigidbody rb;
     public static List<ValueGroup<Coordinate, BulletScript>> BulletCoords = new List<ValueGroup<Coordinate, BulletScript>>();
-    private List<Coordinate> last_coords = new List<Coordinate>();
+    List<Coordinate> path_coords = new List<Coordinate>();
     private float start_time = 0;
+    private Coordinate current_coord;
 	// Use this for initialization
 
 	void Start () 
@@ -54,9 +64,102 @@ public class BulletScript : NetworkBehaviour {
         HomingScript script = homer.GetComponent<HomingScript>();
         script.home_speed = home_speed;
         StartCoroutine(WaitForNetworkDestruction());
-        if(gun_reference.client_user)
+        if(gun_reference.GetComponentInParent<PlayerController>())
         {
-        //    StartCoroutine(UpdateCoord());
+            StartCoroutine(RecordBulletCoord());
+        }
+    }
+
+    IEnumerator RecordBulletCoord()
+    {
+        if (gameObject.layer == LayerMask.NameToLayer("AllyAttackUndetectable"))
+        {
+            yield return null;
+        }
+        else
+        {
+            Quaternion last_rot = transform.rotation * new Quaternion(180, 180, 180, 0);
+            Vector3 projected_end_pos;
+            Coordinate projected_end_coord;
+            Coordinate start_coord;
+            uint min_x;
+            uint min_z;
+            uint max_x;
+            uint max_z;
+            while (this)
+            {
+                if(current_coord != null)
+                {
+                    current_coord.traverse_cost /= 10;
+                }
+                if (Mathf.Abs(
+                    Quaternion.Angle(last_rot, transform.rotation))
+                    > 5f)
+                {
+                    projected_end_pos = transform.forward * rb.velocity.magnitude * (start_time + lasting_time * 1.2f - Time.realtimeSinceStartup);
+                    projected_end_coord = Map.Instance.GetPos(projected_end_pos);
+                    start_coord = Map.Instance.GetPos(transform.position);
+                    if (projected_end_coord != null && start_coord != null)
+                    {
+                        if (start_coord.x < projected_end_coord.x)
+                        {
+                            min_x = start_coord.x;
+                            max_x = projected_end_coord.x;
+                        }
+                        else
+                        {
+                            min_x = projected_end_coord.x;
+                            max_x = start_coord.x;
+                        }
+                        if (start_coord.z < projected_end_coord.z)
+                        {
+                            min_z = start_coord.z;
+                            max_z = projected_end_coord.z;
+                        }
+                        else
+                        {
+                            min_z = projected_end_coord.z;
+                            max_z = start_coord.z;
+                        }
+                        path_coords.RemoveAll(delegate (Coordinate c)
+                        {
+                            if (c.x > max_x || c.x < min_x || c.z > max_z || c.z < min_z)
+                            {
+                                c.status = Coordinate.Status.Safe;
+                                return true;
+                            }
+                            else
+                            {
+                                return false;
+                            }
+                        });
+                        min_x--;
+                        max_x++;
+                        min_z--;
+                        max_x++;
+                        for (uint i = min_x; i <= max_x; i++)
+                        {
+                            for (uint j = min_z; j <= max_z; j++)
+                            {
+                                if (Map.Instance.GetPos(i, j) != null &&
+                                    !path_coords.Contains(
+                                    Map.Instance.GetPos(i, j)))
+                                {
+                                    path_coords.Add(Map.Instance.GetPos(i, j));
+                                    Map.Instance.GetPos(i, j).status = Coordinate.Status.Hazard;
+                                    Map.Instance.GetPos(i, j).traverse_cost = upper_bound_damage * 10000;
+                                }
+                            }
+                        }
+                    }
+                }
+                current_coord = Map.Instance.GetPos(transform.position);
+                if (current_coord != null)
+                {
+                    current_coord.traverse_cost *= 10;
+                }
+                yield return new WaitForFixedUpdate();
+            }
         }
     }
 
@@ -70,34 +173,13 @@ public class BulletScript : NetworkBehaviour {
         {
             yield return new WaitForEndOfFrame();
         }
+        foreach(Coordinate c in path_coords)
+        {
+            c.status = Coordinate.Status.Safe;
+        }
         NetworkServer.Destroy(gameObject);
     }
 
-    [ServerCallback]
-    IEnumerator UpdateCoord()
-    {
-        Rigidbody rb = GetComponent<Rigidbody>();
-
-        float t = Time.realtimeSinceStartup;
-        //while(this)
-        //{
-            yield return new WaitForFixedUpdate();
-            Map.Instance.GetPos(transform.position).status = Coordinate.Status.Hazard;
-            foreach(Coordinate c in Map.Instance.GetPos(transform.position).GetChildren())
-            {
-                c.status = Coordinate.Status.Hazard;
-                if (c.GetChildren().Count > 0)
-                {
-                    foreach (Coordinate cc in c.GetChildren())
-                    {
-                        cc.status = Coordinate.Status.Hazard;
-                        
-                    }
-                }
-            }
-
-        //}
-    }
 
     IEnumerator Pierce(Collision hit)
     {
@@ -145,7 +227,7 @@ public class BulletScript : NetworkBehaviour {
         if (second && second.enabled)
         {
             Physics.IgnoreCollision(first, second, false);
-            if (homer)
+            if (third)
             {
                 Physics.IgnoreCollision(third, second, false);
             }
@@ -229,7 +311,9 @@ public class BulletScript : NetworkBehaviour {
 
                 }
                 int damage = rand.Next(lower_bound_damage, upper_bound_damage);
-                int d = (damage - Target.defence);
+                float da = (100 - Target.defence);
+                da /= 100;
+                int d = (int)((float)damage * da);
                 if (d > 0)
                 {
                     bool crit = false;
@@ -280,12 +364,19 @@ public class BulletScript : NetworkBehaviour {
             {
                 /* Before destruction,Stop all coroutines(the gun_abilities operating on this instance)
                  to prevent exceptions from those coroutines*/
-
+                foreach (Coordinate c in path_coords)
+                {
+                    c.status = Coordinate.Status.Safe;
+                }
                 StopAllCoroutines();
                 NetworkServer.Destroy(gameObject);
             }
             if (!can_pierce)
             {
+                foreach (Coordinate c in path_coords)
+                {
+                    c.status = Coordinate.Status.Safe;
+                }
                 NetworkServer.Destroy(gameObject);
             }
             damaging = false;

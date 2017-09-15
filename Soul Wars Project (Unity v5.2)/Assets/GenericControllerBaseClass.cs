@@ -24,7 +24,7 @@ public abstract class GenericController : NetworkBehaviour
         }
     }
     protected Gun _main_gun;
-    public Gun[] weapons = new Gun[2];
+    public Gun[] weapons = new Gun[3];
     public GameObject Gun;
     public GameObject Shield;
     [SyncVar] public float speed = 20f;

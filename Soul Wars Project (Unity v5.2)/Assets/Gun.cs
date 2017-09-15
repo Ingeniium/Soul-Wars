@@ -114,7 +114,7 @@ public abstract partial class Gun : Item {
     [ClientRpc]
     protected void RpcLevelupIndication()
     {
-        if (PlayerController.Client.netId == client_user.netId && !level_up_indication)
+        if (client_user && PlayerController.Client.netId == client_user.netId && !level_up_indication)
         {
             level_up_indication = Instantiate(client_user.cooldown_canvas, item_image_show.transform.position + new Vector3(-.25f, 0, 0), client_user.cooldown_canvas.transform.rotation) as Canvas;
             level_up_indication.GetComponentInChildren<Text>().text = "!";
@@ -197,7 +197,6 @@ public abstract partial class Gun : Item {
         script.gameObject.layer = layer;
         script.knockback_power = knockback_power;
         /*Homing script values passed for homing toggle*/
-        //.homer.layer = home_layer;
         script.home_speed = home_speed;
         script.home_radius = home_radius;
         script.homes = homes;
@@ -437,9 +436,7 @@ public abstract partial class Gun : Item {
     protected abstract string ClassGunAbilityNames(int index);//For getting a derived class's Gun_ability string names 
     protected abstract void SetGunNameAddons(int index);//For getting a derived class's prefixes/suffixes
     protected abstract string GunAbilityDesc(int index);//For getting a derived class's descriptions
-    
-    /*Functions below are virtual as to allow derived classes their own static variables for keeping track of assignment*/
-    protected abstract bool AreGunLevelUpButtonsAssignedForClass();
+   
     
     
 

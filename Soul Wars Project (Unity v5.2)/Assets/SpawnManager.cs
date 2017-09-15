@@ -7,17 +7,21 @@ public class SpawnManager : NetworkBehaviour {
     public static List<SpawnManager> AllySpawnPoints = new List<SpawnManager>();
     public static List<SpawnManager> EnemySpawnPoints = new List<SpawnManager>() ;
     public static List<SpawnManager> UnclaimedSpawnPoints = new List<SpawnManager>();
+    private HealthDefence HP;
     public static float enemy_respawn_time = 10f;
+    public int ally_defence_bonus = 30;
     public static float ally_respawn_time = 3;
     public GameObject stand;
     public Vector3 spawn_direction;
 	// Use this for initialization
     void Awake()
     {
+        HP = GetComponent<HealthDefence>();
         switch (gameObject.layer)
         {
             case 9:
                 AllySpawnPoints.Add(this);
+                HP.defence += ally_defence_bonus;
                 break;
             case 8:
                 EnemySpawnPoints.Add(this);
@@ -34,6 +38,7 @@ public class SpawnManager : NetworkBehaviour {
     {
         AllySpawnPoints.Remove(this);
         EnemySpawnPoints.Add(this);
+        HP.defence -= ally_defence_bonus;
     }
 
     [ClientRpc]
@@ -41,11 +46,14 @@ public class SpawnManager : NetworkBehaviour {
     {
         EnemySpawnPoints.Remove(this);
         AllySpawnPoints.Add(this);
+        HP.defence -= ally_defence_bonus;
     }
     
     public static IEnumerator WaitForRespawn(HealthDefence killed) 
     {
-       
+
+        NetworkMethods.Instance.CmdSetLayer(killed.gameObject, LayerMask.NameToLayer("Invincible"));
+        int layer;
             if (SpawnManager.AllySpawnPoints.Count != 0)
             {
                 SpawnManager.AllySpawnPoints[0].RpcDisableScripts(killed.gameObject);
@@ -62,9 +70,11 @@ public class SpawnManager : NetworkBehaviour {
                     yield return new WaitForEndOfFrame();
                 }
             killed.transform.position = EnemySpawnPoints[0].transform.position + EnemySpawnPoints[0].spawn_direction;
+            layer = LayerMask.NameToLayer("Enemy");
             }
             else
             {
+            layer = LayerMask.NameToLayer("Ally");
                 PlayersAlive.Instance.Players.Remove(killed.netId.Value);
                 if (SpawnManager.AllySpawnPoints.Count != 0)
                 {
@@ -92,10 +102,11 @@ public class SpawnManager : NetworkBehaviour {
                 SpawnManager.EnemySpawnPoints[0].RpcEnableScripts(killed.gameObject);
                 SpawnManager.EnemySpawnPoints[0].RpcBlink(killed.gameObject);
             }
-           
-        
-        
-   }
+        NetworkMethods.Instance.CmdSetLayer(killed.gameObject, layer);
+
+
+
+    }
 
     [ClientRpc]
     void RpcInterface(NetworkInstanceId ID)
@@ -182,7 +193,6 @@ public class SpawnManager : NetworkBehaviour {
 
     public static IEnumerator Blink(GameObject Respawned, float invis_time = 1.5f)
     {
-        Respawned.layer = 15;
         Renderer rend = Respawned.GetComponent<Renderer>();
         Renderer[] child_rends = Respawned.GetComponentsInChildren<Renderer>();
         rend.enabled = false;
@@ -217,14 +227,7 @@ public class SpawnManager : NetworkBehaviour {
         {
             r.enabled = true;
         }
-        if (Respawned.gameObject.tag == "Player")
-        {
-            Respawned.layer = 9;
-        }
-        else
-        {
-            Respawned.layer = 8;
-        }
+        
     }
 }
 	

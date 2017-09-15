@@ -262,11 +262,6 @@ public class Haze : Gun
         }
     }
 
-    protected override bool AreGunLevelUpButtonsAssignedForClass()
-    {
-        return (GunTable.buttons[0].method == null);
-    }
-
     protected override string GunDesc()
     {
         return "Emits a slow but large," + " \n lingering projectile.";

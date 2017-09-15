@@ -9,15 +9,17 @@ public class Flurry : Gun
     [SyncVar] public int num_bullets = 3;
     public List<ValueGroup[]> TrioList = new List<ValueGroup[]>();
     bool targ_recorded;
-    private readonly static string[] gun_ability_names = new string[12] { "Hunter", "Archer", null,
-                                                                         null, null, null,
-                                                                         null, null, null,
-                                                                         null, null, null}; 
-    private readonly static string[] gun_name_addons = new string[12] { "Precision", "Archery", null, 
-                                                                         "ook", null, null,
-                                                                         null, null, null,
-                                                                         null, null, null};
-    private readonly static string[] gun_ability_desc = new string[12] {
+    private readonly static string[] gun_ability_names = new string[15] { "Hunter", "Archer", null,
+                                                                         "Debris", "Boomerang", null,
+                                                                         "Shadow", "Arrows", null,
+                                                                         "Randomizer", "Seeker", null,
+                                                                         null, "Diverge",null}; 
+    private readonly static string[] gun_name_addons = new string[15] { "Precision", "Archery", null, 
+                                                                         "Perilous", "Psychic", null,
+                                                                         "Umbra", "Myriad", null,
+                                                                         "Random", "Potent", null,
+                                                                          null, "Divergent", null};
+    private readonly static string[] gun_ability_desc = new string[15] {
         "Hunter" + "\n Causes bullets that aren't" + "\n homing in on a target to" + "\n to reroute to another flurry " + "\n bullet's target.",
         "Archer" + "\n Bullets have a 50%" + "\n chance to be target piercing.",
         null,
@@ -31,7 +33,11 @@ public class Flurry : Gun
         null,
 
         "Randomizer" + "\n Bullets disappear until either" + "\n a random amount of time passes" + "\n or a target enters homing range." ,
-        "Seeker" + "\n Each bullet gains a 20% speed" +" \n and homing radius boost each time" + "\n it homes in on a new target.",
+        "Seeker" + "\n Each bullet gains a 20% speed" +"\n and homing radius boost each time" + "\n it homes in on a new target.",
+        null,
+
+        null,
+        "Diverge" + "\n Each bullet has a 10% chance" + "\n to create 10 other non homing" + "\n bullets on target impact.",
         null
     };
     /*This class's pool of gun_abilities.Use of a static container of static methods requiring explicit this
@@ -53,6 +59,10 @@ public class Flurry : Gun
 
         Randomizer,
         Seeker,
+        null,
+
+        null,
+        Diverge,
         null
     };
 
@@ -83,7 +93,7 @@ public class Flurry : Gun
         {
             /*Check if its a flurry bullet that isn't isn't homing*/
             BulletScript b = col.GetComponent<BulletScript>();
-            if (b && b.gun_reference is Flurry && !b.homer.GetComponent<HomingScript>().homing)
+            if (b && b.gun_reference is Flurry && !b.homer.GetComponent<HomingScript>().homing && home.main_col)
             {
                 /*Make bullet face target and fire towards them*/
                 b.transform.LookAt(new Vector3(home.main_col.gameObject.transform.position.x, script.transform.position.y, home.main_col.gameObject.transform.position.z));
@@ -107,21 +117,36 @@ public class Flurry : Gun
 
     private static IEnumerator Boomerang(Gun gun, BulletScript script)
     {
-        script.coroutines_running++;
-        while(!script.Target)
+        
+        Vector3 start_pos = script.transform.position;
+        yield return new WaitForFixedUpdate();
+        if (script.rb)
         {
-            yield return new WaitForEndOfFrame();
+            script.coroutines_running++;
+            float speed = script.rb.velocity.magnitude;
+            while (!script.Target)
+            {
+                yield return new WaitForEndOfFrame();
+            }
+            script.rb.velocity = Vector3.zero;
+            script.coroutines_running--;
+            if (!script.can_pierce)
+            {
+                script.can_pierce = true;
+                script.coroutines_running--;
+                script.transform.LookAt(start_pos);
+                script.rb.velocity = speed * script.transform.forward;
+                yield return new WaitForFixedUpdate();
+                script.can_pierce = false;
+            }
+            else
+            {
+                script.transform.LookAt(start_pos);
+                script.rb.velocity = speed * script.transform.forward;
+                script.coroutines_running--;
+            }
         }
-        script.transform.Rotate(new Vector3(0, 180, 0));
-        Rigidbody rb = script.GetComponent<Rigidbody>();
-        rb.velocity = rb.velocity.magnitude * script.transform.forward;
-        if(!script.can_pierce)
-        {
-            script.can_pierce = true;
-            yield return new WaitForFixedUpdate();
-            script.can_pierce = false;
-        }
-        script.coroutines_running--;
+     
     }
 
     private static IEnumerator Debris(Gun gun, BulletScript script)
@@ -130,7 +155,10 @@ public class Flurry : Gun
         yield return new WaitForSeconds(1.5f);
         Destroy(script.homer);
         NetworkMethods.Instance.RpcSetScale(script.gameObject, Vector3.one * 2);
-        script.GetComponent<Rigidbody>().velocity = Vector3.zero;
+        if (script.rb)
+        {
+            script.GetComponent<Rigidbody>().velocity = Vector3.zero;
+        }
     }
 
 
@@ -230,6 +258,37 @@ public class Flurry : Gun
         }
     }
 
+    public static IEnumerator Diverge(Gun gun, BulletScript script)
+    {
+        if (rand.NextDouble() < .1)
+        {
+            Flurry ggun = (Flurry)gun;
+            script.coroutines_running++;
+            while (!script.Target)
+            {
+                yield return new WaitForEndOfFrame();
+            }
+            for(float i = 0; i < 360;i += 36)
+            {
+                GameObject bullet = Instantiate(ggun.Bullet,
+                    script.transform.position,
+                    Quaternion.Euler(0, i, 0));
+                BulletScript s = bullet.GetComponent<BulletScript>();
+                Destroy(s.homer);
+                NetworkServer.Spawn(bullet);
+                ggun.Claimed_Gun_Mods -= Diverge;
+                ggun.ReadyWeaponForFire(ref bullet);
+                s.can_pierce = true;
+                ggun.RpcFire(bullet.transform.forward,bullet);
+                ggun.Claimed_Gun_Mods += Diverge;
+            }
+            script.coroutines_running--;
+        }
+        else
+        {
+            yield return null;
+        }
+    }
     public override void Shoot()
     {
         base.Shoot();
@@ -300,11 +359,6 @@ public class Flurry : Gun
         {
             prefixes.Add(gun_name_addons[index]);
         }
-    }
-
-    protected override bool AreGunLevelUpButtonsAssignedForClass()
-    {
-        return (GunTable.buttons[0].method == Hunter);
     }
 
     protected override string GunDesc()

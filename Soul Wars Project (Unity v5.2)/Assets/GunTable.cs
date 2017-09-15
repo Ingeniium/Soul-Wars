@@ -91,14 +91,12 @@ public abstract partial class Gun : Item
                     g.button.interactable = true;
                 }
             }
-            if (gun_for_consideration.AreGunLevelUpButtonsAssignedForClass() == false)
-            {
-                for (int i = 0; i < buttons.Length - 1; i++)//Exclude "x" button
-                {
-                    int temp = i;
-                    buttons[temp].method = gun_for_consideration.ClassGunMods(temp);                 
-                }
-            }
+             for (int i = 0; i < buttons.Length - 1; i++)//Exclude "x" button
+             {
+                  int temp = i;
+                  buttons[temp].method = gun_for_consideration.ClassGunMods(temp);                 
+             }
+            
             if (gun_for_consideration.points == 0 && gun_for_consideration.level_up_indication)
             {//Destroy indication when there's no points
                 Destroy(gun_for_consideration.level_up_indication.gameObject);
@@ -110,7 +108,7 @@ public abstract partial class Gun : Item
     }
 
     [ClientRpc]
-    void RpcApplyGunAbilities(int index)
+    public void RpcApplyGunAbilities(int index)
     {
         points--;
         Claimed_Gun_Mods += ClassGunMods(index);
@@ -121,30 +119,40 @@ public abstract partial class Gun : Item
     protected class GunTableButton : MonoBehaviour
     {
         public Button button;
-        public Gun_Abilities method;
+        public Gun_Abilities method
+        {
+            get { return _method; }
+            set
+            {
+                _method = value;
+                button.onClick.RemoveAllListeners();
+                button.onClick.AddListener(delegate
+                {
+                    if (GunTable.gun_for_consideration.points > 0 && method != null)
+                    {
+                        /*Add delegate to gun abilities*/
+                        GunTable.gun_for_consideration.client_user.CmdApplyGunAbilities(
+                            GunTable.gun_for_consideration.gameObject,
+                            index);
+                        /*Switch colors of text and button to show it has been taken*/
+                        ColorBlock cb = button.colors;
+                        cb.disabledColor = Color.yellow;
+                        button.colors = cb;
+                        button.GetComponentInChildren<Text>().color = Color.red;
+                        button.interactable = false;
+                        if (GunTable.gun_for_consideration.points == 0 && GunTable.gun_for_consideration.level_up_indication)
+                        {
+                            Destroy(GunTable.gun_for_consideration.level_up_indication.gameObject);
+                        }
+                    }
+                });
+            }
+        }
         public int index;
+        private Gun_Abilities _method;
         private GameObject desc_canvas_show;
 
         
-        public void OnMouseDrag()
-        {
-            if (GunTable.gun_for_consideration.points > 0 && button.interactable && method != null)
-            {
-                /*Add delegate to gun abilities*/
-                GunTable.gun_for_consideration.RpcApplyGunAbilities(index);
-                /*Switch colors of text and button to show it has been taken*/
-                ColorBlock cb = button.colors;
-                cb.disabledColor = Color.yellow;
-                button.colors = cb;
-                button.GetComponentInChildren<Text>().color = Color.red;
-                button.interactable = false;
-                if (GunTable.gun_for_consideration.points == 0 && GunTable.gun_for_consideration.level_up_indication)
-                {
-                    Destroy(GunTable.gun_for_consideration.level_up_indication.gameObject);
-                }
-            }
-        }
-
         void OnMouseEnter()
         {
             desc_canvas_show = Instantiate(GunTable.desc_canvas, transform.position + new Vector3(1.5f, 0, 1.75f), GunTable.desc_canvas.transform.rotation) as GameObject;

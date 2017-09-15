@@ -84,7 +84,7 @@ public class EnemyInitialization : NetworkBehaviour
         for(int i = 0;i < 30;i++)
         {
             Item.CopyComponent(e, gameObject);
-        }*/
+        } */       
     }
 
 
@@ -117,6 +117,7 @@ public class EnemyInitialization : NetworkBehaviour
                 Unit.attack_func_indexes[i] = (int)e.AttackSettings[i];
                 i++;
             }
+            Unit.movement_func_index = (int)e.MovementSetting;
             Unit.main_gun = Weapons[0].GetComponent<Gun>();
             Unit.GetComponentInParent<HealthDefence>().Controller = Unit;
             Unit.time_until_next_pathfind = time;
@@ -608,7 +609,11 @@ public class EnemyInitialization : NetworkBehaviour
     {
        
         ModDisplay display = AI.GetComponentInParent<ModDisplay>();
-        int n = rand.Next(1);
+        int n = rand.Next(10);
+        while(n == 2 || n == 5 || n == 8 || n == 11)
+        {
+            n = rand.Next(10);
+        }
         foreach (Gun g in AI.weapons)
         {
             if (!g.claimed_gun_ability.Contains(n)

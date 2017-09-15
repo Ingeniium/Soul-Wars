@@ -5,6 +5,13 @@ using UnityEngine.Networking;
 
 public partial class AIController : GenericController
 {
+
+    public int[] attack_func_indexes = new int[]
+   {
+        1,
+        1
+   };
+
     public enum AttackMode
     {
         WildlyFire = 0,

@@ -6,7 +6,7 @@ using System.Collections.Generic;
 
 public class HealthDefence : NetworkBehaviour {
     private Color Original_Color;
-    [SyncVar] public int maxHP;
+    [SyncVar] public int maxHP;//Maximum HP a player can have
     public int HP
     {
         get { return _HP; }

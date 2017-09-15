@@ -5,56 +5,65 @@ public class HomingScript : MonoBehaviour
 {
     public Rigidbody prb;
     public Transform ptr;
-    private List<Collider> col = new List<Collider>();//Made into a list as to enable consideration of multiple projectiles
+    private List<Collider> bullet_colliders = new List<Collider>();//Made into a list as to enable consideration of multiple projectiles
     public Collider main_col;//Collider that device is currently homing in
     public bool homing = false;//Whether it is currently homing on a target
-    public float home_speed;
-    Vector3 target_pos;
+    public float home_speed;//angle speed at which bullet can turn
+    Vector3 target_pos;//position of the collider device is homing on
 
-    void Start()
+    void Awake()
     {
         prb = GetComponentInParent<Rigidbody>();
-        ptr = GetComponentsInParent<Transform>()[1];
+        ptr = GetComponentsInParent<Transform>()[1];//Index 0 actually returns this object's transform rather than bullet object's
     }
     void OnTriggerEnter(Collider Target)
     {
-        col.Add(Target);//Add the collider for consideration
-        if (main_col == null)
+        if (!bullet_colliders.Contains(Target))
         {
-            main_col = Target;
+            bullet_colliders.Add(Target);//Add the collider for consideration
+            bullet_colliders.RemoveAll(delegate (Collider col)//Remove destroyed colliders
+            {
+                return (!col);
+            });
+            if (bullet_colliders.Count == 0)//If there are no colliders to consider,mark device as not homing
+            {
+                homing = false;
+                main_col = null;
+            }
+            else
+            {
+                /*Sort by least distance to greatest distance*/
+                bullet_colliders.SortByLeastToGreatDist(ptr.position);
+                main_col = bullet_colliders[0];
+            }
+
         }
         homing = true;//Make sure that homing is true
     }
 
     void OnTriggerExit(Collider Target)
     {
-        col.Remove(Target);
-        if (col.Count == 0)//If there are no colliders to consider,mark device as not homing
+        if (bullet_colliders.Contains(Target))
         {
-            homing = false;
-            main_col = null;
-        }
+            bullet_colliders.Remove(Target);
         /*If the main collider is out of homing range,and there are other
          * targets in range,then choose the target that's closest to the bullet*/
-        else
-        {
-            try
+            bullet_colliders.RemoveAll(delegate (Collider col)//Remove destroyed colliders
             {
-                float[] distances = new float[col.Count];//A soon to be sorted array
-                float[] dist_ref = new float[col.Count];//An array that has original indices
-                for (int i = 0; i < col.Count; i++)
-                {
-                    distances[i] = Vector3.Distance(col[i].transform.position, ptr.position);
-                    dist_ref[i] = distances[i];
-                }
-                System.Array.Sort(distances);
-                main_col = col[System.Array.FindIndex(dist_ref, delegate(float f) { return (f == distances[0]); })];
-            }
-            catch (System.Exception e)
+                return (!col);
+            });
+            if (bullet_colliders.Count == 0)//If there are no colliders to consider,mark device as not homing
             {
                 homing = false;
                 main_col = null;
             }
+            else
+            {
+                /*Sort by least distance to greatest distance*/
+                bullet_colliders.SortByLeastToGreatDist(ptr.position);
+                main_col = bullet_colliders[0];
+            }
+            
         }
     }
 
@@ -70,7 +79,7 @@ public class HomingScript : MonoBehaviour
             }
             catch (System.Exception e) 
             {
-                homing = false;
+                OnTriggerExit(main_col);
             }
         }
     }

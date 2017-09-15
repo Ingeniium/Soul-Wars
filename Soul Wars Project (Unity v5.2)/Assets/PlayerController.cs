@@ -58,6 +58,12 @@ public class PlayerController : GenericController {
         StartCoroutine(SetShield());
     }
 
+    [Command]
+    public void CmdApplyGunAbilities(GameObject obj,int index)
+    {
+        obj.GetComponent<Gun>().RpcApplyGunAbilities(index);
+    }
+
 
     IEnumerator SetShield()
     {

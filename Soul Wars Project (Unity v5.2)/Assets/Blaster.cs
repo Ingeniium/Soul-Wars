@@ -219,11 +219,6 @@ public class Blaster : Gun
         }
     }
 
-    protected override bool AreGunLevelUpButtonsAssignedForClass()
-    {
-        return (GunTable.buttons[0].method == Brigadier);
-    }
-
     protected override string GunDesc()
     {
         return "Shoots a fast,large bullet";

@@ -254,12 +254,6 @@ public class Strike : Gun {
         }
     }
 
-
-    protected override bool AreGunLevelUpButtonsAssignedForClass()
-    {
-        return (GunTable.buttons[0].method == Marksman);
-    }
-
     protected override string GunDesc()
     {
         return "Launches a powerful arrow.";

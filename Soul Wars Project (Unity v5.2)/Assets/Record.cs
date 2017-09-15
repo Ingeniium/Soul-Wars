@@ -63,7 +63,7 @@ class Record : MonoBehaviour
                 file.Save("SoulWars.xml");
       
             }
-            catch (FileNotFoundException e)
+            catch (System.IO.IsolatedStorage.IsolatedStorageException e)
             {
                 if (stream != null)
                 {
@@ -74,7 +74,18 @@ class Record : MonoBehaviour
                 SaveToFile();
                 return;
             }
-            finally
+        catch (FileNotFoundException e)
+        {
+            if (stream != null)
+            {
+                stream.Close();
+                stream.Dispose();
+            }
+            File.WriteAllText("SoulWars.xml", "<SaveData></SaveData>");
+            SaveToFile();
+            return;
+        }
+        finally
             {
                 if (stream != null)
                 {

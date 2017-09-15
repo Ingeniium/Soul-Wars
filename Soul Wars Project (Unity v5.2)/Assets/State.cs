@@ -104,34 +104,14 @@ public partial class AIController : GenericController
 
         void UpdateSpawnAggro()
         {
-            List<ValueGroup> Distances = new List<ValueGroup>();
-            int i = 0;
-            foreach (SpawnManager s in SpawnManager.AllySpawnPoints)
-            {
-                /*Index information is stored in order to refer to the same SpawnManager*/
-                Distances.Add(new ValueGroup(i, Vector3.Distance(Unit.ptr.position, s.transform.position)));
-                i++;
-            }
             /*Sort from closest to farthest from unit*/
-            Distances.Sort(delegate(ValueGroup lhs, ValueGroup rhs)
-            {
-                if (lhs.value < rhs.value)
-                {
-                    return -1;
-                }
-                else
-                {
-                    return 1;
-                }
-            });
-            int n = Distances.Count;
-            i = 0;
-            foreach (ValueGroup v in Distances)
+            SpawnManager.AllySpawnPoints.SortByLeastToGreatDist(Unit.ptr.position);
+            int n = SpawnManager.AllySpawnPoints.Count;
+            foreach (SpawnManager s in SpawnManager.AllySpawnPoints)
             {
                 /*Insert or Update threat information.Closer spawns are given slightly more threat
                  than farther spawns.*/
-                Unit.UpdateAggro(n * 10, SpawnManager.AllySpawnPoints[Distances[i].index].netId, false);
-                i++;
+                Unit.UpdateAggro(n * 10, s.netId, false);
                 n--;
             }
         }
@@ -170,39 +150,24 @@ public partial class AIController : GenericController
     {
         public override void ResetHateList()
         {
-            List<ValueGroup> Distances = new List<ValueGroup>();
-            int i = 0;
-            GameObject p;
+            List<PlayerController> player_list = new List<PlayerController>();
             foreach (uint u in PlayersAlive.Instance.Players)
             {
-                /*Index information is stored in order to refer to the same SpawnManager*/
                 if (u != 100)
                 {
-                    p = ClientScene.FindLocalObject(new NetworkInstanceId(u));
-                    Distances.Add(new ValueGroup(i, Vector3.Distance(Unit.ptr.position, p.transform.position)));
-                    i++;
+                    player_list.Add(
+                        ClientScene.FindLocalObject(new NetworkInstanceId(u)).
+                        GetComponent<PlayerController>());
                 }
             }
             /*Sort from closest to farthest from unit*/
-            Distances.Sort(delegate(ValueGroup lhs, ValueGroup rhs)
-            {
-                if (lhs.value < rhs.value)
-                {
-                    return -1;
-                }
-                else
-                {
-                    return 1;
-                }
-            });
-            int n = Distances.Count;
-            i = 0;
-            foreach (ValueGroup v in Distances)
+            player_list.SortByLeastToGreatDist(Unit.ptr.position);
+            int n = player_list.Count;
+            foreach (PlayerController p in player_list)
             {
                 /*Insert or Update threat information.Closer units are given significantly more threat
                  than farther units.*/
-                Unit.UpdateAggro(n * 25, new NetworkInstanceId(PlayersAlive.Instance.Players[Distances[i].index]), false);
-                i++;
+                Unit.UpdateAggro(n * 25,p.netId, false);
                 n--;
             }
         }
