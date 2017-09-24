@@ -90,7 +90,7 @@ public class BulletScript : NetworkBehaviour {
             {
                 if(current_coord != null)
                 {
-                    current_coord.traverse_cost /= 10;
+                    current_coord.hazard_cost /= 10;
                 }
                 if (Mathf.Abs(
                     Quaternion.Angle(last_rot, transform.rotation))
@@ -147,7 +147,7 @@ public class BulletScript : NetworkBehaviour {
                                 {
                                     path_coords.Add(Map.Instance.GetPos(i, j));
                                     Map.Instance.GetPos(i, j).status = Coordinate.Status.Hazard;
-                                    Map.Instance.GetPos(i, j).traverse_cost = upper_bound_damage * 10000;
+                                    Map.Instance.GetPos(i, j).hazard_cost = upper_bound_damage * 1000;
                                 }
                             }
                         }
@@ -156,7 +156,7 @@ public class BulletScript : NetworkBehaviour {
                 current_coord = Map.Instance.GetPos(transform.position);
                 if (current_coord != null)
                 {
-                    current_coord.traverse_cost *= 10;
+                    current_coord.hazard_cost *= 10;
                 }
                 yield return new WaitForFixedUpdate();
             }
@@ -176,6 +176,7 @@ public class BulletScript : NetworkBehaviour {
         foreach(Coordinate c in path_coords)
         {
             c.status = Coordinate.Status.Safe;
+            c.hazard_cost -= upper_bound_damage * 1000; 
         }
         NetworkServer.Destroy(gameObject);
     }
@@ -337,7 +338,7 @@ public class BulletScript : NetworkBehaviour {
 
 
                     if (Target.has_exp)
-                    {
+                    {                                                                                        //
                         if (d >= Target.HP)
                         {
                             gun_reference.experience += (int)(Target.HP * Target.exp_rate);
@@ -354,7 +355,7 @@ public class BulletScript : NetworkBehaviour {
                     AIController AI = Target.Controller as AIController;
                     if (AI != null)
                     {
-                        AI.UpdateAggro(d, gun_reference.transform.parent.gameObject.GetComponent<NetworkBehaviour>().netId);
+                        //AI.UpdateAggro(d, gun_reference.transform.parent.gameObject.GetComponent<NetworkBehaviour>().netId);
                     }
                     Target.HP -= d;
                 }
@@ -376,6 +377,7 @@ public class BulletScript : NetworkBehaviour {
                 foreach (Coordinate c in path_coords)
                 {
                     c.status = Coordinate.Status.Safe;
+                    c.hazard_cost -= upper_bound_damage * 1000;
                 }
                 NetworkServer.Destroy(gameObject);
             }

@@ -1,38 +1,31 @@
 ﻿
+using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UI;
-using System.Collections;
-using System.Collections.Generic;
-using System;
 
-public class PlayerController : GenericController {
-    public string player_name
+public class PlayerController : GenericController
+{
+    public string player_name//Name of the player to display
     {
         get { return _player_name; }
         set
         {
             _player_name = value;
-            NameDisplayShow.GetComponentInChildren<Text>().text = value;
+            name_display_show.GetComponentInChildren<Text>().text = value;
         }
     }
-    [SyncVar] public bool loaded = false;
     private string _player_name;
-    public GameObject NameDisplay;
-    public GameObject NameDisplayShow;
-    private Vector3 total_move;
-    public static PlayerController Client;
-    public Text mod_text;
-    public GameObject pass_over;//reference to cmd created objects
-
-    private float moveHorizontal;
-    private float moveVertical;
-    public Rigidbody rb;
-    private Transform tr;
-    public Canvas cooldown_canvas;
-    private Canvas cooldown_canvas_show;
-    public Camera cam;
-    public Camera cam_show
+    public GameObject name_display;//Prefab of below
+    public GameObject name_display_show;//Object that displays name
+    public static PlayerController Client;//Static reference to the playercontroller that's connected client-side
+    public Text mod_text;//Text object that displays mods of units hovered-over by the mouse
+    public Rigidbody rb;//Rigidbody attached to the object
+    public Canvas cooldown_canvas;//Prefab of below
+    private Canvas cooldown_canvas_show;//Object that shows the cooldown of a gun
+    public Camera cam;//Prefab of below
+    public Camera cam_show//Camera for client-side viewing
     {
         get { return _cam_show; }
         private set
@@ -41,10 +34,10 @@ public class PlayerController : GenericController {
         }
     }
     private Camera _cam_show;
-    public bool equip_action = true;
-    public Canvas hpbar;
-    public Canvas hpbar_show;
-    public HealthDefence HP;
+    public bool equip_action = true;//Whether player can act or not.Useful when dealing with ui buttons
+    public Canvas player_interface;//Prefab of below
+    public Canvas player_interface_show;//The Object that's responsible for displaying things like health and shield bars
+    public HealthDefence HP;//Health defence object
 
     [Command]
     void CmdSetShield()
@@ -67,17 +60,22 @@ public class PlayerController : GenericController {
 
     IEnumerator SetShield()
     {
-        while (GetComponentsInChildren<HealthDefence>().Length < 2)
+        while (GetComponentsInChildren<HealthDefence>().Length < 2) //Waits until the shield is created on server
         {
             yield return new WaitForEndOfFrame();
         }
-        Shield = GetComponentsInChildren<HealthDefence>()[1].gameObject;
+        Shield = GetComponentsInChildren<HealthDefence>()[1].gameObject;//Assigns reference to the shield(using the fact that it's a child)
         HealthDefence SP = Shield.GetComponent<HealthDefence>();
-        SP.scale_factor = 2.5f;
-        SP.Controller = this;
-        if (hpbar_show)
+        SP.scale_factor = 2.5f;//Rescales obj
+        SP.Controller = this;//Makes a not of who owns it
+        /*This changes the shield bar from a local shield bar object to the main shield bar
+         provided that the player who owns it is the one who is connected locally.
+         Since player_interface_show would only be instantiated if Start() was executed
+         locally,the follwing check would be true only if the owner is playing locally on 
+         that instance of the game running.*/
+        if (player_interface_show)
         {
-            SP.health_bar_show = hpbar_show.GetComponentsInChildren<Slider>()[3].gameObject as GameObject;
+            SP.health_bar_show = player_interface_show.GetComponentsInChildren<Slider>()[3].gameObject as GameObject;
             SP.hp_string = SP.health_bar_show.GetComponentInChildren<Text>();
             SP.hp_string.text = "<b>" + SP.HP + "</b>";
             SP.hp_bar = SP.health_bar_show.GetComponentInChildren<Slider>().GetComponent<RectTransform
@@ -89,14 +87,14 @@ public class PlayerController : GenericController {
 
     void Awake()
     {
-        NameDisplayShow = Instantiate(NameDisplay) as GameObject;
+        name_display_show = Instantiate(name_display) as GameObject;
         HP = GetComponent<HealthDefence>();
         HP.Controller = this;
     }
 
     void Start()
     {
-
+        /*The code that follows operates locally on ONE client.*/
         if (!isLocalPlayer)
         {
             return;
@@ -108,33 +106,32 @@ public class PlayerController : GenericController {
             {
                 Destroy(cam_show.GetComponent<AudioListener>());
             }
-            HP = GetComponent<HealthDefence>();
 
-            hpbar_show = Instantiate(hpbar) as Canvas;
-            hpbar_show.worldCamera = cam_show;
+            player_interface_show = Instantiate(player_interface) as Canvas;
+            player_interface_show.worldCamera = cam_show;
             cam_show.GetComponent<PlayerFollow>().Player = this;
 
             Client = this;
 
             rb = GetComponent<Rigidbody>();
-            tr = GetComponent<Transform>();
             if (cam_show && cam_show.enabled)
             {
                 cam_show.transform.rotation = cam.transform.rotation;
             }
 
-            HP.health_bar_show = hpbar_show.GetComponentsInChildren<Slider>()[1].gameObject as GameObject;
+            HP.health_bar_show = player_interface_show.GetComponentsInChildren<Slider>()[1].gameObject as GameObject;
             HP.hp_string = HP.health_bar_show.GetComponentInChildren<Text>();
             HP.hp_string.text = "<b>" + HP.HP + "</b>";
             HP.hp_bar = HP.health_bar_show.GetComponentInChildren<Slider>().GetComponent<RectTransform
                 >();
             HP.maxWidth = HP.hp_bar.rect.width;
-            mod_text = hpbar_show.GetComponentInChildren<Text>();
+            mod_text = player_interface_show.GetComponentInChildren<Text>();
             NetworkMethods.Instance.CmdSpawn("Bronze Shield",
                 gameObject,
                 new Vector3(.87f, .134f, 0),
                 new Quaternion(0, 0, 0, 0));
             CmdSetShield();
+            CmdSyncShieldPos();
         }
         StartCoroutine(SetNameDisplay());
 
@@ -188,8 +185,8 @@ public class PlayerController : GenericController {
     [ClientRpc]
     void RpcNameChange(bool again, string name)
     {
-        NameDisplayShow.GetComponentInChildren<Text>().text = name;
-        NameDisplayShow.GetComponent<HPbar>().Object = this.gameObject;
+        name_display_show.GetComponentInChildren<Text>().text = name;
+        name_display_show.GetComponent<HPbar>().Object = this.gameObject;
         if (again)
         {
             Client.CmdNameChange(false, name);
@@ -204,10 +201,10 @@ public class PlayerController : GenericController {
         }
         if ((Input.inputString.Contains("q") || (Input.GetMouseButton(0) && Input.inputString.Contains("")) && !blocking))
         {
-            int index = Array.FindIndex(weapons, delegate (Gun g)
-             { 
-                 return (g && g.button == Input.inputString);    
-             });
+            int index = weapons.FindIndex(delegate (Gun g)
+            {
+                return (g && g.button == Input.inputString);
+            });
             if (index != -1)
             {
                 CmdEquipGun(weapons[index].gameObject);
@@ -215,16 +212,17 @@ public class PlayerController : GenericController {
                 CmdShoot();
             }
         }
-            else if (Input.GetMouseButton(1) && !blocking)
-            {
-                StartShieldBlocking();
-            }
-            if (Input.GetMouseButtonUp(1) && blocking)                                
-            {
-                EndShieldBlocking();   
-            }
+       else if (Input.GetMouseButton(1) && !blocking)
+       {
+            CmdStartShieldBlocking();         
+       }
+       else if (!Input.GetMouseButton(1) && blocking)                                
+       {
+            CmdEndShieldBlocking();
+       }
+
             
-        }
+    }
         
 	
 	
@@ -233,12 +231,105 @@ public class PlayerController : GenericController {
     {
         if (isLocalPlayer)
         {
-            moveHorizontal = Input.GetAxis("Horizontal");
-            moveVertical = Input.GetAxis("Vertical");
-            total_move = new Vector3(moveHorizontal, 0, -1 * moveVertical);
+            float moveHorizontal = Input.GetAxis("Horizontal");
+            float moveVertical = Input.GetAxis("Vertical");
+            Vector3 total_move = new Vector3(moveHorizontal, 0, -1 * moveVertical);
             rb.velocity = speed * total_move;
         }
     }
+    /*Unfortunately,shields and guns on client-only players move like they're lagging behind,
+     so the following functions are designed to somewhat mitigate the problem by removing their 
+     child status.This sync soultion is also the reason why they no longer have netwwork 
+     transforms*/
+    [Command]
+    void CmdSyncShieldPos() 
+    {
+        RpcSyncShieldPos();
+    }
+
+    [ClientRpc]
+    void RpcSyncShieldPos()
+    {
+        StartCoroutine(SyncShieldPos());
+    }
+
+    IEnumerator SyncShieldPos()
+    {
+        while(!Shield)
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        Shield.GetComponent<NetworkTransform>().enabled = false;
+        Shield.transform.parent = null;
+        while(this)
+        {
+            yield return new WaitForFixedUpdate();
+            float x;
+            float z;
+            float rot;
+            if(!blocking)
+            {
+                x = transform.right.x;
+                z = transform.right.z;
+                rot = 0;
+            }
+            else
+            {
+                x = transform.forward.x;
+                z = transform.forward.z;
+                rot = 90;
+            }
+            Vector3 proj = new Vector3(x + transform.position.x,
+            transform.position.y,
+            z + transform.position.z);
+            Shield.transform.rotation = transform.rotation * Quaternion.Euler(0, rot, 0);
+            Shield.transform.position = proj;
+            Vector3 dif = Shield.transform.position - transform.position;
+            dif /= 2;
+            Shield.transform.position -= dif;
+        }
+    }
+    
+    [Command]
+    public void CmdSyncGunPos()
+    {
+        RpcSyncGunPos();
+    }
+
+    [ClientRpc]
+    void RpcSyncGunPos()
+    {
+        StartCoroutine(SyncGunPos());
+    }
+
+    public IEnumerator SyncGunPos()
+    {       
+         Gun[] children = GetComponentsInChildren<Gun>();
+         foreach (Gun g in children)
+         {
+            g.transform.SetParent(null);
+            g.GetComponent<NetworkTransform>().enabled = false;
+         }
+         while (this)
+         {
+             yield return new WaitForFixedUpdate();
+             foreach (Gun g in children)
+             {
+                 if (g)
+                 {
+                     Vector3 proj = new Vector3(transform.forward.x + transform.position.x,
+                     transform.position.y,
+                     transform.forward.z + transform.position.z);
+                     g.transform.rotation = transform.rotation;
+                     g.transform.position = proj;
+                     Vector3 dif = g.transform.position - transform.position;
+                     dif /= 2;
+                     g.transform.position -= dif;
+                 }
+             }
+         }
+    }
+    
 
   
 }

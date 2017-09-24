@@ -24,23 +24,40 @@ public abstract class GenericController : NetworkBehaviour
         }
     }
     protected Gun _main_gun;
-    public Gun[] weapons = new Gun[3];
+    public List<Gun> weapons = new List<Gun>();
     public GameObject Gun;
     public GameObject Shield;
     [SyncVar] public float speed = 20f;
     protected bool blocking = false;
-    protected BoxCollider shield_collider;
+
+    [Command]
+    protected void CmdStartShieldBlocking()
+    {
+        RpcStartShieldBlocking();
+    }
+    
+    [Command]
+    protected void CmdEndShieldBlocking()
+    {
+        RpcEndShieldBlocking();
+    }
+
+    [ClientRpc]
+    protected void RpcStartShieldBlocking()
+    {
+        StartShieldBlocking();
+    }
+
+    [ClientRpc]
+    protected void RpcEndShieldBlocking()
+    {
+        EndShieldBlocking();
+    }
+
     protected void StartShieldBlocking()
     {
         blocking = true;
-        if (isServer)
-        {
-            NetworkMethods.Instance.RpcSetEnabled(Shield, "Collider", true);
-        }
-        else
-        {
-            NetworkMethods.Instance.CmdSetEnabled(Shield, "Collider", true);
-        }
+        Shield.GetComponent<Collider>().enabled = true;
         Quaternion rot = Quaternion.AngleAxis(-90, Vector3.up);
         Shield.transform.rotation *= rot;
         Gun.transform.rotation *= rot;
@@ -68,14 +85,7 @@ public abstract class GenericController : NetworkBehaviour
         blocking = false;
         Quaternion rot = Quaternion.AngleAxis(90, Vector3.up);
         Shield.transform.rotation *= rot;
-        if (isServer)
-        {
-            NetworkMethods.Instance.RpcSetEnabled(Shield, "Collider", false);
-        }
-        else
-        {
-            NetworkMethods.Instance.CmdSetEnabled(Shield, "Collider", false);
-        }
+        Shield.GetComponent<Collider>().enabled = false;
         Gun.transform.rotation *= rot;
         Vector3 temp = Gun.transform.position;
         Gun.transform.position = Shield.transform.position;

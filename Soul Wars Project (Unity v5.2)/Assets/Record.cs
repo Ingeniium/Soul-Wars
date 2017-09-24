@@ -46,34 +46,43 @@ class Record : MonoBehaviour
 
     public void SaveToFile()
     {
-            try
+        PlayerController.Client.weapons.RemoveNull();
+        if (PlayerController.Client.weapons.FindAll(delegate (Gun g)
+         {
+             return g;
+         }).Count
+        < 2)
+        {
+            return;
+        }
+        try
+        {
+            stream = new FileStream("SoulWars.xml", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            file = XDocument.Load("SoulWars.xml");
+            if (file.Root.Descendants(player_name).Any())
             {
-                stream = new FileStream("SoulWars.xml", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                file = XDocument.Load("SoulWars.xml");
-                if (file.Root.Descendants(player_name).Any())
-                {
-                    file.Root.Descendants(player_name).Remove();
-                }
-                file.Root.Add(new XElement(player_name,null));
-                XElement element = file.Root.Element(player_name);
-                foreach (Item i in PlayerController.Client.GetComponentsInChildren<Item>())
-                {
-                    element.Add(i.RecordValuesToSaveFile());
-                }
-                file.Save("SoulWars.xml");
-      
+                file.Root.Descendants(player_name).Remove();
             }
-            catch (System.IO.IsolatedStorage.IsolatedStorageException e)
+            file.Root.Add(new XElement(player_name, null));
+            XElement element = file.Root.Element(player_name);
+            foreach (Gun g in PlayerController.Client.weapons)
             {
-                if (stream != null)
-                {
-                    stream.Close();
-                    stream.Dispose();
-                }
-                File.WriteAllText("SoulWars.xml", "<SaveData></SaveData>");
-                SaveToFile();
-                return;
+                element.Add(g.RecordValuesToSaveFile());
             }
+            file.Save("SoulWars.xml");
+
+        }
+        catch (System.IO.IsolatedStorage.IsolatedStorageException e)
+        {
+            if (stream != null)
+            {
+                stream.Close();
+                stream.Dispose();
+            }
+            File.WriteAllText("SoulWars.xml", "<SaveData></SaveData>");
+            SaveToFile();
+            return;
+        }
         catch (FileNotFoundException e)
         {
             if (stream != null)
@@ -86,14 +95,14 @@ class Record : MonoBehaviour
             return;
         }
         finally
+        {
+            if (stream != null)
             {
-                if (stream != null)
-                {
-                    stream.Close();
-                    stream.Dispose();
-                }
+                stream.Close();
+                stream.Dispose();
             }
-            return;   
+        }
+        return;
     }
 
     IEnumerator LoadFromFile()
@@ -109,34 +118,32 @@ class Record : MonoBehaviour
             int i = 0;
             foreach (XElement e in parent.Elements())
             {
-                    GameObject image_canvas_show = Instantiate(image_canvas,
-                        PlayerController.Client.hpbar_show.GetComponentInChildren<HorizontalLayoutGroup>().gameObject.transform.position,
-                        image_canvas.transform.rotation) as GameObject;
+                GameObject image_canvas_show = Instantiate(image_canvas,
+                    PlayerController.Client.player_interface_show.GetComponentInChildren<HorizontalLayoutGroup>().gameObject.transform.position,
+                    image_canvas.transform.rotation) as GameObject;
 
-                    NetworkMethods.Instance.CmdSpawn(
-                        e.Name.ToString(),
-                        PlayerController.Client.gameObject,
-                        new Vector3(.21f, .11f, .902f),
-                        new Quaternion(0, 0, 0, 0));
+                NetworkMethods.Instance.CmdSpawn(
+                    e.Name.ToString(),
+                    PlayerController.Client.gameObject,
+                    new Vector3(.21f, .11f, .902f),
+                    new Quaternion(0, 0, 0, 0));
 
-                    while (PlayerController.Client.GetComponentsInChildren<Item>().Length == i)
-                    {
-                        yield return new WaitForEndOfFrame();
-                    }
-                    Item item = PlayerController.Client.GetComponentsInChildren<Item>()[i];
-                    item.item_image_show = image_canvas_show;
-                    item.in_inventory = true;
-                    item.RecordValuesFromSaveFile(e);
-                    image_canvas_show.GetComponentInChildren<ItemImage>().item_script = item;
-                    item.client_user = PlayerController.Client;
-                    item.PrepareItemForUse();
-                    i++;
-                
+                while (PlayerController.Client.GetComponentsInChildren<Item>().Length == i)
+                {
+                    yield return new WaitForEndOfFrame();
+                }
+                Item item = PlayerController.Client.GetComponentsInChildren<Item>()[i];
+                item.item_image_show = image_canvas_show;
+                item.in_inventory = true;
+                item.RecordValuesFromSaveFile(e);
+                image_canvas_show.GetComponentInChildren<ItemImage>().item_script = item;
+                item.client_user = PlayerController.Client;
+                item.PrepareItemForUse();
+                i++;
             }
-           
-            PlayerController.Client.loaded = true;
-            
-              
+            PlayerController.Client.CmdSyncGunPos();
+
+
         }
         finally
         {
@@ -152,12 +159,12 @@ class Record : MonoBehaviour
     {
         Debug.Log(2);
         InputField f = name_input_show.GetComponentInChildren<InputField>();
-        f.onEndEdit.AddListener(delegate(string s)
+        f.onEndEdit.AddListener(delegate (string s)
         {
             bool invalid = false;
-            foreach(char c in s)
+            foreach (char c in s)
             {
-                if(forbidden_chars.Contains(c))
+                if (forbidden_chars.Contains(c))
                 {
                     invalid = true;
                     break;
@@ -264,7 +271,7 @@ class Record : MonoBehaviour
                 gun.button = "q";
             }
             gun.PrepareItemForUse();
-            if(i > 0)
+            if (i > 0)
             {
                 NetworkMethods.Instance.CmdSetEnabled(gun.gameObject, "Renderer", false);
             }
@@ -273,10 +280,12 @@ class Record : MonoBehaviour
                 PlayerController.Client.CmdEquipGun(gun.gameObject);
             }
         }
+        PlayerController.Client.CmdSyncGunPos();
         NetworkMethods.Instance.CmdSetLayer(PlayerController.Client.gameObject, 9);
-        NetworkMethods.Instance.CmdSetEnabled(PlayerController.Client.gameObject, "PlayerController", true);          
+        NetworkMethods.Instance.CmdSetEnabled(PlayerController.Client.gameObject, "PlayerController", true);
+
         Destroy(weapon_choose_show.gameObject);
-        
+
     }
 
     void Awake()
@@ -286,7 +295,7 @@ class Record : MonoBehaviour
 
     void Start()
     {
-        if (PlayerController.Client && !PlayerController.Client.loaded)
+        if (PlayerController.Client)
         {
             if (File.Exists("SoulWars.xml"))
             {
@@ -296,16 +305,16 @@ class Record : MonoBehaviour
             {
                 name_input_show = Instantiate(name_input, name_input.transform.position, name_input.transform.rotation) as Canvas;
                 NetworkMethods.Instance.CmdSetLayer(PlayerController.Client.gameObject, 15);
-                NetworkMethods.Instance.CmdSetEnabled(PlayerController.Client.gameObject,"PlayerController", false);
+                NetworkMethods.Instance.CmdSetEnabled(PlayerController.Client.gameObject, "PlayerController", false);
                 SetUpNameInputField();
             }
-            Button[] buttons = PlayerController.Client.hpbar_show.GetComponentsInChildren<Button>();
-            buttons[buttons.Length - 1].onClick.AddListener(delegate()
+            Button[] buttons = PlayerController.Client.player_interface_show.GetComponentsInChildren<Button>();
+            buttons[buttons.Length - 1].onClick.AddListener(delegate ()
             {
                 SaveToFile();
             });
         }
     }
 
-    
+
 }

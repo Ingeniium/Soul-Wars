@@ -93,15 +93,20 @@ public class EnemyInitialization : NetworkBehaviour
     {
         GameObject Enemy;
         GameObject Weapon;
-        GameObject Shield;
+        GameObject Shield = null;
         GameObject[] Weapons;
         float time = .1f;
         foreach (EnemyGroup e in GetComponents<EnemyGroup>())
         {
             Enemy = Instantiate(e.Enemy, e.pos, Quaternion.identity) as GameObject;
-            Shield = Instantiate(Resources.Load("Bronze Shield"), e.pos, Quaternion.identity) as GameObject;
             AIController Unit = Enemy.GetComponentInChildren<AIController>();
-            Unit.Shield = Shield;
+            if (e.can_block)
+            {
+                Shield = Instantiate(Resources.Load("Bronze Shield"), e.pos, Quaternion.identity) as GameObject;
+                Unit.Shield = Shield;
+                NetworkServer.Spawn(Shield);
+            }
+            Unit.can_dodge = e.can_dodge;
             Gun gun;
             Weapons = new GameObject[e.Gun.Length];
             int i = 0;
@@ -113,8 +118,10 @@ public class EnemyInitialization : NetworkBehaviour
                 gun.SetBaseStats();
                 gun.barrel_end = Weapon.transform.GetChild(0);
                 Weapons[i] = Weapon;
-                Unit.weapons[i] = gun;
-                Unit.attack_func_indexes[i] = (int)e.AttackSettings[i];
+                Unit.weapons.Add(gun);
+                Unit.attack_func_indexes.Add((int)e.AttackSettings[i]);
+                gun.level = e.weapon_levels[i];
+                AddLevel(Unit, gun);
                 i++;
             }
             Unit.movement_func_index = (int)e.MovementSetting;
@@ -123,9 +130,8 @@ public class EnemyInitialization : NetworkBehaviour
             Unit.time_until_next_pathfind = time;
             time += .05f;
             NetworkServer.Spawn(Enemy);
-            NetworkServer.Spawn(Shield);
-            StartCoroutine(WaitForMethodsRef(Enemy,Weapons,Shield));
-            
+            StartCoroutine(WaitForMethodsRef(Enemy,Weapons,Unit.Shield));
+            Unit.weapons.RemoveNull();
         }
     }
 
@@ -146,9 +152,12 @@ public class EnemyInitialization : NetworkBehaviour
             }
             i++;
         }
-        NetworkMethods.Instance.RpcSetParent(Shield, Enemy, new Vector3(.87f, .134f, 0), new Quaternion(0, 0, 0, 0));
-        NetworkMethods.Instance.RpcSetLayer(Shield, 8);
-        Shield.GetComponent<HealthDefence>().scale_factor = 3f;
+        if (Shield)
+        {
+            Shield.GetComponent<HealthDefence>().scale_factor = 3f;
+            NetworkMethods.Instance.RpcSetParent(Shield, Enemy, new Vector3(.87f, .134f, 0), new Quaternion(0, 0, 0, 0));
+            NetworkMethods.Instance.RpcSetLayer(Shield, 8);
+        }
         AIController Unit = Enemy.GetComponentInChildren<AIController>();
         switch (Enemy.ToString())
         {
@@ -645,6 +654,28 @@ public class EnemyInitialization : NetworkBehaviour
                 }
             
         
+    }
+
+    private static void AddLevel(AIController AI,Gun gun)
+    {
+
+        ModDisplay display = AI.GetComponentInParent<ModDisplay>();
+        int n = rand.Next(10);
+        while (n == 2 || n == 5 || n == 8 || n == 11)
+        {
+            n = rand.Next(10);
+        }
+        for(int i = 0; i < gun.level;i++)
+        {
+            if(!gun.claimed_gun_ability.Contains(i)
+                && gun.ClassGunMods(i) != null)
+            {
+                gun.claimed_gun_ability.Add(i);
+                gun.Claimed_Gun_Mods += gun.ClassGunMods(i);
+            }
+        }
+        int index = display.Mods.Count;
+        display.Mods.Add("\r\n Level " + gun.level + " " + gun.GetBaseName());
     }
 
     private static void AddShieldDefence(AIController AI)

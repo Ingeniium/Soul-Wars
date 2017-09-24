@@ -5,15 +5,22 @@ using System.Collections.Generic;
 
 public class Haze : Gun
 {
-    private readonly static string[] gun_ability_names = new string[12] { "Fog", "Conflagration", null,
-                                                                         "Resistance","Fume",null,
-                                                                         "Debilitate","Engulf",null,
-                                                                         "Infect","Cloud",null};
-    private readonly static string[] gun_name_addons = new string[12] { "Fog", "Conflagration", null,
-                                                                        "Insulant", "Toxic",null,
-                                                                        "Debilitating", "Ominous",null,
-                                                                        "Infectious", "Cloudy", null};
-    private readonly static string[] gun_ability_desc = new string[12] {
+    private readonly static string[] gun_ability_names = new string[12] 
+    {
+        "Fog", "Conflagration", null,
+        "Resistance","Fume",null,
+        "Debilitate","Engulf",null,
+        "Infect","Cloud",null
+    };
+    private readonly static string[] gun_name_addons = new string[12] 
+    {
+        "Fog", "Conflagration", null,
+        "Insulant", "Toxic",null,
+        "Debilitating", "Ominous",null,
+        "Infectious", "Cloudy", null
+    };
+    private readonly static string[] gun_ability_desc = new string[12] 
+    {
         "Fog" + "\n Adds +10 Chill strength to bullets.",
         "Conflagration" + "\n Adds +10 Burn strenght to bullets.",
         null,

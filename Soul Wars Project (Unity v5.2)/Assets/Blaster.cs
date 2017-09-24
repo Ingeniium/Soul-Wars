@@ -6,20 +6,27 @@ using UnityEngine.Networking;
 
 public class Blaster : Gun
 {
-    private readonly static string[] gun_ability_names = new string[12] { "Brigadier", "Gunslinger", null,
-                                                                        "Sunder", "Curve", null,
-                                                                         "Quake", "Tremor", null,
-                                                                         "Meteor", "Comet", null,};                           
-    private readonly static string[] gun_name_addons = new string[12] { "Punishment", "The Force", null,
-                                                                        "Sundering", "Homing", null,
-                                                                         "Robust", "Intense", null,
-                                                                         "Meteor", "Comet", null,};
-    private readonly static string[] gun_ability_desc = new string[12] {
+    private readonly static string[] gun_ability_names = new string[12] 
+    {
+        "Brigadier", "Gunslinger", null,
+        "Sunder", "Curve", null,
+        "Quake", "Tremor", null,
+        "Meteor", "Comet", null
+    };                           
+    private readonly static string[] gun_name_addons = new string[12] 
+    {
+        "Punishment", "The Force", null,
+        "Sundering", "Homing", null,
+        "Robust", "Intense", null,
+        "Meteor", "Comet", null
+    };
+    private readonly static string[] gun_ability_desc = new string[12]  
+    {
         "Brigadier" + "\n Does 150% damage to" + "\n spawn points and shields.",
         "Gunslinger" + "\n Causes a 2 second stun.",
         null,
 
-       "Sunder" + "\n + 10 Sunder Power.",
+        "Sunder" + "\n + 10 Sunder Power.",
         "Curve" + "\n Grants slight homing ability.",
         null,
 

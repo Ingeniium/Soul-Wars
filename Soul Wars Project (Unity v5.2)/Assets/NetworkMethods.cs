@@ -120,6 +120,18 @@ public class NetworkMethods : NetworkBehaviour
     }
 
     [Command]
+     public void CmdSetParentNull(GameObject obj)
+     {
+        RpcSetParentNull(obj);
+     }
+
+    [ClientRpc]
+    void RpcSetParentNull(GameObject obj)
+    {
+        obj.transform.SetParent(null);
+    }
+
+    [Command]
     public void CmdAddPlayerId(NetworkInstanceId ID)
     {
         PlayersAlive.Instance.Players.Add(ID.Value);

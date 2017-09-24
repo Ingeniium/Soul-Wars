@@ -6,48 +6,45 @@ using System.Collections.Generic;
 
 
 public partial class AIController : GenericController {
-    private Rigidbody prb;
-    public Transform ptr;
-    public HealthDefence Target;
-    private bool target_focus = true;
+    private Rigidbody prb;//Rigidbody of the actual enemy object
+    public Transform ptr;//Transform of the actual enemy object
+    public HealthDefence Target;//What the unit is trying to pursue
+    private bool target_focus = true;//Whether to look at the target or not.Important when blocking.
     private Collider trig;
-    public float shoot_delay;
+    public float shoot_delay;//Delay with an enemy shooting.
     private List<Collider> bullet_colliders = new List<Collider>();
     private Vector3 vec;
-    public float reaction_delay;    
-    [HideInInspector]
-    public SphereCollider enemy_attack_detection;
+    public float reaction_delay;
+    private SphereCollider enemy_attack_detection;//The collider of the detection sphere
     public float minimal_distance = 4f;
-    public float time_until_next_pathfind;
-    private Vector3 move_dir;
+    public float time_until_next_pathfind;//Time after the next frame that it does the A* algorithm again.Important in maintaing gameplay smoothness.
+    private Vector3 move_dir;//Direction to move.
 
+    /*List showing who is aggro'd and what their aggro values are.Made into an array as structs can't be modified from lists.*/
     public ValueGroup[] HateList = new ValueGroup[20]
     {
-        new ValueGroup(0,-1), new ValueGroup(0,-1), 
-        new ValueGroup(0,-1), new ValueGroup(0,-1), 
-        new ValueGroup(0,-1), new ValueGroup(0,-1), 
-        new ValueGroup(0,-1), new ValueGroup(0,-1), 
         new ValueGroup(0,-1), new ValueGroup(0,-1),
-        
-        new ValueGroup(0,-1), new ValueGroup(0,-1), 
-        new ValueGroup(0,-1), new ValueGroup(0,-1), 
-        new ValueGroup(0,-1), new ValueGroup(0,-1), 
-        new ValueGroup(0,-1), new ValueGroup(0,-1), 
-        new ValueGroup(0,-1), new ValueGroup(0,-1)   
+        new ValueGroup(0,-1), new ValueGroup(0,-1),
+        new ValueGroup(0,-1), new ValueGroup(0,-1),
+        new ValueGroup(0,-1), new ValueGroup(0,-1),
+        new ValueGroup(0,-1), new ValueGroup(0,-1),
+
+        new ValueGroup(0,-1), new ValueGroup(0,-1),
+        new ValueGroup(0,-1), new ValueGroup(0,-1),
+        new ValueGroup(0,-1), new ValueGroup(0,-1),
+        new ValueGroup(0,-1), new ValueGroup(0,-1),
+        new ValueGroup(0,-1), new ValueGroup(0,-1)
     };
 
     private static System.Random rand = new System.Random();
-    private ObjectiveState State;
-    private Coordinate Path;
-    private Coordinate prev_start_coord;
-    private Coordinate prev_end_coord;
+    private ObjectiveState State;//Sets the objective and reaction to certain ally objects coming into range
     float GetCoordinateDistFromTarget(Coordinate coord)
     {
         return Math.Abs(
             Vector3.Distance(Map.Instance.GetCenter(coord), Target.transform.position));
     }
 
-   
+
     [ServerCallback]
     void Awake()
     {
@@ -57,19 +54,19 @@ public partial class AIController : GenericController {
     [ServerCallback]
     void Start()
     {
-        
+
         enemy_attack_detection = GetComponent<SphereCollider>();
         PlayersAlive.Instance.Units.Add(this);
-		State = new Conquer (this);
+        State = new Conquer(this);
         prb = GetComponentInParent<Rigidbody>();
         StartCoroutine(WaitForPlayers());
-       
+
     }
 
     [ServerCallback]
     IEnumerator WaitForPlayers()
     {
-        while(PlayersAlive.Instance.Players.Count < 1)
+        while (PlayersAlive.Instance.Players.Count < 1)
         {
             yield return new WaitForEndOfFrame();
         }
@@ -82,7 +79,7 @@ public partial class AIController : GenericController {
             i++;
         }
         PlayersAlive.Instance.CmdPause();
-        while (!Array.Exists(array, delegate(uint u)
+        while (!Array.Exists(array, delegate (uint u)
         {
             return (NetworkServer.FindLocalObject(new NetworkInstanceId(u)).GetComponent<PlayerController>().enabled);
         }))
@@ -92,9 +89,9 @@ public partial class AIController : GenericController {
         PlayersAlive.Instance.CmdUnpause();
         StartCoroutine(Travel());
     }
-      
 
-    
+
+
 
     [ServerCallback]
     void FixedUpdate()
@@ -111,15 +108,18 @@ public partial class AIController : GenericController {
             int i = 0;
             foreach (Gun gun in weapons)
             {
-                if (AttackFuncs[attack_func_indexes[i]](this, gun) && !hit)
+                if (gun)
                 {
-                    main_gun = gun;
-                    gun.Shoot();
+                    if (AttackFuncs[attack_func_indexes[i]](this, gun) && !hit)
+                    {
+                        main_gun = gun;
+                        gun.Shoot();
+                    }
                 }
                 i++;
             }
         }
-   
+
     }
 
     [ServerCallback]
@@ -127,72 +127,63 @@ public partial class AIController : GenericController {
     {
         /*If a player or spawn point was detected within aggro radius,
          react based on State instructions*/
-        if (col.gameObject.layer == 9)
+        if (col.gameObject.layer == LayerMask.NameToLayer("Ally"))
         {
             State.UnitAggroReaction(col);
         }
         /*If bullet,prepare to evade*/
         else
         {
+            bullet_colliders.RemoveNull();
             bullet_colliders.Add(col);
-            trig = GetClosestBullet();
-           
-            //StartCoroutine(DetermineEvasion());
+            StartCoroutine(WaitForBlock(col));
         }
     }
 
     [ServerCallback]
     void OnTriggerExit(Collider col)
     {
-        if (col.gameObject.layer != 9)
+        bullet_colliders.RemoveNull();
+        bullet_colliders.Remove(col);
+    }
+
+    IEnumerator WaitForBlock(Collider col)
+    {
+        /*Only block if:
+         not trying to block another bullet(target_focus is true)
+         shield isnt regenerating (which would happen if the shield's HP gone to zero and hasn't fully generated)
+         the collider still exists
+         the collider isn't a trigger = which would go thru shield any way*/
+        if (!Shield)
         {
-            bullet_colliders.Remove(col);
+            yield return null;
+        }
+        else
+        {
+            HealthDefence SP = Shield.GetComponent<HealthDefence>();
+            while (target_focus && !SP.regeneration && col && !col.isTrigger)
+            {
+                /*Wait until its gets 2 units away or it disappears*/
+                if (Math.Abs(
+                    Vector3.Distance(col.gameObject.transform.position, ptr.position))
+                    < 2f)
+                {
+                    /*Look at the bullet and block until it disappears.*/
+                    target_focus = false;
+                    StartShieldBlocking();
+                    ptr.LookAt(col.transform);
+                    while (col)
+                    {
+                        yield return new WaitForFixedUpdate();
+                    }
+                    EndShieldBlocking();
+                    target_focus = true;
+                }
+                yield return new WaitForFixedUpdate();
+            }
         }
     }
-
-    Collider GetClosestBullet()
-    {
-        List<ValueGroup> distances = new List<ValueGroup>();   
-        /*using foreach in this place casues an invalid operation exception when a collider DOES need to be destroyed,as 
-         due to the destruction itself*/
-        for (int i = 0; i < bullet_colliders.Count; i++)
-        {
-            if (bullet_colliders[i] == null)
-            {
-                bullet_colliders.RemoveAt(i);
-            }
-        }       
-        for(int i = 0;i < bullet_colliders.Count;i++)
-        {
-            try
-            {
-                distances.Add(new ValueGroup(i, Vector3.Distance(ptr.position, bullet_colliders[i].gameObject.transform.position)));
-            }
-            catch (System.Exception e) 
-            {
-                if (distances.Count > i)
-                {
-                    distances.RemoveAt(i);
-                }
-            }
-        }     
-        distances.Sort(delegate(ValueGroup lhs, ValueGroup rhs)
-        {
-            if (lhs.value > rhs.value)
-            {
-                return 1;
-            }
-            else
-            {
-                return -1;
-            }
-        });
-        return bullet_colliders[distances[0].index];      
-    }
-
-
-
-   
+ 
     public void UpdateAggro(int damage = 0, NetworkInstanceId player_id = new NetworkInstanceId(),bool account_attack_dist = true)
     {
         try

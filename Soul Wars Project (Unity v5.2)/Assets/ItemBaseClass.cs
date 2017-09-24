@@ -34,7 +34,7 @@ public abstract class Item : NetworkBehaviour,IRecordable
         set
         {
             _client_user = value;
-            if (_client_user != null && _client_user.hpbar_show)
+            if (_client_user != null && _client_user.player_interface_show)
             {
                 OnClientUserChange();
             }

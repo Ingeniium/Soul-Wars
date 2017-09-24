@@ -7,6 +7,7 @@ public class Coordinate
     public uint x;
     public uint z;
     public float traverse_cost;
+    public float hazard_cost;
 
     private List<Coordinate> possible_coords = new List<Coordinate>();
     public Coordinate parent;
@@ -178,32 +179,53 @@ public class Coordinate
         return possible_coords;
     }
 
-    public float GetTotalCost(int iterations = 0)
+    public float GetTotalCost(bool account_for_hazards = false,int iterations = 0)
     {
         if (parent != null && iterations < 100)
         {
             iterations++;
-            return parent.GetTotalCost(iterations) + traverse_cost;
+            if (account_for_hazards)
+            {
+                return parent.GetTotalCost(account_for_hazards, iterations) + traverse_cost + hazard_cost;
+            }
+            else
+            {
+                return parent.GetTotalCost(account_for_hazards,iterations) + traverse_cost;
+            }
         }
         else
         {
             if (iterations >= 100)
             {
-                // Debug.Log("Overflow : too many parents");
+                 Debug.Log("Overflow : too many parents");
             }
-            return traverse_cost;
+            if (account_for_hazards)
+            {
+                return traverse_cost + hazard_cost;
+            }
+            else
+            {
+                return traverse_cost;
+            }
         }
     }
 
-    public float GetTotalCost(Coordinate coord)
+    public float GetTotalCost(Coordinate coord, bool account_for_hazards = false)
     {
         if (coord != null)
         {
-            return traverse_cost + coord.GetTotalCost();
+            return traverse_cost + coord.GetTotalCost(account_for_hazards);
         }
         else
         {
-            return traverse_cost;
+            if (account_for_hazards)
+            {
+                return traverse_cost + hazard_cost;
+            }
+            else
+            {
+                return traverse_cost;
+            }
         }
     }
 

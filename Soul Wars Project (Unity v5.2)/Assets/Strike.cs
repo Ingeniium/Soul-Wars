@@ -4,15 +4,22 @@ using System.Collections;
 using System.Collections.Generic;
 
 public class Strike : Gun {
-    private readonly static string[] gun_ability_names = new string[12] { "Marksman", "Sniper", null,
-                                                                         "Accelerate", "Camofluage", null,
-                                                                         "Momentum", "Barrier", null,
-                                                                         "Arcane Quiver", "Mythril Quiver", null};
-    private readonly static string[] gun_name_addons = new string[12] { "Marksmanship","Accuracy",null,
-                                                                         "Accelerating", "Hidden", null,
-                                                                         "Mighty", "Adamant", null,
-                                                                         "Arcane", "Mythril", null};
-    private readonly static string[] gun_ability_desc = new string[12] {
+    private readonly static string[] gun_ability_names = new string[12] 
+    {
+        "Marksman", "Sniper", null,
+        "Accelerate", "Camofluage", null,
+        "Momentum", "Barrier", null,
+        "Arcane Quiver", "Mythril Quiver", null
+    };
+    private readonly static string[] gun_name_addons = new string[12] 
+    {
+        "Marksmanship","Accuracy",null,
+        "Accelerating", "Hidden", null,
+        "Mighty", "Adamant", null,
+        "Arcane", "Mythril", null
+    };
+    private readonly static string[] gun_ability_desc = new string[12] 
+    {
         "Marksman" + "\n Can grant up to" + "\n 30% crit chance based on" + "\n how little the bullet turns.",
         "Sniper" + "\n Adds a seconds of" + "\n cooldown to the enemy's" + "\n current gun.",
          null,
@@ -25,7 +32,7 @@ public class Strike : Gun {
         "Barrier" + "\n Allows collisions between" +"\n enemy and ally bullets.",
         null,
 
-        "Arcane Quiver" + "\n 20% chance for a chosen" + "\n gun ability to reapply itself," +"\n potentially doubling its effectiveness.",
+        "Arcane Quiver" + "\n 20% chance for a chosen" + "\n gun ability to reapply itself," +"\n doubling its effectiveness" + "\n each reapplication.",
         "Mythril Quiver" + "\n +10 Mezmerize power.",
         null
     };

@@ -125,7 +125,7 @@ public abstract partial class Gun : Item {
 
     protected override void OnClientUserChange()
     {
-        weapons_bar = _client_user.hpbar_show.GetComponentInChildren<HorizontalLayoutGroup>().gameObject;
+        weapons_bar = _client_user.player_interface_show.GetComponentInChildren<HorizontalLayoutGroup>().gameObject;
         GunLevelUp = UIHide.obj.gameObject;
     }
 
@@ -295,14 +295,7 @@ public abstract partial class Gun : Item {
                 n++;
             }
             client_user.CmdSetGun(gameObject, level, points, experience, next_lvl, indeces);
-            for(int i = 0;i < client_user.weapons.Length;i++)
-            {
-                if(!client_user.weapons[i])
-                {
-                    client_user.weapons[i] = this;
-                    break;
-                }
-            }
+            client_user.weapons.Add(this);
         }
     }
 

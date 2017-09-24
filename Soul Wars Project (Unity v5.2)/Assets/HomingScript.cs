@@ -16,15 +16,13 @@ public class HomingScript : MonoBehaviour
         prb = GetComponentInParent<Rigidbody>();
         ptr = GetComponentsInParent<Transform>()[1];//Index 0 actually returns this object's transform rather than bullet object's
     }
+
     void OnTriggerEnter(Collider Target)
     {
         if (!bullet_colliders.Contains(Target))
         {
             bullet_colliders.Add(Target);//Add the collider for consideration
-            bullet_colliders.RemoveAll(delegate (Collider col)//Remove destroyed colliders
-            {
-                return (!col);
-            });
+            bullet_colliders.RemoveNull();//Remove destroyed colliders 
             if (bullet_colliders.Count == 0)//If there are no colliders to consider,mark device as not homing
             {
                 homing = false;
@@ -46,12 +44,9 @@ public class HomingScript : MonoBehaviour
         if (bullet_colliders.Contains(Target))
         {
             bullet_colliders.Remove(Target);
-        /*If the main collider is out of homing range,and there are other
-         * targets in range,then choose the target that's closest to the bullet*/
-            bullet_colliders.RemoveAll(delegate (Collider col)//Remove destroyed colliders
-            {
-                return (!col);
-            });
+            /*If the main collider is out of homing range,and there are other
+             * targets in range,then choose the target that's closest to the bullet*/
+            bullet_colliders.RemoveNull();//Remove destroyed colliders
             if (bullet_colliders.Count == 0)//If there are no colliders to consider,mark device as not homing
             {
                 homing = false;

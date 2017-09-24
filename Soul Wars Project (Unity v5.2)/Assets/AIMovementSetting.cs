@@ -7,6 +7,10 @@ using UnityEngine;
 public partial class AIController : GenericController
 {
     public int movement_func_index = 0;
+    private Coordinate Path;//The path to take.
+    private Coordinate prev_start_coord;//Used in case the next start coord is null.(See
+    private Coordinate prev_end_coord;//Used in case the next end coord is null.
+    public bool can_dodge;
 
     public enum MovementMode
     {
@@ -168,36 +172,21 @@ public partial class AIController : GenericController
                     /* Debug.Log(Time.realtimeSinceStartup - tstart + " seconds : " +
                           queue.Count + " end routes considered : " +
                           start.GetNumParents() + " parents.");*/
-                    foreach(Coordinate c in start.GetParents())
-                    {
-                        if(c.status == Coordinate.Status.Hazard)
-                        {
-                            c.traverse_cost -= GetCoordinateDistFromTarget(c);
-                        }
-                    }
                     return start;
                 }
                 foreach (Coordinate coord in start.GetChildren())
-                {
-                    if (coord.status == Coordinate.Status.Safe)
-                    {
-                        coord.traverse_cost = GetCoordinateDistFromTarget(coord);
-                    }
-                    else
-                    {
-                        coord.traverse_cost += GetCoordinateDistFromTarget(coord);
-                    }
-
+                { 
+                    coord.traverse_cost = GetCoordinateDistFromTarget(coord);
                     if (!visited.Contains(coord))
                     {
                         coord.parent = start;
-                        queue.Enqueue(coord, coord.GetTotalCost());
+                        queue.Enqueue(coord, coord.GetTotalCost(can_dodge));
                         visited.Add(coord);
                     }
-                    else if (queue.Contains(coord) && coord.GetTotalCost(start) < queue.GetPriority(coord))
+                    else if (queue.Contains(coord) && coord.GetTotalCost(start,can_dodge) < queue.GetPriority(coord))
                     {
                         coord.parent = start;
-                        queue.UpdatePriority(coord, coord.GetTotalCost());
+                        queue.UpdatePriority(coord, coord.GetTotalCost(can_dodge));
                     }
 
 

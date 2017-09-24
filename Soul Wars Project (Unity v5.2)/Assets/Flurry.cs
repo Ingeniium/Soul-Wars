@@ -9,17 +9,24 @@ public class Flurry : Gun
     [SyncVar] public int num_bullets = 3;
     public List<ValueGroup[]> TrioList = new List<ValueGroup[]>();
     bool targ_recorded;
-    private readonly static string[] gun_ability_names = new string[15] { "Hunter", "Archer", null,
-                                                                         "Debris", "Boomerang", null,
-                                                                         "Shadow", "Arrows", null,
-                                                                         "Randomizer", "Seeker", null,
-                                                                         null, "Diverge",null}; 
-    private readonly static string[] gun_name_addons = new string[15] { "Precision", "Archery", null, 
-                                                                         "Perilous", "Psychic", null,
-                                                                         "Umbra", "Myriad", null,
-                                                                         "Random", "Potent", null,
-                                                                          null, "Divergent", null};
-    private readonly static string[] gun_ability_desc = new string[15] {
+    private readonly static string[] gun_ability_names = new string[15] 
+    {
+        "Hunter", "Archer", null,
+        "Debris", "Boomerang", null,
+        "Shadow", "Arrows", null,
+        "Randomizer", "Seeker", null,
+        null, "Diverge",null
+    }; 
+    private readonly static string[] gun_name_addons = new string[15]
+    {
+        "Precision", "Archery", null,
+        "Perilous", "Psychic", null,
+        "Umbra", "Myriad", null,
+        "Random", "Potent", null,
+        null, "Divergent", null
+    };
+    private readonly static string[] gun_ability_desc = new string[15] 
+    {
         "Hunter" + "\n Causes bullets that aren't" + "\n homing in on a target to" + "\n to reroute to another flurry " + "\n bullet's target.",
         "Archer" + "\n Bullets have a 50%" + "\n chance to be target piercing.",
         null,
