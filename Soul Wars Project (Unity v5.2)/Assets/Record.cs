@@ -47,14 +47,6 @@ class Record : MonoBehaviour
     public void SaveToFile()
     {
         PlayerController.Client.weapons.RemoveNull();
-        if (PlayerController.Client.weapons.FindAll(delegate (Gun g)
-         {
-             return g;
-         }).Count
-        < 2)
-        {
-            return;
-        }
         try
         {
             stream = new FileStream("SoulWars.xml", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
@@ -141,9 +133,6 @@ class Record : MonoBehaviour
                 item.PrepareItemForUse();
                 i++;
             }
-            PlayerController.Client.CmdSyncGunPos();
-
-
         }
         finally
         {
@@ -157,7 +146,6 @@ class Record : MonoBehaviour
 
     void SetUpNameInputField()
     {
-        Debug.Log(2);
         InputField f = name_input_show.GetComponentInChildren<InputField>();
         f.onEndEdit.AddListener(delegate (string s)
         {
@@ -169,6 +157,10 @@ class Record : MonoBehaviour
                     invalid = true;
                     break;
                 }
+            }
+            if (s == "")
+            {
+                invalid = true;
             }
             if (invalid)
             {
@@ -280,10 +272,10 @@ class Record : MonoBehaviour
                 PlayerController.Client.CmdEquipGun(gun.gameObject);
             }
         }
-        PlayerController.Client.CmdSyncGunPos();
         NetworkMethods.Instance.CmdSetLayer(PlayerController.Client.gameObject, 9);
         NetworkMethods.Instance.CmdSetEnabled(PlayerController.Client.gameObject, "PlayerController", true);
-
+        Button[] buttons = PlayerController.Client.player_interface_show.GetComponentsInChildren<Button>();
+        buttons[buttons.Length - 1].enabled = true;
         Destroy(weapon_choose_show.gameObject);
 
     }
@@ -297,6 +289,7 @@ class Record : MonoBehaviour
     {
         if (PlayerController.Client)
         {
+            Button[] buttons = PlayerController.Client.player_interface_show.GetComponentsInChildren<Button>();
             if (File.Exists("SoulWars.xml"))
             {
                 StartCoroutine(LoadFromFile());
@@ -306,9 +299,9 @@ class Record : MonoBehaviour
                 name_input_show = Instantiate(name_input, name_input.transform.position, name_input.transform.rotation) as Canvas;
                 NetworkMethods.Instance.CmdSetLayer(PlayerController.Client.gameObject, 15);
                 NetworkMethods.Instance.CmdSetEnabled(PlayerController.Client.gameObject, "PlayerController", false);
+                buttons[buttons.Length - 1].enabled = false;
                 SetUpNameInputField();
             }
-            Button[] buttons = PlayerController.Client.player_interface_show.GetComponentsInChildren<Button>();
             buttons[buttons.Length - 1].onClick.AddListener(delegate ()
             {
                 SaveToFile();

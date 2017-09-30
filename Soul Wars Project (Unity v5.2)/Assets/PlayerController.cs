@@ -1,5 +1,5 @@
 ﻿
-using System;
+using System.Collections.Generic;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -13,13 +13,28 @@ public class PlayerController : GenericController
         set
         {
             _player_name = value;
+            if (!name_display_show)
+            {
+                name_display_show = Instantiate(name_display) as GameObject;
+                HPbar bar = name_display_show.GetComponent<HPbar>();
+                bar.Object = gameObject;
+                bar.offset = new Vector3(0, 0, -5);
+            }
             name_display_show.GetComponentInChildren<Text>().text = value;
+            if (Client.netId == netId)
+            {
+                CmdSyncNameDisplay(value);
+                CmdGetOtherNameDisplays();
+            }
         }
     }
-    private string _player_name;
+    [SyncVar] public string _player_name;
+    [SyncVar] public uint shield_id;
+    private List<uint> synced_gun_ids = new List<uint>();
     public GameObject name_display;//Prefab of below
     public GameObject name_display_show;//Object that displays name
     public static PlayerController Client;//Static reference to the playercontroller that's connected client-side
+    private static List<PlayerController> players = new List<PlayerController>(); //For syncing non syncvar playercontroller across all clients.Chosen over synclist<uint> as those can't be static.
     public Text mod_text;//Text object that displays mods of units hovered-over by the mouse
     public Rigidbody rb;//Rigidbody attached to the object
     public Canvas cooldown_canvas;//Prefab of below
@@ -39,62 +54,28 @@ public class PlayerController : GenericController
     public Canvas player_interface_show;//The Object that's responsible for displaying things like health and shield bars
     public HealthDefence HP;//Health defence object
 
-    [Command]
-    void CmdSetShield()
+    public override void OnStartClient()
     {
-        RpcSetShield();
+        Debug.Log("Connected");
+        CmdAddPlayer();
     }
 
-    [ClientRpc]
-    void RpcSetShield()
+    public override void OnNetworkDestroy()
     {
-        StartCoroutine(SetShield());
-    }
-
-    [Command]
-    public void CmdApplyGunAbilities(GameObject obj,int index)
-    {
-        obj.GetComponent<Gun>().RpcApplyGunAbilities(index);
-    }
-
-
-    IEnumerator SetShield()
-    {
-        while (GetComponentsInChildren<HealthDefence>().Length < 2) //Waits until the shield is created on server
-        {
-            yield return new WaitForEndOfFrame();
-        }
-        Shield = GetComponentsInChildren<HealthDefence>()[1].gameObject;//Assigns reference to the shield(using the fact that it's a child)
-        HealthDefence SP = Shield.GetComponent<HealthDefence>();
-        SP.scale_factor = 2.5f;//Rescales obj
-        SP.Controller = this;//Makes a not of who owns it
-        /*This changes the shield bar from a local shield bar object to the main shield bar
-         provided that the player who owns it is the one who is connected locally.
-         Since player_interface_show would only be instantiated if Start() was executed
-         locally,the follwing check would be true only if the owner is playing locally on 
-         that instance of the game running.*/
-        if (player_interface_show)
-        {
-            SP.health_bar_show = player_interface_show.GetComponentsInChildren<Slider>()[3].gameObject as GameObject;
-            SP.hp_string = SP.health_bar_show.GetComponentInChildren<Text>();
-            SP.hp_string.text = "<b>" + SP.HP + "</b>";
-            SP.hp_bar = SP.health_bar_show.GetComponentInChildren<Slider>().GetComponent<RectTransform
-                >();
-            SP.maxWidth = SP.hp_bar.rect.width;
-        }
-
+        Debug.Log("done");
+        CmdRemovePlayer();
     }
 
     void Awake()
     {
-        name_display_show = Instantiate(name_display) as GameObject;
         HP = GetComponent<HealthDefence>();
         HP.Controller = this;
     }
 
-    void Start()
+    override protected void Start()
     {
         /*The code that follows operates locally on ONE client.*/
+        base.Start();
         if (!isLocalPlayer)
         {
             return;
@@ -130,20 +111,150 @@ public class PlayerController : GenericController
                 gameObject,
                 new Vector3(.87f, .134f, 0),
                 new Quaternion(0, 0, 0, 0));
-            CmdSetShield();
-            CmdSyncShieldPos();
+            StartCoroutine(SetShield());
         }
-        StartCoroutine(SetNameDisplay());
 
     }
 
-
-    IEnumerator SetNameDisplay()
+    [Command]
+    void CmdAddPlayer()
     {
-        yield return new WaitForSeconds(.3f);
-        CmdNameChange(true, _player_name);
+        RpcAddPlayer();
     }
 
+    [ClientRpc]
+    void RpcAddPlayer()
+    {
+        players.Add(this);
+    }
+
+    [Command]
+    void CmdRemovePlayer()
+    {
+        RpcRemovePlayer();
+    }
+
+    [ClientRpc]
+    void RpcRemovePlayer()
+    {
+        players.Remove(this);
+        if (name_display_show)
+        {
+            Destroy(name_display_show);
+        }
+        if (Shield)
+        {
+            Destroy(Shield);
+        }
+        foreach (Gun g in weapons)
+        {
+            if (g)
+            {
+                Destroy(g.gameObject);
+            }
+        }
+
+    }
+
+    [Command]
+    void CmdSyncNameDisplay(string name)
+    {
+        RpcSyncNameDisplay(name);
+    }
+
+    [ClientRpc]
+    void RpcSyncNameDisplay(string name)
+    {
+        player_name = name;
+    }
+
+    [Command]
+    void CmdGetOtherNameDisplays()
+    {
+        RpcGetOtherNameDisplays();
+    }
+
+    [ClientRpc]
+    void RpcGetOtherNameDisplays()
+    {
+        foreach (PlayerController p in players)
+        {
+            p.player_name = _player_name;
+        }
+    }
+
+    [Command]
+    public void CmdApplyGunAbilities(GameObject obj, int index)
+    {
+        obj.GetComponent<Gun>().RpcApplyGunAbilities(index);
+    }
+
+    [Command]
+    void CmdSyncGun(GameObject obj)
+    {
+        RpcSyncGun(obj);
+    }
+
+    [ClientRpc]
+    void RpcSyncGun(GameObject obj)
+    {
+        uint ID = obj.GetComponent<NetworkBehaviour>().netId.Value;
+        if (!synced_gun_ids.Contains(ID))
+        {
+            synced_gun_ids.Add(ID);
+            StartCoroutine(SyncGunPos(obj.GetComponent<Gun>()));
+        }     
+    }    
+
+    protected override void StartShieldBlocking()
+    {
+        if (!Shield)
+        {
+            Shield = ClientScene.FindLocalObject(
+                new NetworkInstanceId(shield_id));
+            HealthDefence SP = Shield.GetComponent<HealthDefence>();
+            SP.scale_factor = 2.5f;
+            SP.Controller = this;
+            StartCoroutine(SyncShieldPos());
+        }
+        base.StartShieldBlocking();
+    }
+
+
+    IEnumerator SetShield()
+    {
+        while (GetComponentsInChildren<HealthDefence>().Length < 2) //Waits until the shield is created on server
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        Shield = GetComponentsInChildren<HealthDefence>()[1].gameObject;
+        HealthDefence SP = Shield.GetComponent<HealthDefence>();
+        SP.scale_factor = 2.5f;//Rescales obj
+        SP.Controller = this;//Makes a not of who owns it
+                             //Assigns reference to the shield(using the fact that it's a child)
+                             /*This changes the shield bar from a local shield bar object to the main shield bar
+                              provided that the player who owns it is the one who is connected locally.
+                              since player_interface_show would only be instantiated if Start() was executed
+                              locally,the follwing check would be true only if the owner is playing locally on 
+                              that instance of the game running.*/
+        if (player_interface_show)
+        {
+            SP.health_bar_show = player_interface_show.GetComponentsInChildren<Slider>()[3].gameObject as GameObject;
+            SP.hp_string = SP.health_bar_show.GetComponentInChildren<Text>();
+            SP.hp_string.text = "<b>" + SP.HP + "</b>";
+            SP.hp_bar = SP.health_bar_show.GetComponentInChildren<Slider>().GetComponent<RectTransform
+                >();
+            SP.maxWidth = SP.hp_bar.rect.width;
+        }
+        StartCoroutine(SyncShieldPos());
+        CmdSetShieldIdOnServer(Shield);
+    }
+
+    [Command]
+    void CmdSetShieldIdOnServer(GameObject obj)
+    {
+        shield_id = obj.GetComponent<NetworkBehaviour>().netId.Value;
+    }
 
     [Command]
     void CmdShoot()
@@ -158,7 +269,6 @@ public class PlayerController : GenericController
         catch (System.NullReferenceException e)
         {
 
-
         }
     }
 
@@ -166,31 +276,6 @@ public class PlayerController : GenericController
     public void CmdSetGun(GameObject g, int _level, uint _points, int _experience, int _next_level, int[] indeces)
     {
         g.GetComponent<Gun>().RpcSetGun(_level, _points, _experience, _next_level, indeces);
-    }
-
-    [Command]
-    public void CmdDestroy(GameObject g)
-    {
-        NetworkServer.Destroy(g);
-    }
-
-
-    [Command]
-    void CmdNameChange(bool again, string name)
-    {
-        RpcNameChange(again, name);
-    }
-
-
-    [ClientRpc]
-    void RpcNameChange(bool again, string name)
-    {
-        name_display_show.GetComponentInChildren<Text>().text = name;
-        name_display_show.GetComponent<HPbar>().Object = this.gameObject;
-        if (again)
-        {
-            Client.CmdNameChange(false, name);
-        }
     }
 
     void Update()
@@ -208,26 +293,27 @@ public class PlayerController : GenericController
             if (index != -1)
             {
                 CmdEquipGun(weapons[index].gameObject);
+                CmdSyncGun(weapons[index].gameObject);
                 StartCoroutine(weapons[index].item_image_show.GetComponentInChildren<ItemImage>().Cooldown(weapons[index].reload_time));
                 CmdShoot();
             }
         }
-       else if (Input.GetMouseButton(1) && !blocking)
-       {
-            CmdStartShieldBlocking();         
-       }
-       else if (!Input.GetMouseButton(1) && blocking)                                
-       {
+        else if (Input.GetMouseButtonDown(1) && !blocking)
+        {
+            CmdStartShieldBlocking();
+        }
+        else if (!Input.GetMouseButtonDown(1) && blocking)
+        {
             CmdEndShieldBlocking();
-       }
+        }
 
-            
+
     }
-        
-	
-	
-	// Update is called once per frame
-	void FixedUpdate ()
+
+
+
+    // Update is called once per frame
+    void FixedUpdate()
     {
         if (isLocalPlayer)
         {
@@ -241,33 +327,22 @@ public class PlayerController : GenericController
      so the following functions are designed to somewhat mitigate the problem by removing their 
      child status.This sync soultion is also the reason why they no longer have netwwork 
      transforms*/
-    [Command]
-    void CmdSyncShieldPos() 
-    {
-        RpcSyncShieldPos();
-    }
-
-    [ClientRpc]
-    void RpcSyncShieldPos()
-    {
-        StartCoroutine(SyncShieldPos());
-    }
 
     IEnumerator SyncShieldPos()
     {
-        while(!Shield)
+        while (!Shield)
         {
             yield return new WaitForEndOfFrame();
         }
         Shield.GetComponent<NetworkTransform>().enabled = false;
         Shield.transform.parent = null;
-        while(this)
+        while (this)
         {
             yield return new WaitForFixedUpdate();
             float x;
             float z;
             float rot;
-            if(!blocking)
+            if (!blocking)
             {
                 x = transform.right.x;
                 z = transform.right.z;
@@ -289,47 +364,29 @@ public class PlayerController : GenericController
             Shield.transform.position -= dif;
         }
     }
-    
-    [Command]
-    public void CmdSyncGunPos()
+
+    public IEnumerator SyncGunPos(Gun gun)
     {
-        RpcSyncGunPos();
+        gun.transform.SetParent(null);
+        gun.GetComponent<NetworkTransform>().enabled = false;
+        while (this)
+        {
+            yield return new WaitForFixedUpdate();
+            if (gun)
+            {
+                Vector3 proj = new Vector3(transform.forward.x + transform.position.x,
+                transform.position.y,
+                transform.forward.z + transform.position.z);
+                gun.transform.rotation = transform.rotation;
+                gun.transform.position = proj;
+                Vector3 dif = gun.transform.position - transform.position;
+                dif /= 2;
+                gun.transform.position -= dif;
+            }
+
+        }
     }
 
-    [ClientRpc]
-    void RpcSyncGunPos()
-    {
-        StartCoroutine(SyncGunPos());
-    }
 
-    public IEnumerator SyncGunPos()
-    {       
-         Gun[] children = GetComponentsInChildren<Gun>();
-         foreach (Gun g in children)
-         {
-            g.transform.SetParent(null);
-            g.GetComponent<NetworkTransform>().enabled = false;
-         }
-         while (this)
-         {
-             yield return new WaitForFixedUpdate();
-             foreach (Gun g in children)
-             {
-                 if (g)
-                 {
-                     Vector3 proj = new Vector3(transform.forward.x + transform.position.x,
-                     transform.position.y,
-                     transform.forward.z + transform.position.z);
-                     g.transform.rotation = transform.rotation;
-                     g.transform.position = proj;
-                     Vector3 dif = g.transform.position - transform.position;
-                     dif /= 2;
-                     g.transform.position -= dif;
-                 }
-             }
-         }
-    }
-    
 
-  
 }

@@ -31,7 +31,7 @@ public class Flurry : Gun
         "Archer" + "\n Bullets have a 50%" + "\n chance to be target piercing.",
         null,
 
-        "Debris" + "\n Causes bullets to enlarge and" + "\n stop moving after 1.5 seconds.",
+        "Debris" + "\n Causes bullets to enlarge and" + "\n move and turn at half speed" + "\n after 1.5 seconds",
         "Boomerang" + "\n Causes bullets to pierce" + "\n its first target and" + "\n return to its firing position.",
         null,
 
@@ -159,13 +159,14 @@ public class Flurry : Gun
     private static IEnumerator Debris(Gun gun, BulletScript script)
     {
         script.lasting_time *= 2;
-        yield return new WaitForSeconds(1.5f);
-        Destroy(script.homer);
+        yield return new WaitForSeconds(1f);
+        script.homer.GetComponent<HomingScript>().home_speed /= 2;
+        script.transform.position = new Vector3(
+            script.transform.position.x,
+            script.transform.position.y + 2,
+            script.transform.position.z);
         NetworkMethods.Instance.RpcSetScale(script.gameObject, Vector3.one * 2);
-        if (script.rb)
-        {
-            script.GetComponent<Rigidbody>().velocity = Vector3.zero;
-        }
+        script.GetComponent<Rigidbody>().velocity /= 2;
     }
 
 
