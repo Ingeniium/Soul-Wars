@@ -163,7 +163,7 @@ public class Flurry : Gun
         script.homer.GetComponent<HomingScript>().home_speed /= 2;
         script.transform.position = new Vector3(
             script.transform.position.x,
-            script.transform.position.y + 2,
+            script.transform.position.y + .75f,
             script.transform.position.z);
         NetworkMethods.Instance.RpcSetScale(script.gameObject, Vector3.one * 2);
         script.GetComponent<Rigidbody>().velocity /= 2;

@@ -12,6 +12,11 @@ public struct ValueGroup//Unity doesn't support Tuple
         index = i;
         value = v;
     }
+
+    public override string ToString()
+    {
+        return index.ToString() + " : " + value.ToString();
+    }
 }
 
 public struct ValueGroup<I,T>
@@ -22,6 +27,11 @@ public struct ValueGroup<I,T>
     {
        index = i;
        value = t;
+    }
+
+    public override string ToString()
+    {
+        return index.ToString() + " : " + value.ToString();
     }
 
 }

@@ -21,7 +21,6 @@ public class ItemImage : MonoBehaviour {
         }                       
     }
     public Item _item_script;
-    public Canvas item_description_canvas;
     private Canvas item_descritption_canvas_show;
     public bool option_showing = false;
     protected Canvas item_options_show;//Canvas for showing item options upon right click
@@ -100,9 +99,10 @@ public class ItemImage : MonoBehaviour {
 
     public void OnPointerEnter()
     {
-         item_descritption_canvas_show = Instantiate(item_description_canvas, transform.position + new Vector3(1.5f, 0, 1.75f), item_description_canvas.transform.rotation) as Canvas;
-         item_descritption_canvas_show.transform.parent = transform;
-         item_descritption_canvas_show.GetComponentInChildren<Text>().text = item_script.ToString();     
+        item_descritption_canvas_show = TextBox.Instance.CreateDescBox(
+            transform,
+            transform.position + new Vector3(1.5f, 0, 1.75f), 
+            item_script.ToString());  
     }
     
     public void OnPointerDown()

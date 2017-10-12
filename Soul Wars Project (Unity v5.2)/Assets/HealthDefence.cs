@@ -54,7 +54,10 @@ public class HealthDefence : NetworkBehaviour {
                         {
                             NetworkMethods.Instance.RpcSetEnabled(gameObject, "Collider", false);
                         }
-                        hp_string.text = "<b>" + HP + "</b>";
+                        if (hp_string)
+                        {
+                            hp_string.text = "<b>" + HP + "</b>";
+                        }
                         regeneration = true;
                         NetworkMethods.Instance.RpcSetColor(gameObject, Color.red);
                         StartCoroutine(Regeneration());
@@ -94,27 +97,51 @@ public class HealthDefence : NetworkBehaviour {
     [SyncVar] public double burn_resistance;
     [SyncVar] public double mezmerize_resistance;
     [SyncVar] public double sunder_resistance;
-    [SyncVar] bool chilling;
-    [SyncVar] bool burning;
-    [SyncVar] bool mezmerized;
-    [SyncVar] bool stunned;
-    [SyncVar] bool sundered;
-    public float standing_power
+    public bool chilling
     {
-        get { return _standing_power; }
-        set
+        get { return _chilling; }
+        private set
         {
-            _standing_power = value;
-            if (_standing_power <= 0)
-            {
-                _standing_power = max_standing_power;
-                StartCoroutine(SpawnManager.Blink(gameObject, .75f));
-            }
+            _chilling = value;
         }
     }
-    
-    private float _standing_power;
-    public float max_standing_power = 10;
+    public bool burning
+    {
+        get { return _burning; }
+        private set
+        {
+            _burning = value;
+        }
+    }
+    public bool mezmerized
+    {
+        get { return _mezmerized; }
+        private set
+        {
+            _mezmerized = value;
+        }
+    }
+    public bool stunned
+    {
+        get { return _stunned; }
+        private set
+        {
+            _stunned = value;
+        }
+    }
+    public bool sundered
+    {
+        get { return _sundered; }
+        private set
+        {
+            _sundered = value;
+        }
+    }
+    bool _chilling;
+    bool _burning;
+    bool _mezmerized;
+    bool _stunned;
+    bool _sundered;
     public Rigidbody rb;
     public GenericController Controller;
     private float _scale_factor;
@@ -135,7 +162,6 @@ public class HealthDefence : NetworkBehaviour {
     public Text hp_string;
     public RectTransform hp_bar;
     public float maxWidth;
-    public bool has_drops;
     public bool has_exp = true;
     public float exp_rate = .5f;
     public double gun_drop_chance;

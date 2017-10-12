@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections;
+﻿using UnityEngine.Networking;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -55,6 +53,7 @@ public class RespawnInterface : MonoBehaviour
     void Awake()
     {
         Instance = this;
+        enabled = false;
     }
 
     void Update()
@@ -73,7 +72,7 @@ public class RespawnInterface : MonoBehaviour
             game_over_show.worldCamera = PlayerController.Client.cam_show;
             enabled = false;
         }
-        if (!wait_for_respawn_show && !choose_respawn_location_show)
+        else if (!wait_for_respawn_show && !choose_respawn_location_show)
         {
             if (SpawnManager.AllySpawnPoints.Count > 1)
             {

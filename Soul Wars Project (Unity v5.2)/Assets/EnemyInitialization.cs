@@ -45,21 +45,31 @@ public class EnemyInitialization : NetworkBehaviour
         {AddHealth},
         {AddDefence},
         {AddShieldDefence},
-        {AddShieldHealth},  
-        {AddBurnStrength}
+        {AddShieldHealth},
+        {AddHealth},
+        {AddDefence},
+        {AddShieldDefence},
+        {AddShieldHealth},
+        {AddBurnStrength},
+        {AddExp}
     };
 
     private List<Action<AIController>> CadetMods = new List<Action<AIController>>()
     {
+        { AddHealth},
+        { AddHealth},
+        {AddHealth},
         {AddHealth},
         {AddProjectileSpeed},
-        {AddPrecision},
-        {AddShieldHealth},  
+        {AddPrecision}, 
         {AddChillStrength}
     };
 
     private List<Action<AIController>> FighterMods = new List<Action<AIController>>()
     {
+        {AddHealth},
+        {AddHealth},
+        {AddHealth},
         {AddCritical},
         {AddPrecision},
         {AddPotentialDamage},
@@ -69,8 +79,12 @@ public class EnemyInitialization : NetworkBehaviour
 
     private List<Action<AIController>> AccursedMods = new List<Action<AIController>>()
     {
+        {AddHealth},
+        {AddDefence},
+        {AddShieldHealth},
         {AddMezmerizeResistance},
-        {AddMezmerizeStrength}
+        {AddMezmerizeStrength},
+        {AddChillResistance }
     };
 
     private List<Action<AIController>> MiscMods = new List<Action<AIController>>()
@@ -78,14 +92,14 @@ public class EnemyInitialization : NetworkBehaviour
         {AddLevel}
     };
 
-    void Awake()
+    /*void Awake()
     {
        /* EnemyGroup e = GetComponent<EnemyGroup>();
         for(int i = 0;i < 30;i++)
         {
             Item.CopyComponent(e, gameObject);
-        } */       
-    }
+        }      
+    } */
 
 
     [ServerCallback]
@@ -100,6 +114,7 @@ public class EnemyInitialization : NetworkBehaviour
         {
             Enemy = Instantiate(e.Enemy, e.pos, Quaternion.identity) as GameObject;
             AIController Unit = Enemy.GetComponentInChildren<AIController>();
+            StartCoroutine(Unit.SetState(e.AISetting));
             if (e.can_block)
             {
                 Shield = Instantiate(Resources.Load("Bronze Shield"), e.pos, Quaternion.identity) as GameObject;
@@ -618,10 +633,10 @@ public class EnemyInitialization : NetworkBehaviour
     {
        
         ModDisplay display = AI.GetComponentInParent<ModDisplay>();
-        int n = rand.Next(10);
-        while(n == 2 || n == 5 || n == 8 || n == 11)
+        int n = rand.Next(11);
+        while((n == 2 || n == 5 || n == 8 || n == 11))
         {
-            n = rand.Next(10);
+            n = rand.Next(11);
         }
         foreach (Gun g in AI.weapons)
         {
@@ -660,19 +675,17 @@ public class EnemyInitialization : NetworkBehaviour
     {
 
         ModDisplay display = AI.GetComponentInParent<ModDisplay>();
-        int n = rand.Next(10);
-        while (n == 2 || n == 5 || n == 8 || n == 11)
-        {
-            n = rand.Next(10);
-        }
         for(int i = 0; i < gun.level;i++)
         {
-            if(!gun.claimed_gun_ability.Contains(i)
-                && gun.ClassGunMods(i) != null)
+            int n = rand.Next(11);
+            while ((!(gun is Strike) 
+                && (n == 2 || n == 5 || n == 8 || n == 11))
+                || gun.claimed_gun_ability.Contains(n))
             {
-                gun.claimed_gun_ability.Add(i);
-                gun.Claimed_Gun_Mods += gun.ClassGunMods(i);
+                n = rand.Next(11);
             }
+           gun.claimed_gun_ability.Add(n);
+           gun.Claimed_Gun_Mods += gun.ClassGunMods(n);          
         }
         int index = display.Mods.Count;
         display.Mods.Add("\r\n Level " + gun.level + " " + gun.GetBaseName());

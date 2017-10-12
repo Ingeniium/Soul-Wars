@@ -27,7 +27,7 @@ public abstract class Item : NetworkBehaviour,IRecordable
     public GameObject item_image_show;//Reference to item image instance
     protected static System.Random rand = new System.Random();
 	public delegate void Options();
-    public PlayerController _client_user;//this being protected actually causes a null ref error in bulletscript
+    protected PlayerController _client_user;
     public PlayerController client_user
     {
         get { return _client_user; }

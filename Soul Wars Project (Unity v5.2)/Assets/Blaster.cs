@@ -8,15 +8,15 @@ public class Blaster : Gun
 {
     private readonly static string[] gun_ability_names = new string[12] 
     {
-        "Brigadier", "Gunslinger", null,
-        "Sunder", "Curve", null,
+        "Brigadier", "Gunslinger", "Destroyer",
+        "Sunder", "Curve", "Bounce",
         "Quake", "Tremor", null,
         "Meteor", "Comet", null
     };                           
     private readonly static string[] gun_name_addons = new string[12] 
     {
-        "Punishment", "The Force", null,
-        "Sundering", "Homing", null,
+        "Punishment", "The Force", "Destruction",
+        "Sundering", "Homing", "Rebounding",
         "Robust", "Intense", null,
         "Meteor", "Comet", null
     };
@@ -24,11 +24,11 @@ public class Blaster : Gun
     {
         "Brigadier" + "\n Does 150% damage to" + "\n spawn points and shields.",
         "Gunslinger" + "\n Causes a 2 second stun.",
-        null,
+        "Destroyer" + "\n Does 30% more damage for" + "\n each status effect the target" + "\n currently suffers.",
 
         "Sunder" + "\n + 10 Sunder Power.",
         "Curve" + "\n Grants slight homing ability.",
-        null,
+        "Bounce" + "\n Causes bullets to bounce on impact" + "\n and quadruples bullet lifetime.",
 
         "Quake" + "\n Does moderate damage " + "\n that's based on the gun to nearby targets.",
         "Tremor" + "\n Stuns nearby foes for 1 second.",
@@ -44,11 +44,11 @@ public class Blaster : Gun
     {
         Brigadier,
         Gunslinger,
-        null,
+        Destroyer,
 
         Sunder,
         Curve,
-        null,
+        Bounce,
 
         Quake,
         Tremor,
@@ -197,6 +197,69 @@ public class Blaster : Gun
         rb.velocity *= 3;
         script.coroutines_running--;
         yield return null;
+    }
+
+    private static IEnumerator Bounce(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        script.can_bounce = true;
+        script.lasting_time *= 4;
+        script.coroutines_running--;
+        yield return new WaitForFixedUpdate();
+        Vector3 original_velocity = script.rb.velocity;
+        while (script)
+        {
+            while (!script.damaging)
+            {
+                yield return new WaitForEndOfFrame();
+            }
+            script.rb.velocity = new Vector3(script.rb.velocity.x,
+                                             0,
+                                             script.rb.velocity.z);
+            if (script.rb.velocity.magnitude < original_velocity.magnitude)
+            {
+                script.rb.velocity = script.rb.velocity.normalized * original_velocity.magnitude;
+            }
+            yield return new WaitForFixedUpdate();
+        }      
+
+    }
+
+    private static IEnumerator Destroyer(Gun gun, BulletScript script)
+    {
+        script.coroutines_running++;
+        while(!script.Target)
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        float multiplier = 1;
+        if(script.Target.chilling)
+        {
+            multiplier += .3f;
+        }
+        if (script.Target.burning)
+        {
+            multiplier += .3f;
+        }
+        if (script.Target.mezmerized)
+        {
+            multiplier += .3f;
+        }
+        if (script.Target.stunned)
+        {
+            multiplier += .3f;
+        }
+        if (script.Target.sundered)
+        {
+            multiplier += .3f;
+        }
+        float upper = script.upper_bound_damage;
+        float lower = script.lower_bound_damage;
+        upper *= multiplier;
+        lower *= multiplier;
+        script.upper_bound_damage = (int)upper;
+        script.lower_bound_damage = (int)lower;
+        script.coroutines_running--;
     }
     
     protected override string GunAbilityDesc(int index)

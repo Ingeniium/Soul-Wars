@@ -52,12 +52,11 @@ public partial class AIController : GenericController {
     }
 
     [ServerCallback]
-    void Start()
+    protected override void Start()
     {
-
+        base.Start();
         enemy_attack_detection = GetComponent<SphereCollider>();
         PlayersAlive.Instance.Units.Add(this);
-        State = new Conquer(this);
         prb = GetComponentInParent<Rigidbody>();
         StartCoroutine(WaitForPlayers());
 
@@ -96,6 +95,10 @@ public partial class AIController : GenericController {
     [ServerCallback]
     void FixedUpdate()
     {
+        if(State == null)
+        {
+            return;
+        }
         State.AffirmTarget(Target);
         if (Target)
         {
@@ -127,7 +130,7 @@ public partial class AIController : GenericController {
     {
         /*If a player or spawn point was detected within aggro radius,
          react based on State instructions*/
-        if (col.gameObject.layer == LayerMask.NameToLayer("Ally"))
+        if (State != null && (col.gameObject.layer == LayerMask.NameToLayer("Ally")))
         {
             State.UnitAggroReaction(col);
         }
@@ -168,11 +171,14 @@ public partial class AIController : GenericController {
                     Vector3.Distance(col.gameObject.transform.position, ptr.position))
                     < 2f)
                 {
+                    float start_block = Time.realtimeSinceStartup;
+                    float max_block_time_allowed = 2;
                     /*Look at the bullet and block until it disappears.*/
                     target_focus = false;
                     StartShieldBlocking();
                     ptr.LookAt(col.transform);
-                    while (col)
+                    while (col 
+                        && Time.realtimeSinceStartup < start_block + max_block_time_allowed)
                     {
                         yield return new WaitForFixedUpdate();
                     }

@@ -32,9 +32,10 @@ public class BulletScript : NetworkBehaviour {
             GetComponent<Collider>().isTrigger = value;
         }
     }
-    bool _can_pierce;
+    private bool _can_pierce;
+    public bool can_bounce = false;
     public float lasting_time = 3f;
-    bool damaging = false;
+    public bool damaging = false;
     public HealthDefence Target;
     public Rigidbody rb;
     public static List<ValueGroup<Coordinate, BulletScript>> BulletCoords = new List<ValueGroup<Coordinate, BulletScript>>();
@@ -64,7 +65,7 @@ public class BulletScript : NetworkBehaviour {
         HomingScript script = homer.GetComponent<HomingScript>();
         script.home_speed = home_speed;
         StartCoroutine(WaitForNetworkDestruction());
-        if(gun_reference.GetComponentInParent<PlayerController>())
+        if(gun_reference.client_user)
         {
             StartCoroutine(RecordBulletCoord());
         }
@@ -173,6 +174,7 @@ public class BulletScript : NetworkBehaviour {
         {
             yield return new WaitForEndOfFrame();
         }
+        GetComponent<Collider>().enabled = false;
         foreach(Coordinate c in path_coords)
         {
             c.status = Coordinate.Status.Safe;
@@ -352,28 +354,29 @@ public class BulletScript : NetworkBehaviour {
                     {
                         Target.GetComponent<Rigidbody>().velocity = Vector3.zero;
                     }
-                    AIController AI = Target.Controller as AIController;
+                    AIController AI = Target.GetComponentInParent<AIController>();
                     if (AI != null)
                     {
-                        //AI.UpdateAggro(d, gun_reference.transform.parent.gameObject.GetComponent<NetworkBehaviour>().netId);
+                        AI.UpdateAggro(d, gun_reference.client_user.netId);
                     }
                     Target.HP -= d;
                 }
             }
-            /*If target is null or hit enemy detetion*/
-            else if ((col && !col.isTrigger) || (hit != null && !hit.gameObject.GetComponent<Collider>().isTrigger))
+            /*If target is null or hit enemy detetion
+           /* else if ((col && !col.isTrigger) || (hit != null && !hit.gameObject.GetComponent<Collider>().isTrigger))
             {
                 /* Before destruction,Stop all coroutines(the gun_abilities operating on this instance)
-                 to prevent exceptions from those coroutines*/
+                 to prevent exceptions from those coroutines
                 foreach (Coordinate c in path_coords)
                 {
                     c.status = Coordinate.Status.Safe;
                 }
                 StopAllCoroutines();
                 NetworkServer.Destroy(gameObject);
-            }
-            if (!can_pierce)
+            }  */
+            if (!can_pierce && !can_bounce)
             {
+                GetComponent<Collider>().enabled = false;
                 foreach (Coordinate c in path_coords)
                 {
                     c.status = Coordinate.Status.Safe;
@@ -381,6 +384,7 @@ public class BulletScript : NetworkBehaviour {
                 }
                 NetworkServer.Destroy(gameObject);
             }
+            
             damaging = false;
         }
     }

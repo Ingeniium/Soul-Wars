@@ -7,7 +7,7 @@ using UnityEngine.UI;
 
 public class PlayerController : GenericController
 {
-    public string player_name//Name of the player to display
+    public string player_name//Property responsible for syncing name displays
     {
         get { return _player_name; }
         set
@@ -21,6 +21,9 @@ public class PlayerController : GenericController
                 bar.offset = new Vector3(0, 0, -5);
             }
             name_display_show.GetComponentInChildren<Text>().text = value;
+            /*A call to sync is made only if the name is being set by the player himself.
+              This ensures that at the start of the game,the names of others are correctly
+              displayed,and other players know his name.*/
             if (Client.netId == netId)
             {
                 CmdSyncNameDisplay(value);
@@ -28,11 +31,11 @@ public class PlayerController : GenericController
             }
         }
     }
-    [SyncVar] public string _player_name;
+    [SyncVar] public string _player_name;//Name of the player to display
     [SyncVar] public uint shield_id;
-    private List<uint> synced_gun_ids = new List<uint>();
+    private List<uint> synced_gun_ids = new List<uint>();//For keeping track of which guns are being synced within a client side instance of the game
     public GameObject name_display;//Prefab of below
-    public GameObject name_display_show;//Object that displays name
+    private GameObject name_display_show;//Object that displays name
     public static PlayerController Client;//Static reference to the playercontroller that's connected client-side
     private static List<PlayerController> players = new List<PlayerController>(); //For syncing non syncvar playercontroller across all clients.Chosen over synclist<uint> as those can't be static.
     public Text mod_text;//Text object that displays mods of units hovered-over by the mouse
@@ -52,23 +55,20 @@ public class PlayerController : GenericController
     public bool equip_action = true;//Whether player can act or not.Useful when dealing with ui buttons
     public Canvas player_interface;//Prefab of below
     public Canvas player_interface_show;//The Object that's responsible for displaying things like health and shield bars
-    public HealthDefence HP;//Health defence object
 
     public override void OnStartClient()
     {
-        Debug.Log("Connected");
         CmdAddPlayer();
     }
 
     public override void OnNetworkDestroy()
     {
-        Debug.Log("done");
         CmdRemovePlayer();
     }
 
     void Awake()
     {
-        HP = GetComponent<HealthDefence>();
+        HealthDefence HP = GetComponent<HealthDefence>();
         HP.Controller = this;
     }
 
@@ -82,31 +82,10 @@ public class PlayerController : GenericController
         }
         else
         {
-            cam_show = Instantiate(cam) as Camera;
-            if (cam_show.GetComponent<AudioListener>())
-            {
-                Destroy(cam_show.GetComponent<AudioListener>());
-            }
-
-            player_interface_show = Instantiate(player_interface) as Canvas;
-            player_interface_show.worldCamera = cam_show;
-            cam_show.GetComponent<PlayerFollow>().Player = this;
-
+            InitializeCamera();
+            InitializePlayerInterface();
             Client = this;
-
             rb = GetComponent<Rigidbody>();
-            if (cam_show && cam_show.enabled)
-            {
-                cam_show.transform.rotation = cam.transform.rotation;
-            }
-
-            HP.health_bar_show = player_interface_show.GetComponentsInChildren<Slider>()[1].gameObject as GameObject;
-            HP.hp_string = HP.health_bar_show.GetComponentInChildren<Text>();
-            HP.hp_string.text = "<b>" + HP.HP + "</b>";
-            HP.hp_bar = HP.health_bar_show.GetComponentInChildren<Slider>().GetComponent<RectTransform
-                >();
-            HP.maxWidth = HP.hp_bar.rect.width;
-            mod_text = player_interface_show.GetComponentInChildren<Text>();
             NetworkMethods.Instance.CmdSpawn("Bronze Shield",
                 gameObject,
                 new Vector3(.87f, .134f, 0),
@@ -114,6 +93,38 @@ public class PlayerController : GenericController
             StartCoroutine(SetShield());
         }
 
+    }
+    
+    /*Code for instantiating and making the camera properly "follow"
+     the player.*/
+    void InitializeCamera()
+    {
+        cam_show = Instantiate(cam) as Camera;
+        if (cam_show.GetComponent<AudioListener>())
+        {
+            Destroy(cam_show.GetComponent<AudioListener>());
+        }
+        player_interface_show = Instantiate(player_interface) as Canvas;
+        player_interface_show.worldCamera = cam_show;
+        cam_show.GetComponent<PlayerFollow>().Player = this;
+        if (cam_show && cam_show.enabled)
+        {
+            cam_show.transform.rotation = cam.transform.rotation;
+        }
+    }
+
+    /*Code for actually syncing health bar values to the actual health of the player,
+     as well as setting up mod text to be displayed*/
+    void InitializePlayerInterface()
+    {
+        HealthDefence HP = GetComponent<HealthDefence>();
+        HP.health_bar_show = player_interface_show.GetComponentsInChildren<Slider>()[1].gameObject as GameObject;
+        HP.hp_string = HP.health_bar_show.GetComponentInChildren<Text>();
+        HP.hp_string.text = "<b>" + HP.HP + "</b>";
+        HP.hp_bar = HP.health_bar_show.GetComponentInChildren<Slider>().GetComponent<RectTransform
+            >();
+        HP.maxWidth = HP.hp_bar.rect.width;
+        mod_text = player_interface_show.GetComponentInChildren<Text>();
     }
 
     [Command]
@@ -156,6 +167,8 @@ public class PlayerController : GenericController
 
     }
 
+    /*For syncing the names of one game instance
+     with other game instances.*/
     [Command]
     void CmdSyncNameDisplay(string name)
     {
@@ -168,6 +181,7 @@ public class PlayerController : GenericController
         player_name = name;
     }
 
+    /*For getting the names of other players*/
     [Command]
     void CmdGetOtherNameDisplays()
     {
@@ -188,23 +202,6 @@ public class PlayerController : GenericController
     {
         obj.GetComponent<Gun>().RpcApplyGunAbilities(index);
     }
-
-    [Command]
-    void CmdSyncGun(GameObject obj)
-    {
-        RpcSyncGun(obj);
-    }
-
-    [ClientRpc]
-    void RpcSyncGun(GameObject obj)
-    {
-        uint ID = obj.GetComponent<NetworkBehaviour>().netId.Value;
-        if (!synced_gun_ids.Contains(ID))
-        {
-            synced_gun_ids.Add(ID);
-            StartCoroutine(SyncGunPos(obj.GetComponent<Gun>()));
-        }     
-    }    
 
     protected override void StartShieldBlocking()
     {
@@ -272,10 +269,13 @@ public class PlayerController : GenericController
         }
     }
 
+    /*Since guns are chosen on client-side,this is needed to make stat changes on server*/
     [Command]
     public void CmdSetGun(GameObject g, int _level, uint _points, int _experience, int _next_level, int[] indeces)
     {
-        g.GetComponent<Gun>().RpcSetGun(_level, _points, _experience, _next_level, indeces);
+        Gun gun = g.GetComponent<Gun>();
+        gun.RpcSetGun(_level, _points, _experience, _next_level, indeces);
+        gun.client_user = this;
     }
 
     void Update()
@@ -284,26 +284,28 @@ public class PlayerController : GenericController
         {
             return;
         }
-        if ((Input.inputString.Contains("q") || (Input.GetMouseButton(0) && Input.inputString.Contains("")) && !blocking))
+        int index = weapons.FindIndex(delegate (Gun g)
         {
-            int index = weapons.FindIndex(delegate (Gun g)
-            {
-                return (g && g.button == Input.inputString);
-            });
-            if (index != -1)
-            {
-                CmdEquipGun(weapons[index].gameObject);
-                CmdSyncGun(weapons[index].gameObject);
-                StartCoroutine(weapons[index].item_image_show.GetComponentInChildren<ItemImage>().Cooldown(weapons[index].reload_time));
-                CmdShoot();
-            }
-        }
-        else if (Input.GetMouseButtonDown(1) && !blocking)
+            return (g 
+            && (Input.inputString.Contains(g.button)
+            || (Input.GetMouseButton(0) 
+            && g.button == "LMB")));
+        });
+        if (index != -1 && !blocking)
+        {
+            CmdEquipGun(weapons[index].gameObject);
+            CmdSyncGun(weapons[index].gameObject);
+            StartCoroutine(weapons[index].item_image_show.GetComponentInChildren<ItemImage>().Cooldown(weapons[index].reload_time));
+            CmdShoot();
+        }      
+        else if (Input.GetMouseButton(1) && !blocking)
         {
             CmdStartShieldBlocking();
+            blocking = true;
         }
-        else if (!Input.GetMouseButtonDown(1) && blocking)
+        else if (!Input.GetMouseButton(1) && blocking)
         {
+            blocking = false;
             CmdEndShieldBlocking();
         }
 
@@ -365,7 +367,24 @@ public class PlayerController : GenericController
         }
     }
 
-    public IEnumerator SyncGunPos(Gun gun)
+    [Command]
+    void CmdSyncGun(GameObject obj)
+    {
+        RpcSyncGun(obj);
+    }
+
+    [ClientRpc]
+    void RpcSyncGun(GameObject obj)
+    {
+        uint ID = obj.GetComponent<NetworkBehaviour>().netId.Value;
+        if (!synced_gun_ids.Contains(ID))
+        {
+            synced_gun_ids.Add(ID);
+            StartCoroutine(SyncGunPos(obj.GetComponent<Gun>()));
+        }
+    }
+
+    IEnumerator SyncGunPos(Gun gun)
     {
         gun.transform.SetParent(null);
         gun.GetComponent<NetworkTransform>().enabled = false;
@@ -386,7 +405,6 @@ public class PlayerController : GenericController
 
         }
     }
-
 
 
 }

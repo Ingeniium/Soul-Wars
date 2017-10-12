@@ -84,13 +84,13 @@ public abstract partial class Gun : Item {
     protected List<string> prefixes = new List<string>();
     protected List<string> suffixes = new List<string>();
     protected string last_suffix = "";
-    protected string _button = "";
+    public string _button = "";
     public string button
     {
         get { return _button; }
         set
         {
-            if (!buttons.Contains(value))
+            if (_button == "" || !buttons.Contains(value))
             {
                 if (buttons.Contains(_button))
                 {
@@ -98,14 +98,7 @@ public abstract partial class Gun : Item {
                 }
                 _button = value;
                 buttons.Add(_button);
-                if (_button != "")
-                {
-                    item_image_show.GetComponentInChildren<ItemImage>().AddSetting("<color=white><size=7>" + _button + "</size></color>", 0);
-                }
-                else
-                {
-                     item_image_show.GetComponentInChildren<ItemImage>().AddSetting("<color=white><size=5>" + "Left \n" + " Mouse" + "</size></color>", 0); 
-                }
+                item_image_show.GetComponentInChildren<ItemImage>().AddSetting("<color=white><size=7>" + _button + "</size></color>", 0);
             }
         }
     }
@@ -286,6 +279,11 @@ public abstract partial class Gun : Item {
         if (item_image_show)
         {
             item_image_show.transform.SetParent(weapons_bar.transform);
+            RectTransform rtr = item_image_show.GetComponent<RectTransform>();
+            rtr.localPosition = new Vector3(
+                rtr.localPosition.x,
+                rtr.localPosition.y,
+                0); 
             buttons.Add(button);
             int[] indeces = new int[claimed_gun_ability.Count];
             int n = 0;
@@ -296,6 +294,10 @@ public abstract partial class Gun : Item {
             }
             client_user.CmdSetGun(gameObject, level, points, experience, next_lvl, indeces);
             client_user.weapons.Add(this);
+            if(client_user.weapons.Count == 1)
+            {
+                PlayerController.Client.CmdEquipGun(gameObject);
+            }
         }
     }
 
@@ -305,11 +307,11 @@ public abstract partial class Gun : Item {
         {
             BringUpLevelUpTable();
         };
-        if (button != "")
+        if (button != "LMB")
         {
             options += delegate
             { 
-                button = "";
+                button = "LMB";
             };
         }
         if (button != "q")
@@ -347,7 +349,7 @@ public abstract partial class Gun : Item {
     {
         List<string> options = new List<string>();
         options.Add("Allocate Gun Points");
-        if(button != "" )
+        if(button != "LMB" )
         {
             options.Add("Set Button as Left Click");
         }
@@ -380,7 +382,7 @@ public abstract partial class Gun : Item {
         element.Add(value_setter);
         value_setter = new XElement("Points",points.ToString());
         element.Add(value_setter);
-        value_setter = new XElement("Button", button);
+        value_setter = new XElement("Button", _button);
         element.Add(value_setter);
         if (claimed_gun_ability.Count != 0)
         {
@@ -418,7 +420,10 @@ public abstract partial class Gun : Item {
             foreach (XElement e in element.Elements("MethodIndex").Elements("Index"))
             {
                 num = Int32.Parse(e.Value);
-                claimed_gun_ability.Add(num);
+                if (!claimed_gun_ability.Contains(num))
+                {
+                    claimed_gun_ability.Add(num);
+                }
             }
         }
         SetBaseStats();

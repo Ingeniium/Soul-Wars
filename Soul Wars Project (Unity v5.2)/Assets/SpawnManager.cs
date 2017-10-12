@@ -6,7 +6,7 @@ using UnityEngine.Networking;
 public class SpawnManager : NetworkBehaviour {
     public static List<SpawnManager> AllySpawnPoints = new List<SpawnManager>();
     public static List<SpawnManager> EnemySpawnPoints = new List<SpawnManager>() ;
-    public static List<SpawnManager> UnclaimedSpawnPoints = new List<SpawnManager>();
+    private static List<SpawnManager> TotalSpawnPoints = new List<SpawnManager>();
     private HealthDefence HP;
     public static float enemy_respawn_time = 10f;
     public int ally_defence_bonus = 30;
@@ -14,9 +14,11 @@ public class SpawnManager : NetworkBehaviour {
     public GameObject stand;
     public Vector3 spawn_direction;
 	// Use this for initialization
+
     void Awake()
     {
         HP = GetComponent<HealthDefence>();
+        TotalSpawnPoints.Add(this);
         switch (gameObject.layer)
         {
             case 9:
@@ -26,11 +28,24 @@ public class SpawnManager : NetworkBehaviour {
             case 8:
                 EnemySpawnPoints.Add(this);
                 break;
-            case 0:
-                UnclaimedSpawnPoints.Add(this);
-                break;
         }
 
+    }
+
+    public static void BeforeSceneLoad()
+    {
+        Debug.Log("Called");
+        /*Oddly enough,static variables actually REMAIN across scene changes.*/
+        if (PlayerController.Client.isServer)
+        {
+            foreach (SpawnManager s in TotalSpawnPoints)
+            {
+                NetworkServer.Destroy(s.gameObject);
+            }
+        }
+        TotalSpawnPoints.Clear();
+        AllySpawnPoints.Clear();
+        EnemySpawnPoints.Clear();
     }
 
     [ClientRpc]
@@ -46,7 +61,7 @@ public class SpawnManager : NetworkBehaviour {
     {
         EnemySpawnPoints.Remove(this);
         AllySpawnPoints.Add(this);
-        HP.defence -= ally_defence_bonus;
+        HP.defence += ally_defence_bonus;
     }
     
     public static IEnumerator WaitForRespawn(HealthDefence killed) 

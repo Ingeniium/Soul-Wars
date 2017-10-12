@@ -12,6 +12,8 @@ public class PlayersAlive : NetworkBehaviour
     public List<BulletScript> Bullets = new List<BulletScript>();
     public List<Vector3> bullet_velocities = new List<Vector3>();
     float time_elapsed_when_paused;
+    public int level;
+    public readonly int max_level = 10;
     bool paused;
 
     void Awake()

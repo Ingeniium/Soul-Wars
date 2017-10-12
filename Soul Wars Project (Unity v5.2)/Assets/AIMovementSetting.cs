@@ -51,29 +51,32 @@ public partial class AIController : GenericController
         float ptr_angle = Math.Abs(ptr.rotation.eulerAngles.y);
         float targ_angle = Math.Abs(Target.transform.rotation.eulerAngles.y);
         float angle = Math.Abs(ptr_angle + targ_angle);
+        uint divisor = 5;
         if (angle > 310 || angle < 40)
         {
             if (ptr.position.x > Target.transform.position.x)
             {
-                for (uint i = Map.Instance.num_rects / 5; i > 0; i--)
+                for (uint i = Map.Instance.num_rects / divisor; i > 0; i--)
                 {
-                    if (Map.Instance.GetPos(targ_coord.x + i, targ_coord.z) != null)
+                    Coordinate coord = Map.Instance.GetPos(targ_coord.x + i, targ_coord.z);
+                    if (coord != null && coord.status == Coordinate.Status.Safe )
                     {
                         return new ValueGroup<Coordinate, Coordinate>(
                             Map.Instance.GetPos(ptr.position),
-                            Map.Instance.GetPos(targ_coord.x + i, targ_coord.z));
+                           coord);
                     }
                 }
             }
             else
             {
-                for (uint i = Map.Instance.num_rects / 5; i > 0; i--)
+                for (uint i = Map.Instance.num_rects / divisor; i > 0; i--)
                 {
-                    if (Map.Instance.GetPos(targ_coord.x - i, targ_coord.z) != null)
-                    {
+                    Coordinate coord = Map.Instance.GetPos(targ_coord.x - i, targ_coord.z);
+                    if (coord != null && coord.status == Coordinate.Status.Safe)
+                    { 
                         return new ValueGroup<Coordinate, Coordinate>(
                             Map.Instance.GetPos(ptr.position),
-                            Map.Instance.GetPos(targ_coord.x - i, targ_coord.z));
+                            coord);
                     }
                 }
             }
@@ -82,21 +85,23 @@ public partial class AIController : GenericController
         {
             if (ptr.position.z > Target.transform.position.z)
             {
-                for (uint i = Map.Instance.num_rects / 5; i > 0; i--)
+                for (uint i = Map.Instance.num_rects / divisor; i > 0; i--)
                 {
-                    if (Map.Instance.GetPos(targ_coord.x, targ_coord.z + i) != null)
+                    Coordinate coord = Map.Instance.GetPos(targ_coord.x, targ_coord.z + i);
+                    if (coord != null && coord.status == Coordinate.Status.Safe)
                     {
                         return new ValueGroup<Coordinate, Coordinate>(
                             Map.Instance.GetPos(ptr.position),
-                            Map.Instance.GetPos(targ_coord.x, targ_coord.z + i));
+                            coord);
                     }
                 }
             }
             else
             {
-                for (uint i = Map.Instance.num_rects / 5; i > 0; i--)
+                for (uint i = Map.Instance.num_rects / divisor; i > 0; i--)
                 {
-                    if (Map.Instance.GetPos(targ_coord.x, targ_coord.z - i) != null)
+                    Coordinate coord = Map.Instance.GetPos(targ_coord.x, targ_coord.z - i);
+                    if (coord != null && coord.status == Coordinate.Status.Safe)
                     {
                         return new ValueGroup<Coordinate, Coordinate>(
                             Map.Instance.GetPos(ptr.position),
@@ -164,6 +169,10 @@ public partial class AIController : GenericController
             prev_start_coord = start;
             prev_end_coord = end;
             queue.Enqueue(start, GetCoordinateDistFromTarget(start));
+            if(end.status == Coordinate.Status.Hazard)
+            {
+                Debug.Log("Unsafe!");
+            }
             while (Time.realtimeSinceStartup < tstart + .01f)
             {
                 start = queue.Dequeue();
@@ -202,7 +211,7 @@ public partial class AIController : GenericController
             }
 
         }
-        return null;
+        return null ;
     }
 
 

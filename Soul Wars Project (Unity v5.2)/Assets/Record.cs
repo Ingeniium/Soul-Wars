@@ -19,6 +19,8 @@ class Record : MonoBehaviour
     private Canvas name_input_show;
     public Canvas weapon_choose;
     private Canvas weapon_choose_show;
+    public Canvas win_canvas;
+    private Canvas win_canvas_show;
     private string player_name;
     private char[] forbidden_chars = new char[]
     {
@@ -104,6 +106,7 @@ class Record : MonoBehaviour
             stream = new FileStream("SoulWars.xml", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             file = XDocument.Load("SoulWars.xml");
             player_name = (file.Root.FirstNode as XElement).Name.ToString();
+            PlayerController.Client.enabled = false;
             PlayerController.Client.player_name = player_name;
             XElement parent = file.Root.Element(player_name);
             GameObject image_canvas = Resources.Load("ItemImageCanvas") as GameObject;
@@ -133,6 +136,7 @@ class Record : MonoBehaviour
                 item.PrepareItemForUse();
                 i++;
             }
+            PlayerController.Client.enabled = true;
         }
         finally
         {
@@ -256,7 +260,7 @@ class Record : MonoBehaviour
             if (i == 0)
             {
                 /*Apparently INput.inputstring is blank for leftmouse clicks*/
-                gun.button = "";
+                gun.button = "LMB";
             }
             else if (i == 1)
             {
@@ -306,6 +310,48 @@ class Record : MonoBehaviour
             {
                 SaveToFile();
             });
+        }
+    }
+
+    void Update()
+    {
+        if (SpawnManager.AllySpawnPoints.Count == 2
+            && !PlayersAlive.Instance.Units.Find(delegate(AIController AI)
+            {
+                return (AI.GetComponentInParent<HealthDefence>().HP > 0);
+            })
+            && !win_canvas_show)
+        {
+            StartCoroutine(LoadNextScene());
+        }
+    }
+
+    IEnumerator LoadNextScene()
+    {
+        win_canvas_show = Instantiate(win_canvas, win_canvas.transform.position, win_canvas.transform.rotation) as Canvas;
+        win_canvas_show.worldCamera = PlayerController.Client.cam_show;
+        Button[] buttons = PlayerController.Client.player_interface_show.GetComponentsInChildren<Button>();
+        Button save_button = buttons[buttons.Length - 1];
+        if (save_button.enabled)
+        {
+            SaveToFile();
+        }
+        SpawnManager.BeforeSceneLoad();
+        if (PlayerController.Client.isServer)
+        {   
+            yield return new WaitForSeconds(3);
+            if (PlayersAlive.Instance.level >= PlayersAlive.Instance.max_level)
+            {
+                NetworkManager.singleton.ServerChangeScene("Networksample");
+            }
+            else
+            {
+                NetworkManager.singleton.ServerChangeScene("Level " + (PlayersAlive.Instance.level + 1));
+            }
+        }
+        else
+        {
+            yield return null;
         }
     }
 
