@@ -1,0 +1,12 @@
+A designer/play-tester is most desired in order to help me finish the development of new weapons, finishing the development of the old, and
+spotting bugs along the way during gameplay. Even if one does not have any experience with this role or any other roles in particular, I'm more than welcome to accept them into this position.
+
+Even though the game is in 3D,only two dimensions are really used;
+An artist that works with sprites is acceptable(although some reworking would be in order to ignore that third dimension entirely). An artist with experience in 3D modeling would be nice as to not undergo such rework.
+
+A musician would be nice.
+
+I think there is too much code for somebody who doesn't have any experience in Unity to understand, even if I go through the inevitable code reworks to make it more legible. The code is in C# ,though as long as you can understand C# Unity code, feel free to write in any language you desire.
+I have multiplayer set up and somewhat stable in unity. The foundations for working AI are set up,with multiple AI settings. The weapons are partially developed. Gameplay is mainly stable albeit a few exceptions here and there but generally playable. There's a save system in place with XML. I'm about to start levelbuilding and finishing up the development of weapons.
+
+Soul Wars is a 3D birds-eye view whenever you die. Having no spawn points means that there's no where for you to spawn, meaning essentially a game over if you die. Choose 2 from 4 weapons to utilize in the battlefield. Level up your weapons by hurting your enemies with them and choose various upgrades to boost your offenses.
