@@ -8,8 +8,7 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>10.0.20506</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <RootNamespace>
-    </RootNamespace>
+    <RootNamespace></RootNamespace>
     <ProjectGuid>{3C470DB8-1D20-0021-A5EF-1E58012473D6}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
@@ -52,81 +51,83 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\AIAttackSetting.cs" />
-    <Compile Include="Assets\AIController.cs" />
-    <Compile Include="Assets\AIMovementSetting.cs" />
-    <Compile Include="Assets\Blaster.cs" />
-    <Compile Include="Assets\BulletScript.cs" />
-    <Compile Include="Assets\StringSeries.cs" />
-    <Compile Include="Assets\Cooldown.cs" />
-    <Compile Include="Assets\DestroyPrevObjects.cs" />
-    <Compile Include="Assets\EnemyGroup.cs" />
-    <Compile Include="Assets\EnemyInitialization.cs" />
-    <Compile Include="Assets\ExitButton.cs" />
-    <Compile Include="Assets\Extensions.cs" />
-    <Compile Include="Assets\FastPriorityQueue.cs" />
-    <Compile Include="Assets\FastPriorityQueueNode.cs" />
-    <Compile Include="Assets\Flurry.cs" />
-    <Compile Include="Assets\GenericControllerBaseClass.cs" />
-    <Compile Include="Assets\GenericPriorityQueue.cs" />
-    <Compile Include="Assets\GenericPriorityQueueNode.cs" />
-    <Compile Include="Assets\gridOverlay.cs" />
-    <Compile Include="Assets\Gun.cs" />
-    <Compile Include="Assets\GunTable.cs" />
-    <Compile Include="Assets\Haze.cs" />
-    <Compile Include="Assets\HealthDefence.cs" />
-    <Compile Include="Assets\HomingScript.cs" />
-    <Compile Include="Assets\HPbar.cs" />
-    <Compile Include="Assets\IFixedSizePriorityQueue.cs" />
-    <Compile Include="Assets\Inventory.cs" />
-    <Compile Include="Assets\IPriorityQueue.cs" />
-    <Compile Include="Assets\IRecordable.cs" />
-    <Compile Include="Assets\ItemBaseClass.cs" />
-    <Compile Include="Assets\ItemImage.cs" />
-    <Compile Include="Assets\Map.cs" />
-    <Compile Include="Assets\ModDisplay.cs" />
-    <Compile Include="Assets\NetworkMethods.cs" />
-    <Compile Include="Assets\ObstacleCoord.cs" />
-    <Compile Include="Assets\Options.cs" />
-    <Compile Include="Assets\PlayerController.cs" />
-    <Compile Include="Assets\PlayerFollow.cs" />
-    <Compile Include="Assets\PlayersAlive.cs" />
-    <Compile Include="Assets\Record.cs" />
-    <Compile Include="Assets\TutorialHelper.cs" />
-    <Compile Include="Assets\RespawnInterface.cs" />
-    <Compile Include="Assets\SimplePriorityQueue.cs" />
-    <Compile Include="Assets\SpawnManager.cs" />
-    <Compile Include="Assets\StablePriorityQueue.cs" />
-    <Compile Include="Assets\StablePriorityQueueNode.cs" />
-    <Compile Include="Assets\State.cs" />
-    <Compile Include="Assets\Strike.cs" />
-    <Compile Include="Assets\TextBox.cs" />
-    <Compile Include="Assets\UIHide.cs" />
-    <Compile Include="Assets\ValueGroup.cs" />
-    <Compile Include="Assets\WeaponHolder.cs" />
-    <None Include="Assets\Resources\Sad.shader" />
-    <None Include="Assets\Resources\soul wars - need help.txt" />
-    <Reference Include="UnityEngine.UI">
-      <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/GUISystem/UnityEngine.UI.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.Networking">
-      <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/Networking/UnityEngine.Networking.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.TestRunner">
-      <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/TestRunner/UnityEngine.TestRunner.dll</HintPath>
-    </Reference>
-    <Reference Include="nunit.framework">
-      <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/TestRunner/net35/unity-custom/nunit.framework.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.Timeline">
-      <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/Timeline/RuntimeEditor/UnityEngine.Timeline.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.Analytics">
-      <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/UnityAnalytics/UnityEngine.Analytics.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.HoloLens">
-      <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/UnityHoloLens/RuntimeEditor/UnityEngine.HoloLens.dll</HintPath>
-    </Reference>
+     <Compile Include="Assets\AIAttackSetting.cs" />
+     <Compile Include="Assets\AIController.cs" />
+     <Compile Include="Assets\AIMovementSetting.cs" />
+     <Compile Include="Assets\Blaster.cs" />
+     <Compile Include="Assets\BulletScript.cs" />
+     <Compile Include="Assets\Cooldown.cs" />
+     <Compile Include="Assets\DestroyPrevObjects.cs" />
+     <Compile Include="Assets\EnemyGroup.cs" />
+     <Compile Include="Assets\EnemyInitialization.cs" />
+     <Compile Include="Assets\ExitButton.cs" />
+     <Compile Include="Assets\Extensions.cs" />
+     <Compile Include="Assets\FastPriorityQueue.cs" />
+     <Compile Include="Assets\FastPriorityQueueNode.cs" />
+     <Compile Include="Assets\Flurry.cs" />
+     <Compile Include="Assets\GenericControllerBaseClass.cs" />
+     <Compile Include="Assets\GenericPriorityQueue.cs" />
+     <Compile Include="Assets\GenericPriorityQueueNode.cs" />
+     <Compile Include="Assets\gridOverlay.cs" />
+     <Compile Include="Assets\Gun.cs" />
+     <Compile Include="Assets\GunTable.cs" />
+     <Compile Include="Assets\Haze.cs" />
+     <Compile Include="Assets\HealthDefence.cs" />
+     <Compile Include="Assets\HomingScript.cs" />
+     <Compile Include="Assets\HPbar.cs" />
+     <Compile Include="Assets\IFixedSizePriorityQueue.cs" />
+     <Compile Include="Assets\Inventory.cs" />
+     <Compile Include="Assets\IPriorityQueue.cs" />
+     <Compile Include="Assets\IRecordable.cs" />
+     <Compile Include="Assets\ItemBaseClass.cs" />
+     <Compile Include="Assets\ItemImage.cs" />
+     <Compile Include="Assets\Map.cs" />
+     <Compile Include="Assets\ModDisplay.cs" />
+     <Compile Include="Assets\NetworkMethods.cs" />
+     <Compile Include="Assets\NetworkSceneSync.cs" />
+     <Compile Include="Assets\ObstacleCoord.cs" />
+     <Compile Include="Assets\Options.cs" />
+     <Compile Include="Assets\PlayerController.cs" />
+     <Compile Include="Assets\PlayerFollow.cs" />
+     <Compile Include="Assets\PlayersAlive.cs" />
+     <Compile Include="Assets\Record.cs" />
+     <Compile Include="Assets\RespawnInterface.cs" />
+     <Compile Include="Assets\SimplePriorityQueue.cs" />
+     <Compile Include="Assets\SpawnManager.cs" />
+     <Compile Include="Assets\StablePriorityQueue.cs" />
+     <Compile Include="Assets\StablePriorityQueueNode.cs" />
+     <Compile Include="Assets\StartGame.cs" />
+     <Compile Include="Assets\State.cs" />
+     <Compile Include="Assets\Strike.cs" />
+     <Compile Include="Assets\StringSeries.cs" />
+     <Compile Include="Assets\TextBox.cs" />
+     <Compile Include="Assets\TutorialHelper.cs" />
+     <Compile Include="Assets\UIHide.cs" />
+     <Compile Include="Assets\ValueGroup.cs" />
+     <Compile Include="Assets\WeaponHolder.cs" />
+     <None Include="Assets\Resources\Sad.shader" />
+     <None Include="Assets\Resources\soul wars - need help.txt" />
+ <Reference Include="UnityEngine.UI">
+ <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/GUISystem/UnityEngine.UI.dll</HintPath>
+ </Reference>
+ <Reference Include="UnityEngine.Networking">
+ <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/Networking/UnityEngine.Networking.dll</HintPath>
+ </Reference>
+ <Reference Include="UnityEngine.TestRunner">
+ <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/TestRunner/UnityEngine.TestRunner.dll</HintPath>
+ </Reference>
+ <Reference Include="nunit.framework">
+ <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/TestRunner/net35/unity-custom/nunit.framework.dll</HintPath>
+ </Reference>
+ <Reference Include="UnityEngine.Timeline">
+ <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/Timeline/RuntimeEditor/UnityEngine.Timeline.dll</HintPath>
+ </Reference>
+ <Reference Include="UnityEngine.Analytics">
+ <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/UnityAnalytics/UnityEngine.Analytics.dll</HintPath>
+ </Reference>
+ <Reference Include="UnityEngine.HoloLens">
+ <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/UnityHoloLens/RuntimeEditor/UnityEngine.HoloLens.dll</HintPath>
+ </Reference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
@@ -136,4 +137,5 @@
   <Target Name="AfterBuild">
   </Target>
   -->
+  
 </Project>
