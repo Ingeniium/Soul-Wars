@@ -14,3 +14,7 @@ I have uploaded code that properly syncs objects that would traditional be child
 I have started working on each gun's 3rd column of gun abilities. Strike is the only one with full three columns of 4 abilities each, with
 Blaster coming in second with only half of that.I have also figured out how I want my first 10 levels to be structured,and I will be 
 displaying tutorial tips in each of those levels.
+
+11/7/2017
+---------
+I have finished Blaster's third column of gun abilities. I have also started working on Haze's third column,and reworked its 'Infect' gun ability so it works as intended. I have implemented 11 levels for the game. My sophmore friend, Ian Mcdonald,also worked on a scene(called test) which has a particle effect he made himself and imported a font.Essentialy, he made a title screen(with the whole folder TitleScreenAssets attributed to him) in which I further developed to include a level select.I have fixed aggro so it works fully as intened.I also refigured the game to allow multiple teams of CPUs that can fight amongst eachother, and can even be allied with the player to fight other CPUs.For this reason, the different types of CPUs now have colored shells to show their team alignment.
