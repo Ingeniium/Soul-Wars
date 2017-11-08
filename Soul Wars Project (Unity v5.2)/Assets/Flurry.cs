@@ -7,8 +7,6 @@ using UnityEngine.Networking;
 public class Flurry : Gun
 {
     [SyncVar] public int num_bullets = 3;
-    public List<ValueGroup[]> TrioList = new List<ValueGroup[]>();
-    bool targ_recorded;
     private readonly static string[] gun_ability_names = new string[15] 
     {
         "Hunter", "Archer", null,
@@ -28,7 +26,7 @@ public class Flurry : Gun
     private readonly static string[] gun_ability_desc = new string[15] 
     {
         "Hunter" + "\n Causes bullets that aren't" + "\n homing in on a target to" + "\n to reroute to another flurry " + "\n bullet's target.",
-        "Archer" + "\n Bullets have a 50%" + "\n chance to be target piercing.",
+        "Archer" + "\n Bullets have a (50 + level)%" + "\n chance to be target piercing.",
         null,
 
         "Debris" + "\n Causes bullets to enlarge and" + "\n move and turn at half speed" + "\n after 1.5 seconds",
@@ -85,22 +83,19 @@ public class Flurry : Gun
         {
             yield return new WaitForEndOfFrame();
         }
-        string layer = null;
-        if (script.gameObject.layer == 13)
-        {
-            layer = "AllyAttack";
-        }
-        else
-        {
-            layer = "EnemyAttack";
-        }
-        Collider[] bullet_colliders = Physics.OverlapSphere(script.gameObject.transform.position, 10,
-            LayerMask.GetMask(layer), QueryTriggerInteraction.Collide);
+        Collider[] bullet_colliders = Physics.OverlapSphere(script.gameObject.transform.position, 
+            10,
+            LayerMask.GetMask("Default"), 
+            QueryTriggerInteraction.Collide);
         foreach (Collider col in bullet_colliders)
         {
             /*Check if its a flurry bullet that isn't isn't homing*/
             BulletScript b = col.GetComponent<BulletScript>();
-            if (b && b.gun_reference is Flurry && !b.homer.GetComponent<HomingScript>().homing && home.main_col)
+            if (b 
+                && b.gameObject.layer == script.gameObject.layer 
+                && b.gun_reference is Flurry 
+                && !b.homer.GetComponent<HomingScript>().homing 
+                && home.main_col)
             {
                 /*Make bullet face target and fire towards them*/
                 b.transform.LookAt(new Vector3(home.main_col.gameObject.transform.position.x, script.transform.position.y, home.main_col.gameObject.transform.position.z));
@@ -163,7 +158,7 @@ public class Flurry : Gun
         script.homer.GetComponent<HomingScript>().home_speed /= 2;
         script.transform.position = new Vector3(
             script.transform.position.x,
-            script.transform.position.y + .75f,
+            script.transform.position.y + 1f,
             script.transform.position.z);
         NetworkMethods.Instance.RpcSetScale(script.gameObject, Vector3.one * 2);
         script.GetComponent<Rigidbody>().velocity /= 2;
@@ -300,8 +295,6 @@ public class Flurry : Gun
     public override void Shoot()
     {
         base.Shoot();
-        TrioList.Add(new ValueGroup[num_bullets]);
-        TrioList[TrioList.Count - 1][0].index = (int)bullet.GetComponent<NetworkIdentity>().netId.Value;
         for (int i = 1; i < num_bullets; i++)
         {
             Quaternion rot;
@@ -315,7 +308,6 @@ public class Flurry : Gun
             }
             bullet = Instantiate(Bullet, barrel_end.position, rot) as GameObject;
             NetworkServer.Spawn(bullet);
-            TrioList[TrioList.Count - 1][i].index = (int)bullet.GetComponent<NetworkIdentity>().netId.Value;
             ReadyWeaponForFire(ref bullet);
             RpcFire(bullet.transform.forward,bullet);
         }
@@ -379,22 +371,14 @@ public class Flurry : Gun
         return "Flurry";
     }
 
-    public override void SetBaseStats()
+    public override void SetBaseStats(string _layer = "Ally")
     {
         upper_bound_damage = 7;
         lower_bound_damage = 4;
-        if (client_user)
-        {
-            layer = 13;
-            home_layer = 10;
-            color = new Color(43, 179, 234);
-        }
-        else
-        {
-            layer = 14;
-            home_layer = 12;
-            color = Color.red;
-        }
+        layer = LayerMask.NameToLayer(_layer + "Attack");
+        home_layer = LayerMask.NameToLayer(_layer + "Homing");
+        color = SpawnManager.GetTeamColor(
+            LayerMask.NameToLayer(_layer));
         range = 10;
         projectile_speed = 5;
         knockback_power = 5;

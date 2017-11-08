@@ -199,13 +199,13 @@ public class Strike : Gun
     private static IEnumerator Barrier(Gun gun, BulletScript script)
     {
         script.coroutines_running++;
-        if (gun.layer == LayerMask.NameToLayer("AllyAttack"))
+        if(gun.client_user)
         {
-            script.gameObject.layer = LayerMask.NameToLayer("Ally");
+            script.gameObject.layer = gun.client_user.gameObject.layer;
         }
         else
         {
-            script.gameObject.layer = LayerMask.NameToLayer("Enemy");
+            script.gameObject.layer = gun.GetComponentInParent<HealthDefence>().gameObject.layer;
         }
         script.coroutines_running--;
         yield return null;
@@ -226,7 +226,7 @@ public class Strike : Gun
                 script.gameObject.layer = 16;
                 rend.material.color = new Color(origin.r, origin.g, origin.b, .3f);
             }
-            else if (gun.layer == 14)
+            else
             {
                 rend.material.color = new Color(origin.r, origin.g, origin.b, .2f);
             }
@@ -242,7 +242,14 @@ public class Strike : Gun
         {
             yield return new WaitForEndOfFrame();
         }
-        gun.client_user.GetComponent<HealthDefence>().HP += 1;
+        if (gun.client_user)
+        {
+            gun.client_user.GetComponent<HealthDefence>().HP += 1;
+        }
+        else
+        {
+            gun.GetComponentInParent<HealthDefence>().HP += 1;
+        }
         script.coroutines_running--;
     }
 
@@ -257,9 +264,7 @@ public class Strike : Gun
         script.GetComponent<Rigidbody>().velocity = Vector3.zero;
         NetworkMethods.Instance.RpcSetEnabled(script.gameObject, "Collider", false);
         NetworkMethods.Instance.RpcSetEnabled(script.gameObject, "Renderer", false);
-        script.coroutines_running--;
-        if (gun.layer == LayerMask.NameToLayer("AllyAttack") 
-            && gun.client_user.speed < 30)
+        if (gun.client_user && gun.client_user.speed < 27)
         {
             gun.client_user.speed += 3;
             gun.client_user.shield_speed += 3;
@@ -279,6 +284,7 @@ public class Strike : Gun
                 AI.shield_speed -= 4;
             }
         }
+        script.coroutines_running--;
 
     }
 
@@ -354,22 +360,14 @@ public class Strike : Gun
         return "Strike";
     }
 
-    public override void SetBaseStats()
+    public override void SetBaseStats(string _layer = "Ally")
     {
         upper_bound_damage = 15;
         lower_bound_damage = 7;
-        if (client_user)
-        {
-            layer = 13;
-            home_layer = 10;
-            color = new Color(43, 179, 234);
-        }
-        else
-        {
-            layer = 14;
-            home_layer = 12;
-            color = Color.red;
-        }
+        layer = LayerMask.NameToLayer(_layer + "Attack");
+        home_layer = LayerMask.NameToLayer(_layer + "Homing");
+        color = SpawnManager.GetTeamColor(
+            LayerMask.NameToLayer(_layer));
         range = 10f;
         projectile_speed = 5;
         knockback_power = 5;

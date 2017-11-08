@@ -12,13 +12,15 @@ public class PlayersAlive : NetworkBehaviour
     public List<BulletScript> Bullets = new List<BulletScript>();
     public List<Vector3> bullet_velocities = new List<Vector3>();
     float time_elapsed_when_paused;
-    public int level;
-    public readonly int max_level = 10;
     bool paused;
 
     void Awake()
     {
         Instance = this;
+        if(Players.Count != 0)
+        {
+            Players.Clear();
+        }
     }
 
     [Command]
@@ -48,10 +50,11 @@ public class PlayersAlive : NetworkBehaviour
         }
         if (!Array.Exists(array, delegate (uint u)
          {
-             return (NetworkServer.FindLocalObject(
-                 new NetworkInstanceId(u)).
-                 GetComponent<PlayerController>().
-                 enabled);
+             GameObject player_obj = ClientScene.FindLocalObject(
+                 new NetworkInstanceId(u));
+             PlayerController player = player_obj.GetComponent<PlayerController>();
+             return player.enabled;
+             
          }))
         {
             if(Bullets.Count > 0)
@@ -77,6 +80,8 @@ public class PlayersAlive : NetworkBehaviour
                 {
                     if (AI)
                     {
+                        AI.GetComponentInParent<Rigidbody>().useGravity = false;
+                        AI.ptr.gameObject.GetComponent<Collider>().enabled = false;
                         AI.enabled = false;
                     }
                 }
@@ -126,6 +131,8 @@ public class PlayersAlive : NetworkBehaviour
             {
                 if (AI)
                 {
+                    AI.ptr.GetComponent<Collider>().enabled = true;
+                    AI.GetComponentInParent<Rigidbody>().useGravity = true;
                     AI.enabled = true;
                 }
             }

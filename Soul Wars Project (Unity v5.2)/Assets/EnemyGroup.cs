@@ -13,6 +13,15 @@ public class EnemyGroup : NetworkBehaviour
     public AIController.MovementMode MovementSetting;
     public bool can_block;
     public bool can_dodge;
+    public enum Layer
+    {
+        Enemy = 8,
+        Ally = 9,
+        Team3 = 18,
+        Team4 = 19,
+        Team5 = 20
+    }
+    public Layer cpu_layer;
 }
 
 

@@ -10,17 +10,17 @@ public class Blaster : Gun
     {
         "Brigadier", "Gunslinger", "Destroyer",
         "Sunder", "Curve", "Bounce",
-        "Quake", "Tremor", null,
-        "Meteor", "Comet", null
+        "Quake", "Tremor", "StarFall",
+        "Meteor", "Comet", "Asteroid"
     };                           
     private readonly static string[] gun_name_addons = new string[12] 
     {
         "Punishment", "The Force", "Destruction",
         "Sundering", "Homing", "Rebounding",
-        "Robust", "Intense", null,
-        "Meteor", "Comet", null
+        "Robust", "Intense", "Astral",
+        "Meteor", "Comet", "Asteroid"
     };
-    private readonly static string[] gun_ability_desc = new string[12]  
+    private readonly static string[] gun_ability_desc = new string[12]
     {
         "Brigadier" + "\n Does 150% damage to" + "\n spawn points and shields.",
         "Gunslinger" + "\n Causes a 2 second stun.",
@@ -30,13 +30,13 @@ public class Blaster : Gun
         "Curve" + "\n Grants slight homing ability.",
         "Bounce" + "\n Causes bullets to bounce on impact" + "\n and quadruples bullet lifetime.",
 
-        "Quake" + "\n Does moderate damage " + "\n that's based on the gun to nearby targets.",
+        "Quake" + "\n Does half damage to nearby targets." + "\n Damage from the quake cannot crit.",
         "Tremor" + "\n Stuns nearby foes for 1 second.",
-        null,
+        "StarFall" + "\n Drops a piercing bullet " + "\n wherever your mouse is when shooting" + "\n in addition to the bullet already fired." ,
 
         "Meteor" + "\n Triples the size of your bullets.",
         "Comet" + "\n Triples the speed of your bullets.",
-        null,
+        "Asteroid" + "\n Causes your bullets to do max damage," + "\n but removes crit chance.",
     };
     /*This class's pool of gun_abilities.Use of a static container of static methods requi"Markring explicit this
     pointers are used for onetime,pre-Awake() initialization of delegates*/
@@ -52,14 +52,63 @@ public class Blaster : Gun
 
         Quake,
         Tremor,
-        null,
+        StarFall,
 
         Meteor,
         Comet,
-        null,
+        Asteroid,
     };
 
-   
+    private static IEnumerator Asteroid(Gun gun,BulletScript script)
+    {
+        script.coroutines_running++;
+        script.lower_bound_damage = script.upper_bound_damage;
+        script.crit_chance = 0;
+        script.coroutines_running--;
+        yield return null;
+    }
+
+    private static IEnumerator StarFall(Gun gun,BulletScript script)
+    {
+        
+        script.coroutines_running++;
+        Vector3 pos;
+        if (gun.client_user)
+        {
+            pos = new Vector3(Input.mousePosition.x / Screen.width,
+                Input.mousePosition.y / Screen.height,
+               20);
+            pos = PlayerFollow.camera.ViewportToWorldPoint(pos);
+            pos = new Vector3(pos.x, 15, pos.z);
+        }
+        else
+        {
+            AIController AI = gun.GetComponentInParent<AIController>();
+            if (AI.Target)
+            {
+                Transform ttr = AI.Target.transform;
+                pos = new Vector3(ttr.position.x, ttr.position.y + 10f, ttr.position.z);
+            }
+            else
+            {
+                pos = Vector3.zero;
+            }
+        }
+        float original_next_time = gun.next_time;
+        GameObject new_bullet = Instantiate(gun.Bullet, pos, gun.Bullet.transform.rotation) as GameObject;
+        NetworkServer.Spawn(new_bullet);
+        Blaster blaster = gun as Blaster;
+        gun.mez_threshold += 100;
+        blaster.ReadyWeaponForFire(ref new_bullet);
+        blaster.next_time = original_next_time;
+        BulletScript new_script = new_bullet.GetComponent<BulletScript>();      
+        new_script.can_pierce = true;
+        new_script.rb.velocity = Vector3.zero;
+        new_script.rb.useGravity = true;
+        gun.mez_threshold -= 100;
+        script.coroutines_running--;
+        yield return null;
+    }
 
     private static IEnumerator Brigadier(Gun gun, BulletScript script)
     {
@@ -127,13 +176,16 @@ public class Blaster : Gun
             yield return new WaitForEndOfFrame();
         }
         string layer = "";
-        if (script.Target.gameObject.layer == 9)
+        if (gun.client_user)
         {
-            layer = "Ally";
+            layer = LayerMask.LayerToName(
+                gun.client_user.gameObject.layer);
         }
         else
         {
-            layer = "Enemy";
+            layer = LayerMask.LayerToName(
+                gun.GetComponentInParent<HealthDefence>()
+                .gameObject.layer);
         }
         Collider[] target_colliders = Physics.OverlapSphere(script.gameObject.transform.position, 7,
             LayerMask.GetMask(layer), QueryTriggerInteraction.Collide);
@@ -156,13 +208,16 @@ public class Blaster : Gun
             yield return new WaitForEndOfFrame();
         }
         string layer = "";
-        if (script.Target.gameObject.layer == 9)
+        if (gun.client_user)
         {
-            layer = "Ally";
+            layer = LayerMask.LayerToName(
+                gun.client_user.gameObject.layer);
         }
         else
         {
-            layer = "Enemy";
+            layer = LayerMask.LayerToName(
+                gun.GetComponentInParent<HealthDefence>()
+                .gameObject.layer);
         }
         Collider[] target_colliders = Physics.OverlapSphere(script.gameObject.transform.position, 7,
             LayerMask.GetMask(layer), QueryTriggerInteraction.Collide);
@@ -183,7 +238,7 @@ public class Blaster : Gun
     {
         script.coroutines_running++;
         SphereCollider collider = script.gameObject.GetComponent<SphereCollider>();
-        script.transform.position = new Vector3(script.transform.position.x, script.transform.position.y + 1.5f, script.transform.position.z);
+        script.transform.position = new Vector3(script.transform.position.x, script.transform.position.y + 1.0f, script.transform.position.z);
         NetworkMethods.Instance.RpcSetScale(script.gameObject, new Vector3(2.4f, 2.4f, 2.4f));
         script.coroutines_running--;
         yield return null;
@@ -299,26 +354,18 @@ public class Blaster : Gun
         return "Blaster";
     }
 
-    public override void SetBaseStats()
+    public override void SetBaseStats(string _layer = "Ally")
     {
         upper_bound_damage = 35;
         lower_bound_damage = 20;
-        if (client_user)
-        {
-            layer = 13;
-            home_layer = 10;
-            color = new Color(43, 179, 234);
-        }
-        else
-        {
-            layer = 14;
-            home_layer = 12;
-            color = Color.red;
-        }
+        layer = LayerMask.NameToLayer(_layer + "Attack");
+        home_layer = LayerMask.NameToLayer(_layer + "Homing");
+        color = SpawnManager.GetTeamColor(
+            LayerMask.NameToLayer(_layer));
         range = 20;
         projectile_speed = 10;
         knockback_power = 5;
-        crit_chance = .05;
+        crit_chance = .10;
         reload_time = 4f;
         home_speed = 0;
         home_radius = 0;

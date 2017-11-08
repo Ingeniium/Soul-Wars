@@ -34,6 +34,7 @@ public partial class AIController : GenericController
         return AI.Sneak();
     }
 
+
     ValueGroup<Coordinate,Coordinate> Charge()
     {
         return new ValueGroup<Coordinate, Coordinate>(
@@ -46,7 +47,14 @@ public partial class AIController : GenericController
         Coordinate targ_coord = Map.Instance.GetPos(Target.transform.position);
         if(targ_coord == null)
         {
-            targ_coord = prev_end_coord;
+            if (prev_end_coord != null)
+            {
+                targ_coord = prev_end_coord;
+            }
+            else
+            {
+                return new ValueGroup<Coordinate, Coordinate>(null, null);
+            }
         }
         float ptr_angle = Math.Abs(ptr.rotation.eulerAngles.y);
         float targ_angle = Math.Abs(Target.transform.rotation.eulerAngles.y);
@@ -59,7 +67,7 @@ public partial class AIController : GenericController
                 for (uint i = Map.Instance.num_rects / divisor; i > 0; i--)
                 {
                     Coordinate coord = Map.Instance.GetPos(targ_coord.x + i, targ_coord.z);
-                    if (coord != null && coord.status == Coordinate.Status.Safe )
+                    if (coord != null && (coord.status == Coordinate.Status.Safe || !coord.isHazardous(transform.parent.gameObject.layer))  )
                     {
                         return new ValueGroup<Coordinate, Coordinate>(
                             Map.Instance.GetPos(ptr.position),
@@ -72,7 +80,7 @@ public partial class AIController : GenericController
                 for (uint i = Map.Instance.num_rects / divisor; i > 0; i--)
                 {
                     Coordinate coord = Map.Instance.GetPos(targ_coord.x - i, targ_coord.z);
-                    if (coord != null && coord.status == Coordinate.Status.Safe)
+                    if (coord != null && (coord.status == Coordinate.Status.Safe || !coord.isHazardous(transform.parent.gameObject.layer)))
                     { 
                         return new ValueGroup<Coordinate, Coordinate>(
                             Map.Instance.GetPos(ptr.position),
@@ -88,7 +96,7 @@ public partial class AIController : GenericController
                 for (uint i = Map.Instance.num_rects / divisor; i > 0; i--)
                 {
                     Coordinate coord = Map.Instance.GetPos(targ_coord.x, targ_coord.z + i);
-                    if (coord != null && coord.status == Coordinate.Status.Safe)
+                    if (coord != null && (coord.status == Coordinate.Status.Safe || !coord.isHazardous(transform.parent.gameObject.layer))    )
                     {
                         return new ValueGroup<Coordinate, Coordinate>(
                             Map.Instance.GetPos(ptr.position),
@@ -101,7 +109,7 @@ public partial class AIController : GenericController
                 for (uint i = Map.Instance.num_rects / divisor; i > 0; i--)
                 {
                     Coordinate coord = Map.Instance.GetPos(targ_coord.x, targ_coord.z - i);
-                    if (coord != null && coord.status == Coordinate.Status.Safe)
+                    if (coord != null && (coord.status == Coordinate.Status.Safe || !coord.isHazardous(transform.parent.gameObject.layer)))
                     {
                         return new ValueGroup<Coordinate, Coordinate>(
                             Map.Instance.GetPos(ptr.position),
@@ -114,26 +122,108 @@ public partial class AIController : GenericController
            Map.Instance.GetPos(ptr.position),
            targ_coord);
 
-    }  
+    }
 
-    IEnumerator Travel()
+    float GetCoordinateDistFromTarget(Coordinate coord)
     {
+        if (Target)
+        {
+            return Math.Abs(
+                Vector3.Distance(Map.Instance.GetCenter(coord), Target.transform.position));
+        }
+        else
+        {
+            return 0;
+        }
+    }
+
+    IEnumerator GetPathCoro(Coordinate start, Coordinate end)
+    {
+        List<Coordinate> visited = new List<Coordinate>();
+        if (Target)
+        {
+            Priority_Queue.SimplePriorityQueue<Coordinate> queue = new Priority_Queue.SimplePriorityQueue<Coordinate>();
+            if (start == null)
+            {
+                start = prev_start_coord;
+            }
+            if (start != null)
+            {
+                start.parent = null;
+            }
+            if (end == null)
+            {
+                end = prev_end_coord;
+            }
+            if (start == null || end == null)
+            {
+                yield break;
+            }
+            float tstart = Time.realtimeSinceStartup;
+            prev_start_coord = start;
+            prev_end_coord = end;
+            queue.Enqueue(start, GetCoordinateDistFromTarget(start));
+            while (Path == null)
+            {
+                start = queue.Dequeue();
+                if (start == end)
+                {
+                    /*Debug.Log(Time.realtimeSinceStartup - tstart + " seconds : " +
+                         queue.Count + " end routes considered : " +
+                         start.GetNumParents() + " parents."); */
+                    Path = start;
+                    yield break;
+                }
+                if(Time.realtimeSinceStartup > tstart + .01f || index != go_index)
+                {
+                    yield return new WaitForEndOfFrame();
+                    tstart = Time.realtimeSinceStartup;
+                }
+                int safe_layer = gameObject.transform.parent.gameObject.layer;
+                foreach (Coordinate coord in start.GetChildren())
+                {
+                    coord.traverse_cost = GetCoordinateDistFromTarget(coord);
+                    if (!visited.Contains(coord))
+                    {
+                        coord.parent = start;
+                        queue.Enqueue(coord, coord.GetTotalCost(safe_layer, can_dodge));
+                        visited.Add(coord);
+                    }
+                    else if (queue.Contains(coord) && coord.GetTotalCost(start, safe_layer, can_dodge) < queue.GetPriority(coord))
+                    {
+                        coord.parent = start;
+                        queue.UpdatePriority(coord, coord.GetTotalCost(safe_layer, can_dodge));
+                    }
+                }
+                if (queue.Count != 0)
+                {
+                    start = queue.First;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+        }
+        yield return null;
+    }
+
+    IEnumerator Travel2()
+    {
+        //yield return new WaitForSecondsRealtime(time_until_next_pathfind);
         while (this)
         {
             ValueGroup<Coordinate, Coordinate> travel_coords;
-            /*The wait for end of frame limits each run of the pathfinding algorithm
-             to one execution per frame.The time_until_next_pathfind variable
-             serves to spread out its execution between many AI,thereby
-             hopefully increasing overall game performance by reducing how much times
-             it executes in a single frame.*/
-            yield return new WaitForEndOfFrame();
-            yield return new WaitForSecondsRealtime(time_until_next_pathfind);
             if (Target)
             {
+                Path = null;
                 travel_coords = MovementFuncs[movement_func_index](this);
-                Path = GetPath(
-                   travel_coords.index,
-                   travel_coords.value);
+                StartCoroutine(GetPathCoro(travel_coords.index, travel_coords.value));
+                while(Path == null)
+                {
+                    yield return new WaitForEndOfFrame();
+                }
                 if (Path != null)
                 {
                     List<Coordinate> list = Path.GetParents();
@@ -147,73 +237,14 @@ public partial class AIController : GenericController
                     }
                 }
             }
+            go_index++;
+            if(go_index == PlayersAlive.Instance.Units.Count)
+            {
+                go_index = 0;
+            }
+            yield return new WaitForEndOfFrame();
         }
     }
-
-    Coordinate GetPath(Coordinate start, Coordinate end)
-    {
-        List<Coordinate> visited = new List<Coordinate>();
-        if (Target)
-        {
-            Priority_Queue.SimplePriorityQueue<Coordinate> queue = new Priority_Queue.SimplePriorityQueue<Coordinate>();
-            if (start == null)
-            {
-                start = prev_start_coord;
-            }
-            start.parent = null;
-            if (end == null)
-            {
-                end = prev_end_coord;
-            }
-            float tstart = Time.realtimeSinceStartup;
-            prev_start_coord = start;
-            prev_end_coord = end;
-            queue.Enqueue(start, GetCoordinateDistFromTarget(start));
-            if(end.status == Coordinate.Status.Hazard)
-            {
-                Debug.Log("Unsafe!");
-            }
-            while (Time.realtimeSinceStartup < tstart + .01f)
-            {
-                start = queue.Dequeue();
-                if (start == end)
-                {
-                    /* Debug.Log(Time.realtimeSinceStartup - tstart + " seconds : " +
-                          queue.Count + " end routes considered : " +
-                          start.GetNumParents() + " parents.");*/
-                    return start;
-                }
-                foreach (Coordinate coord in start.GetChildren())
-                { 
-                    coord.traverse_cost = GetCoordinateDistFromTarget(coord);
-                    if (!visited.Contains(coord))
-                    {
-                        coord.parent = start;
-                        queue.Enqueue(coord, coord.GetTotalCost(can_dodge));
-                        visited.Add(coord);
-                    }
-                    else if (queue.Contains(coord) && coord.GetTotalCost(start,can_dodge) < queue.GetPriority(coord))
-                    {
-                        coord.parent = start;
-                        queue.UpdatePriority(coord, coord.GetTotalCost(can_dodge));
-                    }
-
-
-                }
-                if (queue.Count != 0)
-                {
-                    start = queue.First;
-                }
-                else
-                {
-                    return null;
-                }
-            }
-
-        }
-        return null ;
-    }
-
 
 
 }

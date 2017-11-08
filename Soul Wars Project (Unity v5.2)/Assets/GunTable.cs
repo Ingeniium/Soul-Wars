@@ -23,7 +23,7 @@ public abstract partial class Gun : Item
             set
             {
                 _gun_for_consideration = value;
-                if (buttons == null)
+                if (buttons == null || buttons[0] == null)
                 {
                     InitGunTable();
                 }

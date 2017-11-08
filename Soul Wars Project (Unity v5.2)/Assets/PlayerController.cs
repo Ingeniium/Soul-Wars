@@ -24,7 +24,7 @@ public class PlayerController : GenericController
             /*A call to sync is made only if the name is being set by the player himself.
               This ensures that at the start of the game,the names of others are correctly
               displayed,and other players know his name.*/
-            if (Client.netId == netId)
+            if (Client && Client.netId == netId)
             {
                 CmdSyncNameDisplay(value);
                 CmdGetOtherNameDisplays();
@@ -64,6 +64,14 @@ public class PlayerController : GenericController
     public override void OnNetworkDestroy()
     {
         CmdRemovePlayer();
+        NetworkServer.Destroy(Shield);
+        foreach(Gun g in weapons)
+        {
+            if(g)
+            {
+                NetworkServer.Destroy(g.gameObject);
+            }
+        }
     }
 
     void Awake()
@@ -82,17 +90,43 @@ public class PlayerController : GenericController
         }
         else
         {
-            InitializeCamera();
-            InitializePlayerInterface();
             Client = this;
+            InitializeCamera();
+            InitializePlayerInterface();        
             rb = GetComponent<Rigidbody>();
             NetworkMethods.Instance.CmdSpawn("Bronze Shield",
                 gameObject,
                 new Vector3(.87f, .134f, 0),
                 new Quaternion(0, 0, 0, 0));
             StartCoroutine(SetShield());
+            CmdSyncColors();
         }
 
+    }
+
+    [Command]
+    void CmdSyncColors()
+    {
+        SyncColors();
+    }
+
+    /*For syncing colors of spawn points and enemies for the client*/
+    void SyncColors()
+    {
+         foreach (SpawnManager s in SpawnManager.GetTeamSpawns(gameObject.layer))
+         {
+             s.RpcChangeTeam(s.gameObject.layer);
+         }
+         foreach (SpawnManager s in SpawnManager.GetOpponentSpawns(gameObject.layer))
+         {
+             s.RpcChangeTeam(s.gameObject.layer);
+         }
+        foreach (AIController AI in PlayersAlive.Instance.Units)
+        {
+            GameObject shell = AI.ptr.GetChild(1).gameObject;
+            NetworkMethods.Instance.RpcSetColor(shell, shell.GetComponent<Renderer>().material.color);
+            NetworkMethods.Instance.RpcSetParent(shell, AI.ptr.gameObject, Vector3.zero, Quaternion.identity);
+        }
     }
     
     /*Code for instantiating and making the camera properly "follow"

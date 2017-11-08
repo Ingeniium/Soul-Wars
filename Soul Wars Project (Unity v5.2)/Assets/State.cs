@@ -14,9 +14,18 @@ public partial class AIController : GenericController
         Guard = 3,
     }
 
+    public void ResetHateList()
+    {
+        if(State != null)
+        {
+            State.ResetHateList();
+        }
+    }
+
     public IEnumerator SetState(Type type)
     {
-        while(SpawnManager.AllySpawnPoints.Count == 0)
+        List<SpawnManager> oppenent_spawns = SpawnManager.GetOpponentSpawns(transform.parent.gameObject.layer);
+        while (oppenent_spawns.Count == 0)
         {
             yield return new WaitForEndOfFrame();
         }
@@ -62,31 +71,18 @@ public partial class AIController : GenericController
                 Unit.UpdateAggro();
                 return false;
             }
-            /*If target is an ally player,Check if he is dead.*/
-            else if (Target.type == HealthDefence.Type.Unit)
+            /*Also check if object is on the same team or has no HP left.
+             In this case,remove their aggro from the list.*/
+            if (Target.gameObject.layer == Unit.ptr.gameObject.layer
+                || Target.HP <= 0)
             {
-                if (Target.HP <= 0)
-                {
-                    Unit.RemoveAggro(Target.netId);
-                    return false;
-                }
-                return true;
-            }
-            /*If a spawn,check if its captured by comparing its collision
-             layer to that of the default enemy unit one */
-            else if (Target.type == HealthDefence.Type.Spawn_Point)
-            {
-                if (Target.gameObject.layer == LayerMask.NameToLayer("Enemy"))
-                {
-                    Unit.RemoveAggro(Target.netId);
-                    return false;
-                }
-                return true;
+                Unit.RemoveAggro(Target.netId);
+                return false;
             }
             else
             {
-                return false;
-            }
+                return true;
+            }    
         }
 
 
@@ -115,21 +111,24 @@ public partial class AIController : GenericController
     {
         public override void ResetHateList()
         {
+            Unit.Target = null;
+            Unit.ClearHateList();
             UpdateSpawnAggro();
         }
 
         void UpdateSpawnAggro()
         {
             /*Sort from closest to farthest from unit*/
-            SpawnManager.AllySpawnPoints.SortByLeastToGreatDist(Unit.ptr.position);
-            int n = SpawnManager.AllySpawnPoints.Count;
-            foreach (SpawnManager s in SpawnManager.AllySpawnPoints)
+            List<SpawnManager> s = SpawnManager.GetOpponentSpawns(Unit.transform.parent.gameObject.layer);
+            s.SortByLeastToGreatDist(Unit.ptr.position);
+            int n = s.Count;
+            foreach (SpawnManager sp in s)
             {
                 /*Insert or Update threat information.Closer spawns are given slightly more threat
                  than farther spawns.*/
-                if (s)
+                if (sp)
                 {
-                    Unit.UpdateAggro(n * 10, s.netId, false);
+                    Unit.UpdateAggro(n * 10, sp.netId, false);
                     n--;
                 }
             }
@@ -137,7 +136,11 @@ public partial class AIController : GenericController
 
         public override void UnitAggroReaction(Collider col)
         {
-            HealthDefence target = col.gameObject.GetComponent<HealthDefence>();
+            HealthDefence target = col.gameObject.GetComponentInParent<HealthDefence>();
+            if(!target)
+            {
+                return;
+            }
             /*Players will generate 100 aggro automatically upon entering 
              aggro radius,but only if they're not on the list beforehand*/
             if (target.type == HealthDefence.Type.Unit)
@@ -154,7 +157,7 @@ public partial class AIController : GenericController
              10 units per second*/
             else if (target.type == HealthDefence.Type.Spawn_Point)
             {
-                Unit.StartCoroutine(GenerateGradualThreat(target, target.netId, 10));
+                Unit.StartCoroutine(GenerateGradualThreat(target, target.netId, 20));
             }
 
         }
@@ -169,6 +172,8 @@ public partial class AIController : GenericController
     {
         public override void ResetHateList()
         {
+            Unit.ClearHateList();
+            Unit.Target = null;
             List<PlayerController> player_list = new List<PlayerController>();
             foreach (uint u in PlayersAlive.Instance.Players)
             {

@@ -3,14 +3,15 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine.Networking;
 
-public class BulletScript : NetworkBehaviour {
-	[SyncVar] public int upper_bound_damage;
+public class BulletScript : NetworkBehaviour
+{
+    [SyncVar] public int upper_bound_damage;
     [SyncVar] public int lower_bound_damage;
     Vector3 last_pos;
     static System.Random rand = new System.Random();
-	public GameObject home;
+    public GameObject home;
     public GameObject homer;
-	[SyncVar] public float home_radius;
+    [SyncVar] public float home_radius;
     [SyncVar] public float home_speed;
     [SyncVar] public double crit_chance;
     [SyncVar] public float knockback_power;
@@ -41,16 +42,17 @@ public class BulletScript : NetworkBehaviour {
     public static List<ValueGroup<Coordinate, BulletScript>> BulletCoords = new List<ValueGroup<Coordinate, BulletScript>>();
     List<Coordinate> path_coords = new List<Coordinate>();
     private float start_time = 0;
+    private int bullet_layer = 0;
     private Coordinate current_coord;
-	// Use this for initialization
+    // Use this for initialization
 
-	void Start () 
+    void Start()
     {
         last_pos = transform.position;
         rb = GetComponent<Rigidbody>();
         StartCoroutine(WaitForGunReference());
         PlayersAlive.Instance.Bullets.Add(this);
-	}
+    }
 
     IEnumerator WaitForGunReference()
     {
@@ -65,7 +67,7 @@ public class BulletScript : NetworkBehaviour {
         HomingScript script = homer.GetComponent<HomingScript>();
         script.home_speed = home_speed;
         StartCoroutine(WaitForNetworkDestruction());
-        if(gun_reference.client_user)
+        if (gameObject.layer != LayerMask.NameToLayer("AllyAttackUndetectable"))
         {
             StartCoroutine(RecordBulletCoord());
         }
@@ -73,95 +75,98 @@ public class BulletScript : NetworkBehaviour {
 
     IEnumerator RecordBulletCoord()
     {
-        if (gameObject.layer == LayerMask.NameToLayer("AllyAttackUndetectable"))
+        yield return new WaitForFixedUpdate();
+        yield return new WaitForFixedUpdate();
+        if (gun_reference.client_user)
         {
-            yield return null;
+            bullet_layer = gun_reference.client_user.gameObject.layer;
         }
         else
         {
-            Quaternion last_rot = transform.rotation * new Quaternion(180, 180, 180, 0);
-            Vector3 projected_end_pos;
-            Coordinate projected_end_coord;
-            Coordinate start_coord;
-            uint min_x;
-            uint min_z;
-            uint max_x;
-            uint max_z;
-            while (this)
+            while (!gun_reference.transform.parent)
             {
-                if(current_coord != null)
+                yield return new WaitForEndOfFrame();
+            }
+            bullet_layer = gun_reference.GetComponentInParent<HealthDefence>().gameObject.layer;
+        }
+        Quaternion last_rot = transform.rotation * new Quaternion(180, 180, 180, 0);
+        Vector3 projected_end_pos;
+        Coordinate projected_end_coord;
+        Coordinate start_coord;
+        uint min_x;
+        uint min_z;
+        uint max_x;
+        uint max_z;
+        while (this)
+        {
+            if (Mathf.Abs(
+                Quaternion.Angle(last_rot, transform.rotation))
+                > 5f)
+            {
+                ClearHazardCoords();
+                last_rot = transform.rotation;
+                projected_end_pos = transform.position + rb.velocity * (start_time + lasting_time - Time.realtimeSinceStartup);
+                projected_end_coord = Map.Instance.GetPos(projected_end_pos);
+                start_coord = Map.Instance.GetPos(transform.position);
+                if (projected_end_coord != null && start_coord != null)
                 {
-                    current_coord.hazard_cost /= 10;
-                }
-                if (Mathf.Abs(
-                    Quaternion.Angle(last_rot, transform.rotation))
-                    > 5f)
-                {
-                    projected_end_pos = transform.forward * rb.velocity.magnitude * (start_time + lasting_time * 1.2f - Time.realtimeSinceStartup);
-                    projected_end_coord = Map.Instance.GetPos(projected_end_pos);
-                    start_coord = Map.Instance.GetPos(transform.position);
-                    if (projected_end_coord != null && start_coord != null)
+                    if (start_coord.x < projected_end_coord.x)
                     {
-                        if (start_coord.x < projected_end_coord.x)
+                        min_x = start_coord.x;
+                        max_x = projected_end_coord.x;
+                    }
+                    else
+                    {
+                        min_x = projected_end_coord.x;
+                        max_x = start_coord.x;
+                    }
+                    if (start_coord.z < projected_end_coord.z)
+                    {
+                        min_z = start_coord.z;
+                        max_z = projected_end_coord.z;
+                    }
+                    else
+                    {
+                        min_z = projected_end_coord.z;
+                        max_z = start_coord.z;
+                    }
+                    min_x--;
+                    max_x++;
+                    min_z--;
+                    max_x++;
+                    for (uint i = min_x; i <= max_x; i++)
+                    {
+                        for (uint j = min_z; j <= max_z; j++)
                         {
-                            min_x = start_coord.x;
-                            max_x = projected_end_coord.x;
-                        }
-                        else
-                        {
-                            min_x = projected_end_coord.x;
-                            max_x = start_coord.x;
-                        }
-                        if (start_coord.z < projected_end_coord.z)
-                        {
-                            min_z = start_coord.z;
-                            max_z = projected_end_coord.z;
-                        }
-                        else
-                        {
-                            min_z = projected_end_coord.z;
-                            max_z = start_coord.z;
-                        }
-                        path_coords.RemoveAll(delegate (Coordinate c)
-                        {
-                            if (c.x > max_x || c.x < min_x || c.z > max_z || c.z < min_z)
+                            if (Map.Instance.GetPos(i, j) != null &&
+                                !path_coords.Contains(
+                                Map.Instance.GetPos(i, j)))
                             {
-                                c.status = Coordinate.Status.Safe;
-                                return true;
-                            }
-                            else
-                            {
-                                return false;
-                            }
-                        });
-                        min_x--;
-                        max_x++;
-                        min_z--;
-                        max_x++;
-                        for (uint i = min_x; i <= max_x; i++)
-                        {
-                            for (uint j = min_z; j <= max_z; j++)
-                            {
-                                if (Map.Instance.GetPos(i, j) != null &&
-                                    !path_coords.Contains(
-                                    Map.Instance.GetPos(i, j)))
-                                {
-                                    path_coords.Add(Map.Instance.GetPos(i, j));
-                                    Map.Instance.GetPos(i, j).status = Coordinate.Status.Hazard;
-                                    Map.Instance.GetPos(i, j).hazard_cost = upper_bound_damage * 1000;
-                                }
+                                Map.Instance.GetPos(i, j).hazard_layers.Add(bullet_layer);
+                                path_coords.Add(Map.Instance.GetPos(i, j));
+                                Map.Instance.GetPos(i, j).status = Coordinate.Status.Hazard;
+                                Map.Instance.GetPos(i, j).hazard_cost += upper_bound_damage * 1000;
                             }
                         }
                     }
                 }
-                current_coord = Map.Instance.GetPos(transform.position);
-                if (current_coord != null)
-                {
-                    current_coord.hazard_cost *= 10;
-                }
-                yield return new WaitForFixedUpdate();
+            }
+            yield return new WaitForFixedUpdate();
+        }
+    }
+
+    void ClearHazardCoords()
+    {
+        foreach (Coordinate coord in path_coords)
+        {
+            coord.hazard_cost -= upper_bound_damage * 1000;
+            coord.hazard_layers.Remove(bullet_layer);
+            if (coord.hazard_layers.Count == 0)
+            {
+                coord.status = Coordinate.Status.Safe;
             }
         }
+        path_coords.Clear();
     }
 
     [ServerCallback]
@@ -175,41 +180,36 @@ public class BulletScript : NetworkBehaviour {
             yield return new WaitForEndOfFrame();
         }
         GetComponent<Collider>().enabled = false;
-        foreach(Coordinate c in path_coords)
-        {
-            c.status = Coordinate.Status.Safe;
-            c.hazard_cost -= upper_bound_damage * 1000; 
-        }
+        ClearHazardCoords();
         NetworkServer.Destroy(gameObject);
     }
 
 
     IEnumerator Pierce(Collision hit)
     {
-            Collider first = GetComponent<Collider>();
-            Collider second = null;
-            Collider third = null;
-            if (hit != null)
+        Collider first = GetComponent<Collider>();
+        Collider second = null;
+        Collider third = null;
+        if (hit != null)
+        {
+            second = hit.gameObject.GetComponent<Collider>();
+            third = null;
+            if (homer)
             {
-                 second = hit.gameObject.GetComponent<Collider>();
-                 third = null;
-                if (homer)
-                {
-                    third = homer.GetComponent<Collider>();
-                    Physics.IgnoreCollision(third, second);
-                }
+                third = homer.GetComponent<Collider>();
+                Physics.IgnoreCollision(third, second);
             }
-           
-             yield return new WaitForSeconds(1);
-             if (second)
-             {
-                 Physics.IgnoreCollision(first, second, false);
-                 if (third)
-                 {
-                     Physics.IgnoreCollision(third, second, false);
-                 }
-             }
-    
+        }
+        yield return new WaitForSeconds(1);
+        if (second)
+        {
+            Physics.IgnoreCollision(first, second, false);
+            if (third)
+            {
+                Physics.IgnoreCollision(third, second, false);
+            }
+        }
+
     }
 
     IEnumerator Pierce(Collider hit)
@@ -238,7 +238,7 @@ public class BulletScript : NetworkBehaviour {
     }
 
 
-   [ServerCallback]
+    [ServerCallback]
     void OnCollisionEnter(Collision hit)
     {
         try
@@ -249,30 +249,32 @@ public class BulletScript : NetworkBehaviour {
         {
             StopAllCoroutines();
             NetworkServer.Destroy(gameObject);
+            ClearHazardCoords();
             //Always destroy the object upon any detectable impact upon an exception           
         }
     }
 
-   [ServerCallback]
-   void OnTriggerEnter(Collider hit)
-   {
-       try
-       {
-           if (can_pierce)//Check put there b/c otherwise,homing detection would call it
-           {
-               StartCoroutine(Damage(null, hit));
-           }
-       }
-       catch (System.NullReferenceException e)
-       {
-           StopAllCoroutines();
-           NetworkServer.Destroy(gameObject);
-           //Always destroy the object upon any detectable impact upon an exception           
-       }
-   }
+    [ServerCallback]
+    void OnTriggerEnter(Collider hit)
+    {
+        try
+        {
+            if (can_pierce)//Check put there b/c otherwise,homing detection would call it
+            {
+                StartCoroutine(Damage(null, hit));
+            }
+        }
+        catch (System.NullReferenceException e)
+        {
+            StopAllCoroutines();
+            NetworkServer.Destroy(gameObject);
+            ClearHazardCoords();
+            //Always destroy the object upon any detectable impact upon an exception           
+        }
+    }
 
-     
-    IEnumerator Damage(Collision hit,Collider col = null)
+
+    IEnumerator Damage(Collision hit, Collider col = null)
     {
         if (!damaging)
         {
@@ -311,86 +313,133 @@ public class BulletScript : NetworkBehaviour {
                     {
                         StartCoroutine(Pierce(col));
                     }
-
                 }
-                int damage = rand.Next(lower_bound_damage, upper_bound_damage);
-                float da = (100 - Target.defence);
-                da /= 100;
-                int d = (int)((float)damage * da);
-                if (d > 0)
+                ValueGroup<bool,int> v = GetDamage(Target);
+                bool crit = v.index;
+                int damage = v.value;
+                if (damage > 0)
                 {
-                    bool crit = false;
-                    if ((crit_chance - Target.crit_resistance) >= rand.NextDouble() + .001)//bullets with a crit chance of 0 shouldn't be able to land a crit
-                    {
-                        crit = true;
-                        d *= 3;
-                    }
                     Target.StartCoroutine(Target.DetermineChill(chill_strength));
-                    Target.StartCoroutine(Target.DetermineBurn(burn_strength, d));
+                    Target.StartCoroutine(Target.DetermineBurn(burn_strength, damage));
                     Target.StartCoroutine(Target.DetermineMezmerize(mezmerize_strength));
-                    Target.StartCoroutine(Target.DetermineSunder(sunder_strength, d));
+                    Target.StartCoroutine(Target.DetermineSunder(sunder_strength, damage));
                     if (crit)
                     {
-                        Target.RpcDisplayHPChange(new Color(114, 0, 198), d);//Violet
+                        Target.RpcDisplayHPChange(new Color(114, 0, 198), damage);//Violet
                     }
                     else
                     {
-                        Target.RpcDisplayHPChange(Color.red, d);
+                        Target.RpcDisplayHPChange(Color.red, damage);
                     }
-
-
-                    if (Target.has_exp)
-                    {                                                                                        //
-                        if (d >= Target.HP)
-                        {
-                            gun_reference.experience += (int)(Target.HP * Target.exp_rate);
-                        }
-                        else
-                        {
-                            gun_reference.experience += (int)(d * Target.exp_rate);
-                        }
-                    }
+                    ApplyExperience(damage, Target);
                     if (Target.Controller)
                     {
                         Target.GetComponent<Rigidbody>().velocity = Vector3.zero;
                     }
-                    AIController AI = Target.GetComponentInParent<AIController>();
+                    AIController AI = Target.GetComponentInChildren<AIController>();
                     if (AI != null)
                     {
-                        AI.UpdateAggro(d, gun_reference.client_user.netId);
+                        ApplyAggro(AI,damage);
                     }
-                    Target.HP -= d;
+                    else
+                    {
+                        SpawnManager SP = Target.GetComponent<SpawnManager>();
+                        if (SP)
+                        {
+                            ApplySpawnCounterDamage(SP, damage);
+                        }
+                    }
+                    Target.HP -= damage;
                 }
             }
-            /*If target is null or hit enemy detetion
-           /* else if ((col && !col.isTrigger) || (hit != null && !hit.gameObject.GetComponent<Collider>().isTrigger))
-            {
-                /* Before destruction,Stop all coroutines(the gun_abilities operating on this instance)
-                 to prevent exceptions from those coroutines
-                foreach (Coordinate c in path_coords)
-                {
-                    c.status = Coordinate.Status.Safe;
-                }
-                StopAllCoroutines();
-                NetworkServer.Destroy(gameObject);
-            }  */
             if (!can_pierce && !can_bounce)
             {
                 GetComponent<Collider>().enabled = false;
-                foreach (Coordinate c in path_coords)
-                {
-                    c.status = Coordinate.Status.Safe;
-                    c.hazard_cost -= upper_bound_damage * 1000;
-                }
+                ClearHazardCoords();
                 NetworkServer.Destroy(gameObject);
             }
-            
             damaging = false;
         }
     }
-       
 
-   
+    /*returns damage based on random rolls, the boundaries of damage set
+      by lower-bound_damage and upper_bound_damage fields,Target defence, and gun abilities
+      which can affect those fields.Also returns whether it crit or not. */
+    ValueGroup<bool,int> GetDamage(HealthDefence Target)
+    {
+        int damage = rand.Next(lower_bound_damage, upper_bound_damage);
+        float da = (100 - Target.defence);
+        da /= 100;
+        int d = (int)((float)damage * da);
+        bool crit = false;
+        if ((crit_chance - Target.crit_resistance) 
+            >= rand.NextDouble() + .001)//bullets with a crit chance of 0 shouldn't be able to land a crit
+        {
+            crit = true;
+            d *= 3;
+        }
+        return new ValueGroup<bool, int>(crit, d);
+    }
+
+    /*Applies experience to whomever shot the damaging bullet*/
+    void ApplyExperience(int damage,HealthDefence Target)
+    {
+        if (Target.has_exp && gun_reference.client_user)
+        {                                                                                        //
+            if (damage >= Target.HP)
+            {
+                gun_reference.experience += (int)(Target.HP * Target.exp_rate);
+            }
+            else
+            {
+                gun_reference.experience += (int)(damage * Target.exp_rate);
+            }
+        }
+    }
+
+    /*Applies aggro to whoever damage the AIController.Assumes that
+      the target is a cpu.*/
+    void ApplyAggro(AIController AI,int damage)
+    {
+        /*This distinction is made,for players' guns aren't children for the sake
+          of manual position syncing in multiplayer.*/
+        NetworkInstanceId ID;
+        string name;
+        if (gun_reference.client_user)
+        {
+            name = gun_reference.client_user.player_name;
+            ID = gun_reference.client_user.netId;
+        }
+        else
+        {
+            NetworkBehaviour pnb = gun_reference.transform.parent.GetComponent<NetworkBehaviour>();
+            ID = pnb.netId;
+            AIController aAI = pnb.GetComponentInChildren<AIController>();
+            name = LayerMask.LayerToName(aAI.ptr.gameObject.layer) + " CPU "
+                + aAI.index;
+        }
+        AI.UpdateAggro(damage, ID);
+        AI.PrintAggro(name, ID.Value);
+    }
+
+    /*Adds damage d to the counter of SpawnManager SP.Assumes that 
+     SP isn't null.*/
+    void ApplySpawnCounterDamage(SpawnManager SP,int d)
+    {
+        if (gun_reference.client_user)
+        {
+            Target.UpdateDamageCounter(d, gun_reference.client_user.gameObject.layer);
+        }
+        else
+        {
+            Target.UpdateDamageCounter(d, gun_reference.GetComponentInParent<HealthDefence>().gameObject.layer);
+        }
+    }
+
+    
+
+
+
 }
 
 

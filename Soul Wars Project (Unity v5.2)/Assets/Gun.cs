@@ -107,14 +107,19 @@ public abstract partial class Gun : Item {
     [ClientRpc]
     protected void RpcLevelupIndication()
     {
-        if (client_user && PlayerController.Client.netId == client_user.netId && !level_up_indication)
+        if (client_user && PlayerController.Client.netId == client_user.netId)
         {
-            level_up_indication = Instantiate(client_user.cooldown_canvas, item_image_show.transform.position + new Vector3(-.25f, 0, 0), client_user.cooldown_canvas.transform.rotation) as Canvas;
-            level_up_indication.GetComponentInChildren<Text>().text = "!";
-            level_up_indication.GetComponentInChildren<Text>().color = Color.green;
-            level_up_indication.transform.SetParent(item_image_show.transform);
+            if (!level_up_indication)
+            {
+                level_up_indication = Instantiate(client_user.cooldown_canvas, item_image_show.transform.position + new Vector3(-.25f, 0, 0), client_user.cooldown_canvas.transform.rotation) as Canvas;
+                level_up_indication.GetComponentInChildren<Text>().text = "!";
+                level_up_indication.GetComponentInChildren<Text>().color = Color.green;
+                level_up_indication.transform.SetParent(item_image_show.transform);
+            }
+            TutorialHelper.Instance.LevelUpIndication(GetBaseName(), level);
         }
     }
+
 
     protected override void OnClientUserChange()
     {
@@ -154,11 +159,9 @@ public abstract partial class Gun : Item {
         if (weapon_fire)
         {
             weapon_fire.GetComponent<Rigidbody>().velocity = dir * projectile_speed; 
-        }
-        
+        }       
     }
-    
-    
+      
     public virtual void Shoot()
     {
         bullet = Instantiate(Bullet, barrel_end.position, barrel_end.rotation) as GameObject;

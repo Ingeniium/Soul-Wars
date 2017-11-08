@@ -8,32 +8,32 @@ public class Haze : Gun
     private readonly static string[] gun_ability_names = new string[12] 
     {
         "Fog", "Conflagration", null,
-        "Resistance","Fume",null,
+        "Resistance","Fume","Epidemic",
         "Debilitate","Engulf",null,
         "Infect","Cloud",null
     };
     private readonly static string[] gun_name_addons = new string[12] 
     {
         "Fog", "Conflagration", null,
-        "Insulant", "Toxic",null,
+        "Insulant", "Toxic","Contagious",
         "Debilitating", "Ominous",null,
         "Infectious", "Cloudy", null
     };
     private readonly static string[] gun_ability_desc = new string[12] 
     {
         "Fog" + "\n Adds +10 Chill strength to bullets.",
-        "Conflagration" + "\n Adds +10 Burn strenght to bullets.",
+        "Conflagration" + "\n Adds +10 Burn strength to bullets.",
         null,
 
         "Resistance" + "\n Enemy bullets that pass thru" + "\n this bullet will have half power" + "\n to most status effects.",
         "Fume" + "\n Adds one to two points of damage" + "\n to the bullet upon hitting" + "\n new targets.",
-        null,
+        "Epidemic" + "\n Allows chance for status effects" + "\n of enemies to spread within bullet's radius.",
 
         "Debilitate" + "\n Bullets ignore half target resistance" + "\n to most status effects.",
         "Engulf" + "\n Causes bullets to stick to their first target.",
         null,
 
-        "Infect" + "\n Bullets from allies and yourself will" + "\n have +5 resistance to most status effects" + "\n upon crossing bullets from this gun.",
+        "Infect" + "\n Bullets from allies and yourself will" + "\n gain +5 standard status power" + "\n upon crossing bullets from this gun.",
         "Cloud" + "\n Doubles the size of the bullets.",
         null
     };
@@ -47,7 +47,7 @@ public class Haze : Gun
 
         Resistance,
         Fume,
-        null,
+        Epidemic,
 
         Debilitate,
         Engulf,
@@ -72,6 +72,70 @@ public class Haze : Gun
         script.burn_strength += .10;
         script.coroutines_running--;
         yield return null;
+    }
+
+    private static IEnumerator Epidemic(Gun gun, BulletScript script)
+    { 
+        bool chill = false;
+        bool stun = false;
+        bool burn = false;
+        bool mez = false;
+        bool sunder = false;
+        const double num = .05;
+        while(script)
+        {
+            while (!script.Target)
+            {
+                yield return new WaitForEndOfFrame();
+            }
+            if(chill)
+            {
+                script.Target.StartCoroutine(script.Target.DetermineChill(num));
+            }
+            if(stun)
+            {
+                script.Target.DetermineStun(1);
+            }
+            if(burn)
+            {
+                int damage = script.lower_bound_damage 
+                    + (script.upper_bound_damage - script.lower_bound_damage) / 2
+                    - script.Target.defence;
+                script.Target.StartCoroutine(script.Target.DetermineBurn(num, damage));
+            }
+            if(mez)
+            {
+                script.Target.StartCoroutine(script.Target.DetermineMezmerize(num));
+            }
+            if(sunder)
+            {
+                int damage = script.lower_bound_damage 
+                    + (script.upper_bound_damage - script.lower_bound_damage) / 2
+                    - script.Target.defence;
+                script.Target.StartCoroutine(script.Target.DetermineSunder(num, damage));
+            }
+            if(script.Target.chilling)
+            {
+                chill = true;
+            }
+            if(script.Target.stunned)
+            {
+                stun = true;
+            }
+            if(script.Target.burning)
+            {
+                burn = true;
+            }
+            if(script.Target.mezmerized)
+            {
+                mez = true;
+            }
+            if(script.Target.sundered)
+            {
+                sunder = true;
+            }
+            yield return new WaitForEndOfFrame();
+        }
     }
 
     private static IEnumerator Fume(Gun gun, BulletScript script)
@@ -108,16 +172,10 @@ public class Haze : Gun
 
     private static IEnumerator Resistance(Gun gun, BulletScript script)
     {
-        string layer = null;
         List<uint> IDs = new List<uint>();
-        if (script.gameObject.layer == 13)
-        {
-            layer = "EnemyAttack";
-        }
-        else
-        {
-            layer = "AllyAttack";
-        }
+        string layer = "";
+        layer = LayerMask.LayerToName(
+            script.gameObject.layer);
         while (script)
         {
             Collider[] bullet_colliders = Physics.OverlapSphere(script.gameObject.transform.position, 2,
@@ -179,20 +237,16 @@ public class Haze : Gun
 
     private static IEnumerator Infect(Gun gun, BulletScript script)
     {
-        string layer = null;
         List<uint> IDs = new List<uint>();
-        if (script.gameObject.layer == 13)
-        {
-            layer = "AllyAttack";
-        }
-        else
-        {
-            layer = "EnemyAttack";
-        }
+        IDs.Add(script.netId.Value);
         while (script)
         {
-            Collider[] bullet_colliders = Physics.OverlapSphere(script.gameObject.transform.position, 2,
-                LayerMask.GetMask(layer), QueryTriggerInteraction.Collide);
+            float radius = script.GetComponent<BoxCollider>().size.z;
+            Collider[] bullet_colliders = Physics.OverlapSphere(script.gameObject.transform.position,
+                radius,
+                LayerMask.GetMask(
+                    LayerMask.LayerToName(script.gameObject.layer)),
+                QueryTriggerInteraction.Collide);
             foreach (Collider col in bullet_colliders)
             {
                 BulletScript b = col.gameObject.GetComponent<BulletScript>();
@@ -218,17 +272,24 @@ public class Haze : Gun
         }
         Rigidbody rb = script.GetComponent<Rigidbody>();
         Rigidbody trb = script.Target.GetComponent<Rigidbody>();
-        rb.freezeRotation = true;
-        script.transform.position = new Vector3(script.Target.transform.position.x,
-            script.transform.position.y,
-            script.Target.transform.position.z);
-        script.coroutines_running--;
-        while (script)
+        if (trb)
         {
-            rb.velocity = new Vector3(trb.velocity.x,
-                0,
-                trb.velocity.z);
-            yield return new WaitForFixedUpdate();
+            rb.freezeRotation = true;
+            script.transform.position = new Vector3(script.Target.transform.position.x,
+                script.transform.position.y,
+                script.Target.transform.position.z);
+            script.coroutines_running--;
+            while (script)
+            {
+                rb.velocity = new Vector3(trb.velocity.x,
+                    0,
+                    trb.velocity.z);
+                yield return new WaitForFixedUpdate();
+            }
+        }
+        else
+        {
+            rb.velocity = Vector3.zero;
         }
     }
 
@@ -279,22 +340,14 @@ public class Haze : Gun
         return "Haze";
     }
 
-    public override void SetBaseStats()
+    public override void SetBaseStats(string _layer = "Ally")
     {
         upper_bound_damage = 8;
         lower_bound_damage = 6;
-        if (client_user)
-        {
-            layer = 13;
-            home_layer = 10;
-            color = new Color(43, 179, 234);
-        }
-        else
-        {
-            layer = 14;
-            home_layer = 12;
-            color = Color.red;
-        }
+        layer = LayerMask.NameToLayer(_layer + "Attack");
+        home_layer = LayerMask.NameToLayer(_layer + "Homing");
+        color = SpawnManager.GetTeamColor(
+            LayerMask.NameToLayer(_layer));
         range = 10;
         projectile_speed = 2;
         knockback_power = 5;

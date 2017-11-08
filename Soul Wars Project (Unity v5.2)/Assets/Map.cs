@@ -23,6 +23,7 @@ public class Coordinate
         Hazard = 1
     }
 
+    public List<int> hazard_layers = new List<int>();
     public Status status = Status.Safe;
     public static bool operator ==(Coordinate lhs, Coordinate rhs)
     {
@@ -179,27 +180,32 @@ public class Coordinate
         return possible_coords;
     }
 
-    public float GetTotalCost(bool account_for_hazards = false,int iterations = 0)
+    public bool isHazardous(int safe_layer)
+    {
+        return status == Status.Hazard &&
+        hazard_layers.Exists(delegate (int i)
+        {
+            return (i != safe_layer);
+        });
+    }
+
+    public float GetTotalCost(int safe_layer = 0,bool account_for_hazards = false,int iterations = 0)
     {
         if (parent != null && iterations < 100)
         {
             iterations++;
-            if (account_for_hazards)
+            if (account_for_hazards && isHazardous(safe_layer))
             {
-                return parent.GetTotalCost(account_for_hazards, iterations) + traverse_cost + hazard_cost;
+                return parent.GetTotalCost(safe_layer,account_for_hazards, iterations) + traverse_cost + hazard_cost;
             }
             else
             {
-                return parent.GetTotalCost(account_for_hazards,iterations) + traverse_cost;
+                return parent.GetTotalCost(safe_layer,account_for_hazards,iterations) + traverse_cost;
             }
         }
         else
         {
-            if (iterations >= 100)
-            {
-                 Debug.Log("Overflow : too many parents");
-            }
-            if (account_for_hazards)
+            if (account_for_hazards && isHazardous(safe_layer))
             {
                 return traverse_cost + hazard_cost;
             }
@@ -210,15 +216,15 @@ public class Coordinate
         }
     }
 
-    public float GetTotalCost(Coordinate coord, bool account_for_hazards = false)
+    public float GetTotalCost(Coordinate coord,int safe_layer = 0, bool account_for_hazards = false)
     {
         if (coord != null)
         {
-            return traverse_cost + coord.GetTotalCost(account_for_hazards);
+            return traverse_cost + coord.GetTotalCost(safe_layer,account_for_hazards);
         }
         else
         {
-            if (account_for_hazards)
+            if (account_for_hazards && isHazardous(safe_layer))
             {
                 return traverse_cost + hazard_cost;
             }
@@ -337,6 +343,23 @@ public class Map : NetworkBehaviour
         each rectangle*/
         uint coord_x = (uint)((pos.x - min_x) / interval_x);
         uint coord_z = (uint)((pos.z - min_z) / interval_z);
+        const uint NEGATIVE_OUTBOUND = 1000;
+        if (coord_x > NEGATIVE_OUTBOUND)
+        {
+            coord_x = 0;
+        }
+        else if (coord_x > num_rects)
+        {
+            coord_x = num_rects;
+        }
+        if (coord_z > NEGATIVE_OUTBOUND)
+        {
+            coord_z = 0;
+        }
+        else if (coord_z > num_rects)
+        {
+            coord_z = num_rects;
+        }
         ValueGroup<uint, uint> Key = new ValueGroup<uint, uint>(coord_x, coord_z);
         if (Coords.ContainsKey(Key))
         {
@@ -367,9 +390,16 @@ public class Map : NetworkBehaviour
          The 'x' and 'z' * 1.5f represents centerpoint of the 
          rectangle,while the intervals scale them up. to the
           platform's actual dimensions.*/
-        return new Vector3((interval_x * ((float)coord.x + .5f)) + min_x,
-            11f,
-            (interval_z * ((float)coord.z + .5f)) + min_z);
+        if (coord != null)
+        {
+            return new Vector3((interval_x * ((float)coord.x + .5f)) + min_x,
+                11f,
+                (interval_z * ((float)coord.z + .5f)) + min_z);
+        }
+        else
+        {
+            return Vector3.zero;
+        }
     }
 
     public void RemoveCoord(ValueGroup<uint, uint> key)

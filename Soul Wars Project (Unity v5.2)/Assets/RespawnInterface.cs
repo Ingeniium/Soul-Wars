@@ -1,4 +1,4 @@
-﻿using UnityEngine.Networking;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -6,6 +6,7 @@ using UnityEngine.UI;
 public class RespawnInterface : MonoBehaviour
 {
     public static RespawnInterface Instance;
+    int player_team_layer;
     public Canvas wait_for_respawn;
     private Canvas wait_for_respawn_show;
     public Canvas game_over;
@@ -19,20 +20,21 @@ public class RespawnInterface : MonoBehaviour
         get { return _spawn_index; }
         set
         {
-            if (value == SpawnManager.AllySpawnPoints.Count)
+            List<SpawnManager> spawn_team = SpawnManager.GetTeamSpawns(player_team_layer);
+            if (value == spawn_team.Count) 
             {
                 _spawn_index = 0;
             }
             else if (value < 0)
             {
-                _spawn_index = SpawnManager.AllySpawnPoints.Count - 1;
+                _spawn_index = spawn_team.Count - 1;
             }
             else
             {
                 _spawn_index = value;
             }
-            PlayerController.Client.cam_show.transform.position = SpawnManager.AllySpawnPoints[spawn_index].transform.position + PlayerController.Client.cam_show.GetComponent<PlayerFollow>()._offset;
-            PlayerController.Client.transform.position = SpawnManager.AllySpawnPoints[spawn_index].transform.position + SpawnManager.AllySpawnPoints[spawn_index].spawn_direction;
+            PlayerController.Client.cam_show.transform.position = spawn_team[spawn_index].transform.position + PlayerController.Client.cam_show.GetComponent<PlayerFollow>()._offset;
+            PlayerController.Client.transform.position = spawn_team[spawn_index].transform.position + spawn_team[spawn_index].spawn_direction;
         }
     }
     public bool respawning
@@ -54,11 +56,13 @@ public class RespawnInterface : MonoBehaviour
     {
         Instance = this;
         enabled = false;
+        player_team_layer = PlayerController.Client.gameObject.layer;
     }
 
     void Update()
     {
-        if (SpawnManager.AllySpawnPoints.Count == 0 && PlayersAlive.Instance.Players.Count == 0)
+        List<SpawnManager> spawn_team = SpawnManager.GetTeamSpawns(player_team_layer);
+        if ( spawn_team.Count == 0 && PlayersAlive.Instance.Players.Count == 0)
         {
             if (wait_for_respawn_show)
             {
@@ -74,11 +78,11 @@ public class RespawnInterface : MonoBehaviour
         }
         else if (!wait_for_respawn_show && !choose_respawn_location_show)
         {
-            if (SpawnManager.AllySpawnPoints.Count > 1)
+            if (spawn_team.Count > 1)
             {
                 choose_respawn_location_show = Instantiate(choose_respawn_location, choose_respawn_location.transform.position, choose_respawn_location.transform.rotation) as Canvas;
                 choose_respawn_location_show.worldCamera = PlayerController.Client.cam_show;
-                PlayerController.Client.cam_show.transform.position = SpawnManager.AllySpawnPoints[spawn_index].transform.position + PlayerController.Client.cam_show.GetComponent<PlayerFollow>()._offset;
+                PlayerController.Client.cam_show.transform.position = spawn_team[spawn_index].transform.position + PlayerController.Client.cam_show.GetComponent<PlayerFollow>()._offset;
                 Button[] buttons = choose_respawn_location_show.GetComponentsInChildren<Button>();
                 spawn_index_text = choose_respawn_location_show.GetComponentInChildren<Text>();
                 spawn_index_text.text = spawn_index.ToString();
@@ -102,7 +106,7 @@ public class RespawnInterface : MonoBehaviour
                     spawn_index_text.text = spawn_index.ToString();
                 });
             }
-            else if (SpawnManager.AllySpawnPoints.Count == 1)
+            else if (spawn_team.Count == 1)
             {
                 spawn_index = 0;
                 respawning = false;

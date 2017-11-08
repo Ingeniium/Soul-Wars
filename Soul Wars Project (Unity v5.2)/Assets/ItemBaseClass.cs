@@ -100,7 +100,7 @@ public void OnPointerClick()
 
     public abstract XElement RecordValuesToSaveFile();
     public abstract void RecordValuesFromSaveFile(XElement element);
-    public abstract void SetBaseStats();
+    public abstract void SetBaseStats(string _layer = "Ally");
     
 }
 

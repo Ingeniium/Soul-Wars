@@ -1,40 +1,55 @@
-﻿using UnityEngine;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.Networking;
 
-public class SpawnManager : NetworkBehaviour {
-    public static List<SpawnManager> AllySpawnPoints = new List<SpawnManager>();
-    public static List<SpawnManager> EnemySpawnPoints = new List<SpawnManager>() ;
+public class SpawnManager : NetworkBehaviour
+{
+    private static List<SpawnManager> AllySpawnPoints = new List<SpawnManager>();
+    private static List<SpawnManager> EnemySpawnPoints = new List<SpawnManager>();
+    private static List<SpawnManager> EnemySpawnPoints2 = new List<SpawnManager>();
+    private static List<SpawnManager> EnemySpawnPoints3 = new List<SpawnManager>();
+    private static List<SpawnManager> EnemySpawnPoints4 = new List<SpawnManager>();
     private static List<SpawnManager> TotalSpawnPoints = new List<SpawnManager>();
+    private static List<List<SpawnManager>> SpawnTeamList = new List<List<SpawnManager>>();
     private HealthDefence HP;
-    public static float enemy_respawn_time = 10f;
+    static float cpu_respawn_time = 2;
     public int ally_defence_bonus = 30;
     public static float ally_respawn_time = 3;
     public GameObject stand;
     public Vector3 spawn_direction;
-	// Use this for initialization
+    static List<Color> team_colors = new List<Color>()
+    {
+        Color.blue,
+        Color.red,
+        Color.green,
+        Color.gray,
+        Color.yellow
+    };
+    // Use this for initialization
 
     void Awake()
     {
+        SpawnTeamList.Add(AllySpawnPoints);
+        SpawnTeamList.Add(EnemySpawnPoints);
+        SpawnTeamList.Add(EnemySpawnPoints2);
+        SpawnTeamList.Add(EnemySpawnPoints3);
+        SpawnTeamList.Add(EnemySpawnPoints4);
         HP = GetComponent<HealthDefence>();
         TotalSpawnPoints.Add(this);
-        switch (gameObject.layer)
-        {
-            case 9:
-                AllySpawnPoints.Add(this);
-                HP.defence += ally_defence_bonus;
-                break;
-            case 8:
-                EnemySpawnPoints.Add(this);
-                break;
-        }
+    }
 
+    void Start()
+    {
+        if (isServer)
+        {
+            RpcChangeTeam(gameObject.layer);
+            ChangeTeam(gameObject.layer);
+        }
     }
 
     public static void BeforeSceneLoad()
     {
-        Debug.Log("Called");
         /*Oddly enough,static variables actually REMAIN across scene changes.*/
         if (PlayerController.Client.isServer)
         {
@@ -44,83 +59,156 @@ public class SpawnManager : NetworkBehaviour {
             }
         }
         TotalSpawnPoints.Clear();
-        AllySpawnPoints.Clear();
-        EnemySpawnPoints.Clear();
+        foreach (List<SpawnManager> sp in SpawnTeamList)
+        {
+            sp.Clear();
+        }
+        SpawnTeamList.Clear();
+    }
+
+    /*Gets the list of spawn points captured by that specific team
+     (denoted by their respective layer)*/
+    public static List<SpawnManager> GetTeamSpawns(int layer)
+    {
+        if (layer == LayerMask.NameToLayer("Ally"))
+        {
+            return AllySpawnPoints;
+        }
+        else if (layer == LayerMask.NameToLayer("Enemy"))
+        {
+            return EnemySpawnPoints;
+        }
+        else
+        {
+            const int EXTRA_TEAM_OFFSET = 16;
+            return SpawnTeamList[layer - EXTRA_TEAM_OFFSET];
+        }
+    }
+
+    public static List<SpawnManager> GetOpponentSpawns(int excluded_layer)
+    {
+        List<SpawnManager> spawn_points = new List<SpawnManager>();
+        foreach (SpawnManager s in TotalSpawnPoints)
+        {
+            if (s.gameObject.layer != excluded_layer)
+            {
+                spawn_points.Add(s);
+            }
+        }
+        return spawn_points;
+    }
+
+    /*Gets color of the specific team (denoted by their respective layer)*/
+    public static Color GetTeamColor(int layer, float alpha = 1)
+    {
+        if (layer == LayerMask.NameToLayer("Ally"))
+        {
+            return new Color(team_colors[0].r,
+                team_colors[0].g,
+                team_colors[0].b,
+                alpha);
+        }
+        else if (layer == LayerMask.NameToLayer("Enemy"))
+        {
+            return new Color(team_colors[1].r,
+                team_colors[1].g,
+                team_colors[1].b,
+                alpha);
+        }
+        else
+        {
+            const int EXTRA_TEAM_OFFSET = 16;
+            return new Color(team_colors[layer - EXTRA_TEAM_OFFSET].r,
+                team_colors[layer - EXTRA_TEAM_OFFSET].g,
+                team_colors[layer - EXTRA_TEAM_OFFSET].b,
+                alpha);
+        }
     }
 
     [ClientRpc]
-    public void RpcMakeEnemy()
+    public void RpcChangeTeam(int layer)
     {
-        AllySpawnPoints.Remove(this);
-        EnemySpawnPoints.Add(this);
-        HP.defence -= ally_defence_bonus;
+        ChangeTeam(layer);
     }
 
-    [ClientRpc]
-    public void RpcMakeAlly()
+    /*Changes the team of the spawn point */
+    void ChangeTeam(int layer)
     {
-        EnemySpawnPoints.Remove(this);
-        AllySpawnPoints.Add(this);
-        HP.defence += ally_defence_bonus;
+        if (layer != gameObject.layer)
+        {
+            List<SpawnManager> prev_list = GetTeamSpawns(gameObject.layer);
+            prev_list.Remove(this);
+            if (prev_list == AllySpawnPoints)
+            {
+                HP.defence -= ally_defence_bonus;
+            }
+        }
+        List<SpawnManager> new_list = GetTeamSpawns(layer);
+        if (!new_list.Contains(this))
+        {
+            new_list.Add(this);
+            if (new_list == AllySpawnPoints)
+            {
+                HP.defence += ally_defence_bonus;
+            }
+            Color new_color = GetTeamColor(layer);
+            Renderer[] rends = GetComponentsInChildren<Renderer>();
+            foreach (Renderer r in rends)
+            {
+                r.material.color = new_color;
+            }
+            gameObject.layer = layer;
+        }
     }
-    
-    public static IEnumerator WaitForRespawn(HealthDefence killed) 
-    {
 
+    /*Deals with the process of death and respawn*/
+    public static IEnumerator WaitForRespawn(HealthDefence killed)
+    {
+        int ORIGINAL_LAYER = killed.gameObject.layer;
+        List<SpawnManager> team_spawns = GetTeamSpawns(ORIGINAL_LAYER);
         NetworkMethods.Instance.CmdSetLayer(killed.gameObject, LayerMask.NameToLayer("Invincible"));
-        int layer;
-            if (SpawnManager.AllySpawnPoints.Count != 0)
-            {
-                SpawnManager.AllySpawnPoints[0].RpcDisableScripts(killed.gameObject);
-            }
-            else
-            {
-                SpawnManager.EnemySpawnPoints[0].RpcDisableScripts(killed.gameObject);
-            }
-            if (killed.gameObject.layer == 8)
-            {
-                yield return new WaitForSeconds(enemy_respawn_time);
-                while (EnemySpawnPoints.Count < 1)
-                {
-                    yield return new WaitForEndOfFrame();
-                }
-            killed.transform.position = EnemySpawnPoints[0].transform.position + EnemySpawnPoints[0].spawn_direction;
-            layer = LayerMask.NameToLayer("Enemy");
-            }
-            else
-            {
-            layer = LayerMask.NameToLayer("Ally");
-                PlayersAlive.Instance.Players.Remove(killed.netId.Value);
-                if (SpawnManager.AllySpawnPoints.Count != 0)
-                {
-                    SpawnManager.AllySpawnPoints[0].RpcInterface(killed.netId);
-                }
-                else
-                {
-                    SpawnManager.EnemySpawnPoints[0].RpcInterface(killed.netId);
-                }
-                yield return new WaitForSeconds(ally_respawn_time);
-                while (AllySpawnPoints.Count < 1)
-                {
-                    yield return new WaitForEndOfFrame();
-                }
-                PlayersAlive.Instance.Players.Add(killed.netId.Value);
-            }
-            killed.HP = killed.maxHP;
-            if (SpawnManager.AllySpawnPoints.Count != 0)
-            {
-                SpawnManager.AllySpawnPoints[0].RpcEnableScripts(killed.gameObject);
-                SpawnManager.AllySpawnPoints[0].RpcBlink(killed.gameObject);
-            }
-            else
-            {
-                SpawnManager.EnemySpawnPoints[0].RpcEnableScripts(killed.gameObject);
-                SpawnManager.EnemySpawnPoints[0].RpcBlink(killed.gameObject);
-            }
-        NetworkMethods.Instance.CmdSetLayer(killed.gameObject, layer);
+        TotalSpawnPoints[0].RpcDisableScripts(killed.gameObject);
 
+        bool is_cpu = !killed.Controller || killed.Controller is AIController;
+        if (is_cpu)
+        {
+            yield return new WaitForSeconds(cpu_respawn_time);
+        }
+        else
+        {
+            PlayersAlive.Instance.Players.Remove(killed.netId.Value);
+            TotalSpawnPoints[0].RpcInterface(killed.netId);
+            yield return new WaitForSeconds(ally_respawn_time);
+        }
 
+        while (team_spawns.Count < 1)
+        {
+            yield return new WaitForEndOfFrame();
+        }
 
+        if (is_cpu)
+        {
+            killed.gameObject.transform.position = team_spawns[0].transform.position
+             + team_spawns[0].spawn_direction;
+           (killed.Controller as AIController).ResetHateList();
+        }
+        else
+        {
+            PlayersAlive.Instance.Players.Add(killed.netId.Value);
+            while (RespawnInterface.Instance.respawning)
+            {
+                yield return new WaitForEndOfFrame();
+            }
+            int index = RespawnInterface.Instance.spawn_index;
+            killed.gameObject.transform.position = team_spawns[index].transform.position
+                + team_spawns[index].spawn_direction;
+
+        }
+
+        killed.HP = killed.maxHP;
+        TotalSpawnPoints[0].RpcEnableScripts(killed.gameObject);
+        TotalSpawnPoints[0].RpcBlink(killed.gameObject);
+        NetworkMethods.Instance.CmdSetLayer(killed.gameObject, ORIGINAL_LAYER);
     }
 
     [ClientRpc]
@@ -138,7 +226,7 @@ public class SpawnManager : NetworkBehaviour {
         StartCoroutine(Blink(g));
     }
 
-   
+
 
     [ClientRpc]
     private void RpcDisableScripts(GameObject killed)
@@ -227,7 +315,7 @@ public class SpawnManager : NetworkBehaviour {
                     {
                         r.enabled = false;
                     }
-                     break;
+                    break;
                 case false:
                     rend.enabled = true;
                     foreach (Renderer r in child_rends)
@@ -242,8 +330,8 @@ public class SpawnManager : NetworkBehaviour {
         {
             r.enabled = true;
         }
-        
+
     }
 }
-	
+
 

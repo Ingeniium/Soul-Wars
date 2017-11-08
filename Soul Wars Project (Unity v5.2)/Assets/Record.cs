@@ -42,6 +42,7 @@ class Record : MonoBehaviour
         ']',
         '?',
         '!',
+        '.',
         ' '
     };
 
@@ -291,8 +292,12 @@ class Record : MonoBehaviour
 
     void Start()
     {
-        if (PlayerController.Client)
+        if (PlayerController.Client && !EnemyInitialization.Instance.watch_only)
         {
+            if(win_canvas_show)
+            {
+                Destroy(win_canvas_show);
+            }
             Button[] buttons = PlayerController.Client.player_interface_show.GetComponentsInChildren<Button>();
             if (File.Exists("SoulWars.xml"))
             {
@@ -315,10 +320,13 @@ class Record : MonoBehaviour
 
     void Update()
     {
-        if (SpawnManager.AllySpawnPoints.Count == 2
+        List<SpawnManager> opponent_spawns = SpawnManager.GetOpponentSpawns(PlayerController.Client.gameObject.layer);
+        if (opponent_spawns.Count == 0
             && !PlayersAlive.Instance.Units.Find(delegate(AIController AI)
             {
-                return (AI.GetComponentInParent<HealthDefence>().HP > 0);
+                return (AI.GetComponentInParent<HealthDefence>().HP > 0
+                && AI.transform.parent.gameObject.layer 
+                != PlayerController.Client.gameObject.layer);
             })
             && !win_canvas_show)
         {
@@ -339,14 +347,14 @@ class Record : MonoBehaviour
         SpawnManager.BeforeSceneLoad();
         if (PlayerController.Client.isServer)
         {   
-            yield return new WaitForSeconds(3);
-            if (PlayersAlive.Instance.level >= PlayersAlive.Instance.max_level)
+            yield return new WaitForSeconds(2);
+            if (NetworkSceneSync.Instance.server_level >= NetworkSceneSync.Instance.max_level)
             {
                 NetworkManager.singleton.ServerChangeScene("Networksample");
             }
             else
             {
-                NetworkManager.singleton.ServerChangeScene("Level " + (PlayersAlive.Instance.level + 1));
+                NetworkManager.singleton.ServerChangeScene("Level " + (NetworkSceneSync.Instance.server_level + 1));
             }
         }
         else

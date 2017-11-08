@@ -43,11 +43,7 @@ public class HealthDefence : NetworkBehaviour {
                 switch (type)
                 {
                     case Type.Unit:
-                        if (Controller is PlayerController)
-                        {
-                            PlayersAlive.Instance.Players.Remove(netId.Value);
-                        }
-                        StartCoroutine(SpawnManager.WaitForRespawn(this));
+                        Controller.StartCoroutine(SpawnManager.WaitForRespawn(this));
                         break;
                     case Type.Shield:
                         if (shield_collider)
@@ -64,22 +60,21 @@ public class HealthDefence : NetworkBehaviour {
                         break;
 
                     case Type.Spawn_Point:
-                        if (gameObject.layer == 9)
+                        SpawnManager s = GetComponent<SpawnManager>();
+                        damage_counter_list.Sort(delegate (ValueGroup<int,int> lhs, ValueGroup<int,int> rhs)
                         {
-                            NetworkMethods.Instance.RpcSetLayer(gameObject, 8);
-                            SpawnManager s = GetComponent<SpawnManager>();
-                            NetworkMethods.Instance.RpcSetColor(gameObject, Color.red);
-                            NetworkMethods.Instance.RpcSetColor(s.stand, Color.red);
-                            s.RpcMakeEnemy();
-                        }
-                        else
-                        {
-                            NetworkMethods.Instance.RpcSetLayer(gameObject,9);
-                            SpawnManager s = GetComponent<SpawnManager>();
-                            NetworkMethods.Instance.RpcSetColor(gameObject, new Color32(52, 95, 221, 225));
-                            NetworkMethods.Instance.RpcSetColor(s.stand, new Color32(52, 95, 221, 225));
-                            s.RpcMakeAlly();
-                        }
+                            if(lhs.value > rhs.value)
+                            {
+                                return -1;
+                            }
+                            else
+                            {
+                                return 1;
+                            }
+                        });
+                        int new_layer = damage_counter_list[0].index;
+                        s.RpcChangeTeam(new_layer);
+                        damage_counter_list.Clear();
                         _HP = maxHP;
                         break;
                 }
@@ -172,6 +167,7 @@ public class HealthDefence : NetworkBehaviour {
     public GameObject health_change_canvas;
     public GameObject health_change_show;
     static System.Random rand = new System.Random();
+    private List<ValueGroup<int, int>> damage_counter_list = new List<ValueGroup<int, int>>();
     public Type type = Type.Unit;
     public enum Type
     {
@@ -206,10 +202,31 @@ public class HealthDefence : NetworkBehaviour {
         }
     }
 
+    public void UpdateDamageCounter(int damage,int layer)
+    {
+        if(layer == LayerMask.NameToLayer("Invincible"))
+        {
+            return;
+        }
+        int index = damage_counter_list.FindIndex(delegate (ValueGroup<int,int> v)
+        {
+            return (v.index == layer);
+        });
+        if(index == -1)
+        {
+            damage_counter_list.Add(new ValueGroup<int, int>(layer, damage));
+        }
+        else
+        {
+            damage_counter_list[index] = new ValueGroup<int, int>(layer,
+                damage_counter_list[index].value + damage);
+        }
+    }
+
     public IEnumerator DetermineChill(double chill)
     {
         double net_chill = chill - chill_resistance;
-        if (net_chill > 0 && type == HealthDefence.Type.Unit && !chilling && rand.NextDouble() < net_chill * 8)
+        if (net_chill > 0 && type == Type.Unit && !chilling && rand.NextDouble() < net_chill * 8)
         {
             chilling = true;
             float original = Controller.speed;
@@ -229,7 +246,7 @@ public class HealthDefence : NetworkBehaviour {
     public IEnumerator DetermineBurn(double burn,int damage)
     {
         double net_burn = burn - burn_resistance;
-        if (net_burn > 0 && !burning && type == HealthDefence.Type.Unit && rand.NextDouble() < net_burn * 6)
+        if (net_burn > 0 && !burning && rand.NextDouble() < net_burn * 6)
         {
             burning = true;
             int num = (damage / 3) + (int)net_burn * 100;
@@ -249,7 +266,7 @@ public class HealthDefence : NetworkBehaviour {
     public IEnumerator DetermineMezmerize(double mez)
     {
         double net_mez = mez - mezmerize_resistance;
-        if (net_mez > 0 && !mezmerized && type == HealthDefence.Type.Unit && rand.NextDouble() < net_mez * 6)
+        if (net_mez > 0 && !mezmerized && type == Type.Unit && rand.NextDouble() < net_mez * 6)
         {
             mezmerized = true;
             foreach (Gun gun in Controller.weapons)
@@ -330,6 +347,7 @@ public class HealthDefence : NetworkBehaviour {
     {
         if (ailment_display_show)
         {
+            StopAllCoroutines();
             ailments.Clear();
             ailment_text.text = "";
         }

@@ -14,6 +14,9 @@ public class EnemyInitialization : NetworkBehaviour
     public double class_mod_chance;
     public double unique_mod_chance;
     public double misc_mod_chance;
+    public bool watch_only;
+    public float radius_offset = 0;
+    public static EnemyInitialization Instance;
 
     static System.Random rand = new System.Random();
     /*With each roll,you have a 60% chance of an enemy getting a mod*/
@@ -92,14 +95,33 @@ public class EnemyInitialization : NetworkBehaviour
         {AddLevel}
     };
 
-    /*void Awake()
+    void Awake()
     {
-       /* EnemyGroup e = GetComponent<EnemyGroup>();
-        for(int i = 0;i < 30;i++)
+        Instance = this; 
+    } 
+
+    IEnumerator WatchOnly()
+    {
+        while(!PlayerController.Client)
         {
-            Item.CopyComponent(e, gameObject);
-        }      
-    } */
+            yield return new WaitForEndOfFrame();
+        }
+        yield return new WaitForSeconds(.2f);
+        PlayerController.Client.enabled = false;
+        PlayerController.Client.player_name = "";
+        Destroy(PlayerController.Client.player_interface_show.gameObject);
+        PlayerController.Client.gameObject.layer = LayerMask.NameToLayer("Invincible");
+        PlayerController.Client.GetComponent<Renderer>().enabled = false;
+        NetworkServer.Destroy(PlayerController.Client.Shield);
+        foreach(Gun g in PlayerController.Client.weapons)
+        {
+            if(g)
+            {
+               // Destroy(g.item_image_show);
+                NetworkServer.Destroy(g.gameObject);
+            }
+        }
+    }
 
 
     [ServerCallback]
@@ -110,10 +132,23 @@ public class EnemyInitialization : NetworkBehaviour
         GameObject Shield = null;
         GameObject[] Weapons;
         float time = .1f;
-        foreach (EnemyGroup e in GetComponents<EnemyGroup>())
+        List<float> times = new List<float>();
+        EnemyGroup[] cpus = GetComponents<EnemyGroup>();
+        for(int i = 0;i < cpus.Length;i++)
+        {
+            times.Add(i * 1.2f);      
+        }
+        foreach (EnemyGroup e in cpus)
         {
             Enemy = Instantiate(e.Enemy, e.pos, Quaternion.identity) as GameObject;
             AIController Unit = Enemy.GetComponentInChildren<AIController>();
+            Unit.GetComponent<SphereCollider>().radius += radius_offset;
+            Enemy.layer = (int)e.cpu_layer;
+            Unit.gameObject.layer = LayerMask.NameToLayer(
+                LayerMask.LayerToName(Enemy.layer)
+                + "Detection");
+            Enemy.GetComponentsInChildren<Renderer>()[1].material.color
+                = SpawnManager.GetTeamColor(Enemy.layer,.5f);
             StartCoroutine(Unit.SetState(e.AISetting));
             if (e.can_block)
             {
@@ -130,7 +165,7 @@ public class EnemyInitialization : NetworkBehaviour
                 Weapon = Instantiate(g, e.pos, Quaternion.identity) as GameObject;
                 NetworkServer.Spawn(Weapon);
                 gun = Weapon.GetComponent<Gun>();
-                gun.SetBaseStats();
+                gun.SetBaseStats(LayerMask.LayerToName(Enemy.layer));
                 gun.barrel_end = Weapon.transform.GetChild(0);
                 Weapons[i] = Weapon;
                 Unit.weapons.Add(gun);
@@ -142,16 +177,21 @@ public class EnemyInitialization : NetworkBehaviour
             Unit.movement_func_index = (int)e.MovementSetting;
             Unit.main_gun = Weapons[0].GetComponent<Gun>();
             Unit.GetComponentInParent<HealthDefence>().Controller = Unit;
-            Unit.time_until_next_pathfind = time;
-            time += .05f;
+            int index = rand.Next(times.Count);
+            Unit.time_until_next_pathfind = times[index];
+            times.RemoveAt(index);
             NetworkServer.Spawn(Enemy);
-            StartCoroutine(WaitForMethodsRef(Enemy,Weapons,Unit.Shield));
+            StartCoroutine(WaitForMethodsRef(Enemy,Weapons,Unit.Shield,Enemy.layer));
             Unit.weapons.RemoveNull();
+        }
+        if(watch_only)
+        {
+            StartCoroutine(WatchOnly());
         }
     }
 
     [ServerCallback]
-    IEnumerator WaitForMethodsRef(GameObject Enemy,GameObject[] Gun, GameObject Shield)
+    IEnumerator WaitForMethodsRef(GameObject Enemy,GameObject[] Gun, GameObject Shield,int layer)
     {
         while (!NetworkMethods.Instance)
         {
@@ -171,7 +211,8 @@ public class EnemyInitialization : NetworkBehaviour
         {
             Shield.GetComponent<HealthDefence>().scale_factor = 3f;
             NetworkMethods.Instance.RpcSetParent(Shield, Enemy, new Vector3(.87f, .134f, 0), new Quaternion(0, 0, 0, 0));
-            NetworkMethods.Instance.RpcSetLayer(Shield, 8);
+            NetworkMethods.Instance.RpcSetLayer(Shield, layer);
+            
         }
         AIController Unit = Enemy.GetComponentInChildren<AIController>();
         switch (Enemy.ToString())

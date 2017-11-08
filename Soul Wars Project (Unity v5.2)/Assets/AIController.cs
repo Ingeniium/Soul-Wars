@@ -19,6 +19,9 @@ public partial class AIController : GenericController {
     public float minimal_distance = 4f;
     public float time_until_next_pathfind;//Time after the next frame that it does the A* algorithm again.Important in maintaing gameplay smoothness.
     private Vector3 move_dir;//Direction to move.
+    public int index;
+    private static int go_index = 0;
+    public GameObject shell;
 
     /*List showing who is aggro'd and what their aggro values are.Made into an array as structs can't be modified from lists.*/
     public ValueGroup[] HateList = new ValueGroup[20]
@@ -36,19 +39,18 @@ public partial class AIController : GenericController {
         new ValueGroup(0,-1), new ValueGroup(0,-1)
     };
 
+    private readonly static ValueGroup NOT_SET = new ValueGroup(-1, -1);
+
     private static System.Random rand = new System.Random();
     private ObjectiveState State;//Sets the objective and reaction to certain ally objects coming into range
-    float GetCoordinateDistFromTarget(Coordinate coord)
-    {
-        return Math.Abs(
-            Vector3.Distance(Map.Instance.GetCenter(coord), Target.transform.position));
-    }
-
 
     [ServerCallback]
     void Awake()
     {
         GetComponentInParent<HealthDefence>().Controller = this;
+        prb = GetComponentInParent<Rigidbody>();
+        GameObject shell_show = Instantiate(shell, ptr.position,Quaternion.identity, ptr) as GameObject;
+        NetworkServer.Spawn(shell_show);
     }
 
     [ServerCallback]
@@ -56,9 +58,16 @@ public partial class AIController : GenericController {
     {
         base.Start();
         enemy_attack_detection = GetComponent<SphereCollider>();
+        index = PlayersAlive.Instance.Units.Count;
         PlayersAlive.Instance.Units.Add(this);
-        prb = GetComponentInParent<Rigidbody>();
-        StartCoroutine(WaitForPlayers());
+        if (!EnemyInitialization.Instance.watch_only)
+        {
+            StartCoroutine(WaitForPlayers());
+        }
+        else
+        {
+            StartCoroutine(Travel2());
+        }
 
     }
 
@@ -86,11 +95,8 @@ public partial class AIController : GenericController {
             yield return new WaitForEndOfFrame();
         }
         PlayersAlive.Instance.CmdUnpause();
-        StartCoroutine(Travel());
+        StartCoroutine(Travel2());
     }
-
-
-
 
     [ServerCallback]
     void FixedUpdate()
@@ -128,9 +134,11 @@ public partial class AIController : GenericController {
     [ServerCallback]
     void OnTriggerEnter(Collider col)
     {
-        /*If a player or spawn point was detected within aggro radius,
+        /*If an opponent or spawn point was detected within aggro radius,
          react based on State instructions*/
-        if (State != null && (col.gameObject.layer == LayerMask.NameToLayer("Ally")))
+        if (State != null
+            && !(LayerMask.LayerToName(col.gameObject.layer).Contains(
+                "Attack")))
         {
             State.UnitAggroReaction(col);
         }
@@ -188,6 +196,17 @@ public partial class AIController : GenericController {
                 yield return new WaitForFixedUpdate();
             }
         }
+    }
+
+    public void PrintAggro(string aggresor_name,uint ID)
+    { 
+        float aggro = Array.Find(HateList, delegate (ValueGroup v)
+        {
+           return (v.index == ID);
+        }).value;
+        string team = LayerMask.LayerToName(ptr.gameObject.layer);
+        Debug.Log(team + " CPU " + index + "'s aggro towards " + aggresor_name
+            + " : " + aggro);
     }
  
     public void UpdateAggro(int damage = 0, NetworkInstanceId player_id = new NetworkInstanceId(),bool account_attack_dist = true)
@@ -287,7 +306,7 @@ public partial class AIController : GenericController {
             if(index != -1)
             {
                 Target = null;
-                HateList[index] = new ValueGroup(-1,-1);
+                HateList[index] = NOT_SET;
                 UpdateAggro();
             }
         }
@@ -305,18 +324,17 @@ public partial class AIController : GenericController {
         });
         if (index != -1)
         {
-            HateList[index] = new ValueGroup(-1, -1);
+            HateList[index] = NOT_SET;
             UpdateAggro();
         }
     }
 
     void ClearHateList()
     {
-        for (int i = 0; i < 20; i++)
+        for (int i = 0; i < HateList.Length; i++)
         {
-            HateList[i] = new ValueGroup(-1, -1);
+            HateList[i] = NOT_SET;
         }
-        State.ResetHateList();
     }
 
 
