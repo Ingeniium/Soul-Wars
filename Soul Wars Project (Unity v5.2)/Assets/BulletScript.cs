@@ -42,8 +42,9 @@ public class BulletScript : NetworkBehaviour
     public static List<ValueGroup<Coordinate, BulletScript>> BulletCoords = new List<ValueGroup<Coordinate, BulletScript>>();
     List<Coordinate> path_coords = new List<Coordinate>();
     private float start_time = 0;
-    private int bullet_layer = 0;
     private Coordinate current_coord;
+    public float coord_radius = 3;
+
     // Use this for initialization
 
     void Start()
@@ -69,98 +70,94 @@ public class BulletScript : NetworkBehaviour
         StartCoroutine(WaitForNetworkDestruction());
         if (gameObject.layer != LayerMask.NameToLayer("AllyAttackUndetectable"))
         {
-            StartCoroutine(RecordBulletCoord());
+            StartCoroutine(TrackBulletCoordinates());
         }
     }
 
-    IEnumerator RecordBulletCoord()
+    /*Updates coordinates based on what the bullet "occupies".
+     The collider that is considered for what it "occupies"
+     is set by coord_area,which is set editor time and gun 
+     abilities at run time.*/
+    IEnumerator TrackBulletCoordinates()
     {
-        yield return new WaitForFixedUpdate();
-        yield return new WaitForFixedUpdate();
+        while (!gun_reference.client_user &&
+            !gun_reference.transform.parent)
+        {
+            yield return new WaitForFixedUpdate();
+        }
+        int bullet_layer = GetBulletLayer();
+        const float TIME_FOR_NEXT_TRACKING = .2f;
+        while (this)
+        {
+            AddColliderCoordsToPathCoords(bullet_layer);
+            yield return new WaitForSeconds(TIME_FOR_NEXT_TRACKING);
+        }
+    }
+
+    /*Adds coordinates that the collider "occupies"
+     based on the world bounds the collider takes up.*/
+    void AddColliderCoordsToPathCoords(int bullet_layer)
+    {
+        ClearHazardCoords();
+        /*Using collider.bounds actually doesn't give you absolute extrema x and z position values(i checked), 
+         on sphere colliders.Since not every bullet has a sphere collider as a homing or damage collision mechanism,
+         a field named coord_radius is used instead.*/
+        Vector3 pos = transform.position;
+        for (float i = pos.x - coord_radius; i <= pos.x + coord_radius; i += Map.Instance.interval_x)
+        {
+            for (float j = pos.z - coord_radius; j <= pos.z + coord_radius; j += Map.Instance.interval_z)
+            {
+                Vector3 new_pos = new Vector3(i, 13, j);
+                Coordinate coord = Map.Instance.GetPos(new_pos);
+                float cost = upper_bound_damage * 25;
+                AddCoordToPathCoords(coord, cost, bullet_layer);
+            }
+        }
+    }
+
+    /*Adds a bullet to the path coords list, and updates each coordinate's
+      hazard info.*/
+    void AddCoordToPathCoords(Coordinate coord, float cost, int bullet_layer)
+    {
+        if (coord != null && !path_coords.Contains(coord))
+        {
+            coord.hazard_layers.Add(new ValueGroup<ValueGroup<uint, int>, float>(
+                new ValueGroup<uint, int>(netId.Value,
+                bullet_layer),
+                cost));
+            coord.status = Coordinate.Status.Hazard;
+            path_coords.Add(coord);
+        }
+    }
+
+    /*Returns the layer of whomever owns the gun that
+      created this bullet*/
+    int GetBulletLayer()
+    {
+        int bullet_layer = 0;
         if (gun_reference.client_user)
         {
             bullet_layer = gun_reference.client_user.gameObject.layer;
         }
         else
         {
-            while (!gun_reference.transform.parent)
-            {
-                yield return new WaitForEndOfFrame();
-            }
             bullet_layer = gun_reference.GetComponentInParent<HealthDefence>().gameObject.layer;
         }
-        Quaternion last_rot = transform.rotation * new Quaternion(180, 180, 180, 0);
-        Vector3 projected_end_pos;
-        Coordinate projected_end_coord;
-        Coordinate start_coord;
-        uint min_x;
-        uint min_z;
-        uint max_x;
-        uint max_z;
-        while (this)
-        {
-            if (Mathf.Abs(
-                Quaternion.Angle(last_rot, transform.rotation))
-                > 5f)
-            {
-                ClearHazardCoords();
-                last_rot = transform.rotation;
-                projected_end_pos = transform.position + rb.velocity * (start_time + lasting_time - Time.realtimeSinceStartup);
-                projected_end_coord = Map.Instance.GetPos(projected_end_pos);
-                start_coord = Map.Instance.GetPos(transform.position);
-                if (projected_end_coord != null && start_coord != null)
-                {
-                    if (start_coord.x < projected_end_coord.x)
-                    {
-                        min_x = start_coord.x;
-                        max_x = projected_end_coord.x;
-                    }
-                    else
-                    {
-                        min_x = projected_end_coord.x;
-                        max_x = start_coord.x;
-                    }
-                    if (start_coord.z < projected_end_coord.z)
-                    {
-                        min_z = start_coord.z;
-                        max_z = projected_end_coord.z;
-                    }
-                    else
-                    {
-                        min_z = projected_end_coord.z;
-                        max_z = start_coord.z;
-                    }
-                    min_x--;
-                    max_x++;
-                    min_z--;
-                    max_x++;
-                    for (uint i = min_x; i <= max_x; i++)
-                    {
-                        for (uint j = min_z; j <= max_z; j++)
-                        {
-                            if (Map.Instance.GetPos(i, j) != null &&
-                                !path_coords.Contains(
-                                Map.Instance.GetPos(i, j)))
-                            {
-                                Map.Instance.GetPos(i, j).hazard_layers.Add(bullet_layer);
-                                path_coords.Add(Map.Instance.GetPos(i, j));
-                                Map.Instance.GetPos(i, j).status = Coordinate.Status.Hazard;
-                                Map.Instance.GetPos(i, j).hazard_cost += upper_bound_damage * 1000;
-                            }
-                        }
-                    }
-                }
-            }
-            yield return new WaitForFixedUpdate();
-        }
+        return bullet_layer;
     }
 
+    /*Removes the bullet's info from the coord (essentially marking that the 
+     bullet no longer "occupies" the area anymore) and clears the list of path
+     coordinates.*/
     void ClearHazardCoords()
     {
         foreach (Coordinate coord in path_coords)
         {
-            coord.hazard_cost -= upper_bound_damage * 1000;
-            coord.hazard_layers.Remove(bullet_layer);
+            coord.hazard_layers.RemoveAll(delegate (ValueGroup<ValueGroup<uint, int>, float> v)
+            {
+                uint id = v.index.index;
+                return (id == netId.Value);
+            });
             if (coord.hazard_layers.Count == 0)
             {
                 coord.status = Coordinate.Status.Safe;
@@ -248,8 +245,8 @@ public class BulletScript : NetworkBehaviour
         catch (System.NullReferenceException e)
         {
             StopAllCoroutines();
-            NetworkServer.Destroy(gameObject);
             ClearHazardCoords();
+            NetworkServer.Destroy(gameObject);
             //Always destroy the object upon any detectable impact upon an exception           
         }
     }
@@ -267,12 +264,11 @@ public class BulletScript : NetworkBehaviour
         catch (System.NullReferenceException e)
         {
             StopAllCoroutines();
-            NetworkServer.Destroy(gameObject);
             ClearHazardCoords();
+            NetworkServer.Destroy(gameObject);
             //Always destroy the object upon any detectable impact upon an exception           
         }
     }
-
 
     IEnumerator Damage(Collision hit, Collider col = null)
     {
@@ -314,15 +310,13 @@ public class BulletScript : NetworkBehaviour
                         StartCoroutine(Pierce(col));
                     }
                 }
-                ValueGroup<bool,int> v = GetDamage(Target);
+                ValueGroup<bool, int> v = GetDamage(Target);
                 bool crit = v.index;
                 int damage = v.value;
                 if (damage > 0)
                 {
-                    Target.StartCoroutine(Target.DetermineChill(chill_strength));
-                    Target.StartCoroutine(Target.DetermineBurn(burn_strength, damage));
-                    Target.StartCoroutine(Target.DetermineMezmerize(mezmerize_strength));
-                    Target.StartCoroutine(Target.DetermineSunder(sunder_strength, damage));
+                    double[] powers = { burn_strength,sunder_strength,chill_strength, mezmerize_strength };
+                    Target.DetermineStatusEffects(powers, damage);
                     if (crit)
                     {
                         Target.RpcDisplayHPChange(new Color(114, 0, 198), damage);//Violet
@@ -331,24 +325,9 @@ public class BulletScript : NetworkBehaviour
                     {
                         Target.RpcDisplayHPChange(Color.red, damage);
                     }
-                    ApplyExperience(damage, Target);
-                    if (Target.Controller)
-                    {
-                        Target.GetComponent<Rigidbody>().velocity = Vector3.zero;
-                    }
-                    AIController AI = Target.GetComponentInChildren<AIController>();
-                    if (AI != null)
-                    {
-                        ApplyAggro(AI,damage);
-                    }
-                    else
-                    {
-                        SpawnManager SP = Target.GetComponent<SpawnManager>();
-                        if (SP)
-                        {
-                            ApplySpawnCounterDamage(SP, damage);
-                        }
-                    }
+                    ApplyExperience(damage, Target as UnitHealthDefence);
+                    ApplyAggro(damage, Target as UnitHealthDefence);                 
+                    ApplySpawnCounterDamage(damage,Target as SpawnPointHealthDefence);
                     Target.HP -= damage;
                 }
             }
@@ -365,14 +344,14 @@ public class BulletScript : NetworkBehaviour
     /*returns damage based on random rolls, the boundaries of damage set
       by lower-bound_damage and upper_bound_damage fields,Target defence, and gun abilities
       which can affect those fields.Also returns whether it crit or not. */
-    ValueGroup<bool,int> GetDamage(HealthDefence Target)
+    ValueGroup<bool, int> GetDamage(HealthDefence Target)
     {
         int damage = rand.Next(lower_bound_damage, upper_bound_damage);
         float da = (100 - Target.defence);
         da /= 100;
         int d = (int)((float)damage * da);
         bool crit = false;
-        if ((crit_chance - Target.crit_resistance) 
+        if ((crit_chance - Target.crit_resistance)
             >= rand.NextDouble() + .001)//bullets with a crit chance of 0 shouldn't be able to land a crit
         {
             crit = true;
@@ -382,9 +361,9 @@ public class BulletScript : NetworkBehaviour
     }
 
     /*Applies experience to whomever shot the damaging bullet*/
-    void ApplyExperience(int damage,HealthDefence Target)
+    void ApplyExperience(int damage, UnitHealthDefence Target)
     {
-        if (Target.has_exp && gun_reference.client_user)
+        if (Target && gun_reference.client_user)
         {                                                                                        //
             if (damage >= Target.HP)
             {
@@ -399,44 +378,49 @@ public class BulletScript : NetworkBehaviour
 
     /*Applies aggro to whoever damage the AIController.Assumes that
       the target is a cpu.*/
-    void ApplyAggro(AIController AI,int damage)
+    void ApplyAggro(int damage, UnitHealthDefence Target)
     {
         /*This distinction is made,for players' guns aren't children for the sake
           of manual position syncing in multiplayer.*/
-        NetworkInstanceId ID;
-        string name;
-        if (gun_reference.client_user)
+        if (Target)
         {
-            name = gun_reference.client_user.player_name;
-            ID = gun_reference.client_user.netId;
+            AIController AI = Target.GetComponentInChildren<AIController>();
+            if (AI)
+            {
+                NetworkInstanceId ID;
+                if (gun_reference.client_user)
+                {
+                    ID = gun_reference.client_user.netId;
+                }
+                else
+                {
+                    NetworkBehaviour pnb = gun_reference.transform.parent.GetComponent<NetworkBehaviour>();
+                    ID = pnb.netId;
+                    AIController aAI = pnb.GetComponentInChildren<AIController>();
+                }
+                AI.UpdateAggro(damage, ID);
+            }
         }
-        else
-        {
-            NetworkBehaviour pnb = gun_reference.transform.parent.GetComponent<NetworkBehaviour>();
-            ID = pnb.netId;
-            AIController aAI = pnb.GetComponentInChildren<AIController>();
-            name = LayerMask.LayerToName(aAI.ptr.gameObject.layer) + " CPU "
-                + aAI.index;
-        }
-        AI.UpdateAggro(damage, ID);
-        AI.PrintAggro(name, ID.Value);
     }
 
     /*Adds damage d to the counter of SpawnManager SP.Assumes that 
      SP isn't null.*/
-    void ApplySpawnCounterDamage(SpawnManager SP,int d)
+    void ApplySpawnCounterDamage(int damage,SpawnPointHealthDefence Target)
     {
-        if (gun_reference.client_user)
+        if (Target)
         {
-            Target.UpdateDamageCounter(d, gun_reference.client_user.gameObject.layer);
-        }
-        else
-        {
-            Target.UpdateDamageCounter(d, gun_reference.GetComponentInParent<HealthDefence>().gameObject.layer);
+            if (gun_reference.client_user)
+            {
+                Target.UpdateDamageCounter(damage, gun_reference.client_user.gameObject.layer);
+            }
+            else
+            {
+                Target.UpdateDamageCounter(damage, gun_reference.GetComponentInParent<HealthDefence>().gameObject.layer);
+            }
         }
     }
 
-    
+
 
 
 

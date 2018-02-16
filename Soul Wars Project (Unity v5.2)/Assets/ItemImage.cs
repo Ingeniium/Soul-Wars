@@ -33,7 +33,8 @@ public class ItemImage : MonoBehaviour {
 
     void Start()
     {
-        settings_canvas_show = Instantiate(settings_canvas, transform.position, settings_canvas.transform.rotation, transform);
+        settings_canvas_show = Instantiate(settings_canvas, Vector3.zero, settings_canvas.transform.rotation, transform);
+        settings_canvas_show.transform.localPosition = Vector3.zero;
         settings_text = settings_canvas_show.GetComponentInChildren<Text>();
     }
 
@@ -101,8 +102,9 @@ public class ItemImage : MonoBehaviour {
     {
         item_descritption_canvas_show = TextBox.Instance.CreateDescBox(
             transform,
-            transform.position + new Vector3(1.5f, 0, 1.75f), 
-            item_script.ToString());  
+            new Vector3(transform.position.x + 2.5f,transform.position.y,transform.position.z +2.5f), 
+            item_script.ToString()
+            );  
     }
     
     public void OnPointerDown()

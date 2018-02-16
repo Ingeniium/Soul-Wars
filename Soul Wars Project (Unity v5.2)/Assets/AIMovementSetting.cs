@@ -11,6 +11,7 @@ public partial class AIController : GenericController
     private Coordinate prev_start_coord;//Used in case the next start coord is null.(See
     private Coordinate prev_end_coord;//Used in case the next end coord is null.
     public bool can_dodge;
+    private float minimal_distance = 1.5f;
 
     public enum MovementMode
     {
@@ -34,12 +35,86 @@ public partial class AIController : GenericController
         return AI.Sneak();
     }
 
+    /*Gets a coordinate that simply has minimal distance - i 
+      added to the coordinates z value.It iterates until it gets 
+      an existing coord to return.*/
+    ValueGroup<Coordinate,float> GetMinimalDistStarterCoord(Coordinate coord)
+    {
+        for(float i = minimal_distance;i > minimal_distance * -1;i -= .5f)
+        {
+            Vector3 pos = Map.Instance.GetCenter(coord);
+            pos = new Vector3(pos.x, pos.y, pos.z + i);
+            Coordinate new_coord = Map.Instance.GetPos(pos);
+            //Coordinate new_coord = Map.Instance.GetPos(coord.x, coord.z + (uint)i);
+            if(new_coord != null)
+            {
+                return new ValueGroup<Coordinate, float>(new_coord, i);
+            }
+        }
+        return new ValueGroup<Coordinate, float>(coord, minimal_distance) ;
+    }
 
-    ValueGroup<Coordinate,Coordinate> Charge()
+
+    /*Gets the closest coord whose center is minimum distance away
+      from the target coordinate.Note that coordinate target doesn't
+      have to the coordinate of the AI's current target*/    
+    Coordinate GetClosestCoordToTargetCoord(Coordinate target)
+    {
+        if(target == null)
+        {
+            return null;
+        }
+        const float INTERVAL_THETA = 20;
+        const float FULL_CIRCLE = 360;
+        ValueGroup<Coordinate, float> v = GetMinimalDistStarterCoord(target);
+        Coordinate goal = v.index;
+        Coordinate current_coord = Map.Instance.GetPos(ptr.position);
+        Vector3 ORIGINAL_POS = Map.Instance.GetCenter(goal);
+        float dist = v.value;
+        float goal_cost = 0;
+        if(goal.isHazardous(ptr.gameObject.layer))
+        {
+            goal_cost = goal.GetHazardCost(ptr.gameObject.layer);
+           // Debug.Log("Hazardous");
+        }
+        float goal_distance = Math.Abs(
+            Vector3.Distance(
+                Map.Instance.GetCenter(goal),
+                Map.Instance.GetCenter(current_coord)));
+        for(float degrees = 10;degrees < FULL_CIRCLE;degrees += INTERVAL_THETA )
+        {
+            Vector3 pos = Quaternion.AngleAxis(degrees, Vector3.up) * ORIGINAL_POS;
+            Coordinate coord = Map.Instance.GetPos(pos);
+            if (coord != null)
+            {
+                float cost = 0;
+                if(coord.isHazardous(ptr.gameObject.layer))
+                {
+                    cost = coord.GetHazardCost(ptr.gameObject.layer);
+                }
+                float distance = Math.Abs(
+               Vector3.Distance(
+                   Map.Instance.GetCenter(coord),
+                   Map.Instance.GetCenter(current_coord)));
+                
+                if (distance + cost < goal_distance + goal_cost)
+                {
+                    goal = coord;
+                    goal_distance = distance;
+                    goal_cost = cost;
+                }
+            }
+        }
+        return goal;
+    }
+
+
+    ValueGroup<Coordinate, Coordinate> Charge()
     {
         return new ValueGroup<Coordinate, Coordinate>(
             Map.Instance.GetPos(ptr.position),
-            Map.Instance.GetPos(Target.transform.position));
+            GetClosestCoordToTargetCoord(
+                Map.Instance.GetPos(Target.transform.position)));
     }
 
     ValueGroup<Coordinate,Coordinate> Sneak()
@@ -168,7 +243,7 @@ public partial class AIController : GenericController
                 start = queue.Dequeue();
                 if (start == end)
                 {
-                    /*Debug.Log(Time.realtimeSinceStartup - tstart + " seconds : " +
+                   /* Debug.Log(Time.realtimeSinceStartup - tstart + " seconds : " +
                          queue.Count + " end routes considered : " +
                          start.GetNumParents() + " parents."); */
                     Path = start;
@@ -179,7 +254,7 @@ public partial class AIController : GenericController
                     yield return new WaitForEndOfFrame();
                     tstart = Time.realtimeSinceStartup;
                 }
-                int safe_layer = gameObject.transform.parent.gameObject.layer;
+                int safe_layer = ptr.gameObject.layer;
                 foreach (Coordinate coord in start.GetChildren())
                 {
                     coord.traverse_cost = GetCoordinateDistFromTarget(coord);

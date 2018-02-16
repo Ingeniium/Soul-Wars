@@ -10,14 +10,14 @@ using System;
 public abstract partial class Gun : Item {
     public GameObject GunLevelUp;//Reference to the table used for getting gun abilities
     public GameObject weapons_bar;//Reference to the weapons bar
-	public GameObject Bullet;
-	public GameObject bullet;
+    public GameObject Bullet;
+    public GameObject bullet;
     [SyncVar] public float reload_time;//How long it takes to fire each shot
-	[SyncVar] public float next_time;//Next firing time
+    [SyncVar] public float next_time;//Next firing time
     [SyncVar] public float home_speed;//Angular turning speed of the bullet
-	[SyncVar] public float home_radius;
+    [SyncVar] public float home_radius;
     public bool homes = true;//whether the bullets will have homing capabilities
-	[SyncVar] public int lower_bound_damage = 7;
+    [SyncVar] public int lower_bound_damage = 7;
     [SyncVar] public int upper_bound_damage = 15;
     [SyncVar] public float knockback_power;//How much knockback force and knockback stun is done 
     [SyncVar] public float projectile_speed;
@@ -29,7 +29,7 @@ public abstract partial class Gun : Item {
     [SyncVar] public double mezmerize_strength;
     [SyncVar] public double sunder_strength;
     public Gun median;//for copy transfer
-	public Transform barrel_end;//Where bullets actually SPAWN from
+    public Transform barrel_end;//Where bullets actually SPAWN from
     [SyncVar] public Color color;//color assigned to the BULLETS
     public int layer;//Collision layer of the bullet
     public int home_layer;//Collision layer of the bullet's homing device
@@ -50,7 +50,7 @@ public abstract partial class Gun : Item {
     public int experience
     {
         get { return _experience; }
-        set 
+        set
         {
             if (level >= 5)
             {
@@ -77,9 +77,10 @@ public abstract partial class Gun : Item {
     [SyncVar] public uint points = 0;//points to spend on abilities unlocked by gun level ups
     public int mez_threshold;
     protected Canvas level_up_indication;
-    public List<int> claimed_gun_ability = new List<int>();//For determining which abilities have already been chosen
-    public delegate IEnumerator Gun_Abilities(Gun gun,BulletScript script);
-    public Gun_Abilities Claimed_Gun_Mods;//Abilities which have already been chosen
+    protected List<int> claimed_gun_ability = new List<int>();//For determining which abilities have already been chosen
+    public delegate IEnumerator Gun_Abilities(Gun gun, BulletScript script);
+    protected Gun_Abilities Claimed_Gun_Mods;//Abilities which have already been chosen
+    public float coord_radius;
     /*Below are added to names of weapons as a result of getting abilities*/
     protected List<string> prefixes = new List<string>();
     protected List<string> suffixes = new List<string>();
@@ -102,7 +103,7 @@ public abstract partial class Gun : Item {
             }
         }
     }
-    public static List<String> buttons = new List<string>();   
+    public static List<String> buttons = new List<string>();
 
     [ClientRpc]
     protected void RpcLevelupIndication()
@@ -116,7 +117,7 @@ public abstract partial class Gun : Item {
                 level_up_indication.GetComponentInChildren<Text>().color = Color.green;
                 level_up_indication.transform.SetParent(item_image_show.transform);
             }
-            TutorialHelper.Instance.LevelUpIndication(GetBaseName(), level);
+            //TutorialHelper.Instance.LevelUpIndication(GetBaseName(), level);
         }
     }
 
@@ -125,6 +126,29 @@ public abstract partial class Gun : Item {
     {
         weapons_bar = _client_user.player_interface_show.GetComponentInChildren<HorizontalLayoutGroup>().gameObject;
         GunLevelUp = UIHide.obj.gameObject;
+    }
+
+    /*Returns whether a gun already has an ability (based on its index in the
+      gun type's ability list).If the ability hasn't been implemented, it will return
+      true (as to prevent adding it to the list of claimed abilities).*/
+    public bool HasAbility(int index)
+    {
+        return ClassGunMods(index) == null
+           || claimed_gun_ability.Contains(index);
+    }
+
+    /*Adds a gun ability to the gun based on the gun type's
+     list of gun abilities.*/
+    public void AddAbility(int index)
+    {
+        Claimed_Gun_Mods += ClassGunMods(index);
+        claimed_gun_ability.Add(index);
+        SetGunNameAddons(index);
+    }
+
+    public void AddAbility(Gun_Abilities ability)
+    {
+        Claimed_Gun_Mods += ability;   
     }
 
     
@@ -162,12 +186,13 @@ public abstract partial class Gun : Item {
         }       
     }
       
-    public virtual void Shoot()
+    public virtual void Shoot(Vector3 forward,Vector3 pos, Quaternion rot)
     {
-        bullet = Instantiate(Bullet, barrel_end.position, barrel_end.rotation) as GameObject;
+
+        bullet = Instantiate(Bullet, pos, rot) as GameObject;
         NetworkServer.Spawn(bullet);
         ReadyWeaponForFire(ref bullet);
-        RpcFire(barrel_end.forward,bullet);
+        RpcFire(forward,bullet);
     }
 
     public virtual void Shoot(GameObject g)
@@ -197,6 +222,7 @@ public abstract partial class Gun : Item {
         script.home_radius = home_radius;
         script.homes = homes;
         script.can_pierce = can_pierce;
+        script.coord_radius = coord_radius;
         script.gun_reference = this;//For gaining exp 
         next_time = Time.time + reload_time;
         if (Claimed_Gun_Mods != null)//Apply chosen gun_abilities to each bullet
@@ -284,9 +310,9 @@ public abstract partial class Gun : Item {
             item_image_show.transform.SetParent(weapons_bar.transform);
             RectTransform rtr = item_image_show.GetComponent<RectTransform>();
             rtr.localPosition = new Vector3(
-                rtr.localPosition.x,
-                rtr.localPosition.y,
-                0); 
+               rtr.localPosition.x,
+               rtr.localPosition.y,
+                0);       
             buttons.Add(button);
             int[] indeces = new int[claimed_gun_ability.Count];
             int n = 0;
