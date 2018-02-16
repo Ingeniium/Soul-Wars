@@ -36,7 +36,7 @@ public class PlayerFollow : MonoBehaviour
 
     void FixedUpdate()
     {
-        if (Player != null && Player.isLocalPlayer)
+        if (Player != null && Player.rb && Player.isLocalPlayer)
         {
             ray = camera.ScreenPointToRay(Input.mousePosition);
             if (Physics.Raycast(ray, out hit))
@@ -48,7 +48,7 @@ public class PlayerFollow : MonoBehaviour
 
     void LateUpdate()
     {
-        if (EnemyInitialization.Instance.watch_only && Input.GetKeyDown(LOOK_AT_NEXT_CPU_KEY) && PlayersAlive.Instance)
+        if (EnemyInitialization.Instance && EnemyInitialization.Instance.watch_only && Input.GetKeyDown(LOOK_AT_NEXT_CPU_KEY) && PlayersAlive.Instance)
         {
             int max_iterations = 25;
             for (int i = 0; i < max_iterations; i++)
@@ -69,7 +69,7 @@ public class PlayerFollow : MonoBehaviour
         {
             camera_focus_index = -1;
         }
-        else if (EnemyInitialization.Instance.watch_only && Input.GetKey(LOOK_AT_CENTER))
+        else if (EnemyInitialization.Instance && EnemyInitialization.Instance.watch_only && Input.GetKey(LOOK_AT_CENTER))
         {
             camera_focus_index = -2;
             transform.position = new Vector3(0, center_offset_y, 0);
@@ -86,7 +86,7 @@ public class PlayerFollow : MonoBehaviour
         {
             transform.position = Player.transform.position + _offset;
         }
-        else if(EnemyInitialization.Instance.watch_only && PlayersAlive.Instance && camera_focus_index > -1)
+        else if(EnemyInitialization.Instance && EnemyInitialization.Instance.watch_only && PlayersAlive.Instance && camera_focus_index > -1)
         {
             transform.position = PlayersAlive.Instance.Units[camera_focus_index].transform.position
                 + _offset;

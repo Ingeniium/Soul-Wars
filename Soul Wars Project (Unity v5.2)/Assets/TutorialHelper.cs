@@ -23,7 +23,7 @@ public class TutorialHelper : MonoBehaviour
     IEnumerator WaitForTextBoxRef()
     {
         advice_content_list = GetComponents<StringSeries>();
-        while(!TextBox.Instance)
+        while(!TextBox.Instance || (!PlayerController.Client && !PlayerController.Client.player_interface_show) )
         {
             yield return new WaitForEndOfFrame();
         }
@@ -35,7 +35,7 @@ public class TutorialHelper : MonoBehaviour
                 sentence += advice_content_list[i].strings[j] + "\r\n";
             }
             TextBox.Instance.CreateExitDescBox(
-                null,
+                PlayerController.Client.player_interface_show.transform,
                 advice_location_list[i],
                 sentence,
                 is_world_space_list[i]);

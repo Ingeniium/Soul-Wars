@@ -41,21 +41,11 @@ public class PlayersAlive : NetworkBehaviour
     [ClientRpc]
     void RpcPause()
     {
-        uint[] array = new uint[Players.Count];
-        int i = 0;
-        foreach (uint u in Players)
-        {
-            array[i] = u;
-            i++;
-        }
-        if (!Array.Exists(array, delegate (uint u)
-         {
-             GameObject player_obj = ClientScene.FindLocalObject(
-                 new NetworkInstanceId(u));
-             PlayerController player = player_obj.GetComponent<PlayerController>();
-             return player.enabled;
-             
-         }))
+        
+       if(!PlayerController.players.Exists(delegate (PlayerController p)
+       {
+           return p.enabled;
+       }))
         {
             if(Bullets.Count > 0)
             {
@@ -80,7 +70,7 @@ public class PlayersAlive : NetworkBehaviour
                 {
                     if (AI)
                     {
-                        AI.GetComponentInParent<Rigidbody>().useGravity = false;
+                        AI.prb.useGravity = false;
                         AI.ptr.gameObject.GetComponent<Collider>().enabled = false;
                         AI.enabled = false;
                     }
@@ -132,7 +122,7 @@ public class PlayersAlive : NetworkBehaviour
                 if (AI)
                 {
                     AI.ptr.GetComponent<Collider>().enabled = true;
-                    AI.GetComponentInParent<Rigidbody>().useGravity = true;
+                    AI.prb.useGravity = true;
                     AI.enabled = true;
                 }
             }

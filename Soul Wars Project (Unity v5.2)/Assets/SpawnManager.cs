@@ -41,10 +41,26 @@ public class SpawnManager : NetworkBehaviour
 
     void Start()
     {
-        if (isServer)
+        ChangeTeam(gameObject.layer);
+        StartCoroutine(FloatSphere());
+    }
+
+    /*Floats sphere above stand.*/
+    IEnumerator FloatSphere()
+    {
+        Vector3 start_sphere_pos = transform.position;
+        float start = Time.realtimeSinceStartup;
+        const float LOOP_SPEED = 6;
+        const float HEIGHT_MULTIPLIER = .05f;
+        while(this)
         {
-            RpcChangeTeam(gameObject.layer);
-            ChangeTeam(gameObject.layer);
+            stand.transform.SetParent(null);
+            transform.position = new Vector3(
+                transform.position.x,
+                transform.position.y + HEIGHT_MULTIPLIER * Mathf.Sin(LOOP_SPEED * (Time.realtimeSinceStartup - start)),
+                transform.position.z);
+            stand.transform.SetParent(transform);
+            yield return new WaitForFixedUpdate();
         }
     }
 
@@ -55,7 +71,10 @@ public class SpawnManager : NetworkBehaviour
         {
             foreach (SpawnManager s in TotalSpawnPoints)
             {
-                NetworkServer.Destroy(s.gameObject);
+                if (PlayerController.Client.isServer)
+                {
+                    NetworkServer.Destroy(s.gameObject);
+                }
             }
         }
         TotalSpawnPoints.Clear();
@@ -90,7 +109,7 @@ public class SpawnManager : NetworkBehaviour
         List<SpawnManager> spawn_points = new List<SpawnManager>();
         foreach (SpawnManager s in TotalSpawnPoints)
         {
-            if (s.gameObject.layer != excluded_layer)
+            if (s && s.gameObject.layer != excluded_layer)
             {
                 spawn_points.Add(s);
             }
@@ -169,8 +188,8 @@ public class SpawnManager : NetworkBehaviour
         NetworkMethods.Instance.CmdSetLayer(killed.gameObject, LayerMask.NameToLayer("Invincible"));
         TotalSpawnPoints[0].RpcDisableScripts(killed.gameObject);
 
-        bool is_cpu = !killed.Controller || killed.Controller is AIController;
-        if (is_cpu)
+        AIController AI = killed.GetComponent<AIController>();
+        if (AI)
         {
             yield return new WaitForSeconds(cpu_respawn_time);
         }
@@ -186,11 +205,11 @@ public class SpawnManager : NetworkBehaviour
             yield return new WaitForEndOfFrame();
         }
 
-        if (is_cpu)
+        if (AI)
         {
             killed.gameObject.transform.position = team_spawns[0].transform.position
              + team_spawns[0].spawn_direction;
-           (killed.Controller as AIController).ResetHateList();
+           AI.ResetHateList();
         }
         else
         {
@@ -207,7 +226,7 @@ public class SpawnManager : NetworkBehaviour
 
         killed.HP = killed.maxHP;
         TotalSpawnPoints[0].RpcEnableScripts(killed.gameObject);
-        TotalSpawnPoints[0].RpcBlink(killed.gameObject);
+        NetworkMethods.Instance.RpcBlink(killed.gameObject, 1.5f);
         NetworkMethods.Instance.CmdSetLayer(killed.gameObject, ORIGINAL_LAYER);
     }
 
@@ -219,14 +238,7 @@ public class SpawnManager : NetworkBehaviour
             RespawnInterface.Instance.respawning = true;
         }
     }
-
-    [ClientRpc]
-    void RpcBlink(GameObject g)
-    {
-        StartCoroutine(Blink(g));
-    }
-
-
+ 
 
     [ClientRpc]
     private void RpcDisableScripts(GameObject killed)
@@ -294,44 +306,6 @@ public class SpawnManager : NetworkBehaviour
         }
     }
 
-    public static IEnumerator Blink(GameObject Respawned, float invis_time = 1.5f)
-    {
-        Renderer rend = Respawned.GetComponent<Renderer>();
-        Renderer[] child_rends = Respawned.GetComponentsInChildren<Renderer>();
-        rend.enabled = false;
-        foreach (Renderer r in child_rends)
-        {
-            r.enabled = false;
-        }
-        invis_time += Time.time;
-        while (Time.time < invis_time)
-        {
-            yield return new WaitForSecondsRealtime(.2f);
-            switch (rend.enabled)
-            {
-                case true:
-                    rend.enabled = false;
-                    foreach (Renderer r in child_rends)
-                    {
-                        r.enabled = false;
-                    }
-                    break;
-                case false:
-                    rend.enabled = true;
-                    foreach (Renderer r in child_rends)
-                    {
-                        r.enabled = true;
-                    }
-                    break;
-            }
-        }
-        rend.enabled = true;
-        foreach (Renderer r in child_rends)
-        {
-            r.enabled = true;
-        }
-
-    }
 }
 
 
