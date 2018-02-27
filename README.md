@@ -1,4 +1,5 @@
 
+
 # Soul-Wars
 
 9/15/2017
@@ -18,3 +19,8 @@ displaying tutorial tips in each of those levels.
 11/7/2017
 ---------
 I have finished Blaster's third column of gun abilities. I have also started working on Haze's third column,and reworked its 'Infect' gun ability so it works as intended. I have implemented 11 levels for the game. My sophmore friend, Ian Mcdonald,also worked on a scene(called test) which has a particle effect he made himself and imported a font.Essentialy, he made a title screen(with the whole folder TitleScreenAssets attributed to him) in which I further developed to include a level select.I have fixed aggro so it works fully as intended.I also reconfigured the game to allow multiple teams of CPUs that can fight amongst eachother, and can even be allied with the player to fight other CPUs.For this reason, the different types of CPUs now have colored shells to show their team alignment.
+
+2/27/2018
+---------
+You can now just download the zip file to play the game.Also, in order to build and successfully run the solution,the DLLs by the guy in
+https://forum.unity.com/threads/unet-hlapi-pro-taking-unet-to-the-next-level.425437/ are needed since they fixed networking bugs/quirks about the system which plagued me for months.
