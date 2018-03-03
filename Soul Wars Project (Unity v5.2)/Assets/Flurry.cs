@@ -292,9 +292,9 @@ public class Flurry : Gun
             yield return null;
         }
     }
-    public override void Shoot()
+    public override void Shoot(Vector3 forward,Vector3 pos,Quaternion q)
     {
-        base.Shoot();
+        base.Shoot(forward,pos,q);
         for (int i = 1; i < num_bullets; i++)
         {
             Quaternion rot;
@@ -306,7 +306,7 @@ public class Flurry : Gun
             {
                 rot = GetComponentsInChildren<Transform>()[3].rotation;
             }
-            bullet = Instantiate(Bullet, barrel_end.position, rot) as GameObject;
+            bullet = Instantiate(Bullet, pos, rot) as GameObject;
             NetworkServer.Spawn(bullet);
             ReadyWeaponForFire(ref bullet);
             RpcFire(bullet.transform.forward,bullet);
@@ -385,10 +385,11 @@ public class Flurry : Gun
         crit_chance = .05;
         reload_time = 1.5f;
         home_speed = 1.5f;
-        home_radius = 3f;
+        home_radius = 1f;
         homes = true;
         /*Resources.Load seems to only work for getting prefabs as only game objects.*/
         Bullet = Resources.Load("Bullet") as GameObject;
+        coord_radius = 2f;
     }
 
     public override string GetImagePreviewString()

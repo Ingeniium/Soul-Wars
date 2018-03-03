@@ -52,7 +52,7 @@ public class SpawnManager : NetworkBehaviour
         float start = Time.realtimeSinceStartup;
         const float LOOP_SPEED = 6;
         const float HEIGHT_MULTIPLIER = .05f;
-        while(this)
+        while (this)
         {
             stand.transform.SetParent(null);
             transform.position = new Vector3(
@@ -188,7 +188,7 @@ public class SpawnManager : NetworkBehaviour
         NetworkMethods.Instance.CmdSetLayer(killed.gameObject, LayerMask.NameToLayer("Invincible"));
         TotalSpawnPoints[0].RpcDisableScripts(killed.gameObject);
 
-        AIController AI = killed.GetComponent<AIController>();
+        AIController AI = killed.GetComponentInChildren<AIController>();
         if (AI)
         {
             yield return new WaitForSeconds(cpu_respawn_time);
@@ -205,11 +205,18 @@ public class SpawnManager : NetworkBehaviour
             yield return new WaitForEndOfFrame();
         }
 
+        TotalSpawnPoints[0].RpcEnableScripts(killed.gameObject);
+        NetworkMethods.Instance.RpcBlink(killed.gameObject, 1.5f);
+        NetworkMethods.Instance.CmdSetLayer(killed.gameObject, ORIGINAL_LAYER);
         if (AI)
         {
             killed.gameObject.transform.position = team_spawns[0].transform.position
              + team_spawns[0].spawn_direction;
-           AI.ResetHateList();
+            while (killed.gameObject.layer != ORIGINAL_LAYER)
+            {
+                yield return new WaitForEndOfFrame();
+            }
+            AI.ResetHateList();
         }
         else
         {
@@ -223,11 +230,7 @@ public class SpawnManager : NetworkBehaviour
                 + team_spawns[index].spawn_direction;
 
         }
-
         killed.HP = killed.maxHP;
-        TotalSpawnPoints[0].RpcEnableScripts(killed.gameObject);
-        NetworkMethods.Instance.RpcBlink(killed.gameObject, 1.5f);
-        NetworkMethods.Instance.CmdSetLayer(killed.gameObject, ORIGINAL_LAYER);
     }
 
     [ClientRpc]
@@ -238,7 +241,7 @@ public class SpawnManager : NetworkBehaviour
             RespawnInterface.Instance.respawning = true;
         }
     }
- 
+
 
     [ClientRpc]
     private void RpcDisableScripts(GameObject killed)

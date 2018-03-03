@@ -50,11 +50,11 @@ public partial class AIController : GenericController
                 {
                     if (vec == Vector3.zero)
                     {
-                        State = new Guard(this,dist);
+                        State = new Guard(this, dist);
                     }
                     else
                     {
-                        State = new Guard(this, vec,dist);
+                        State = new Guard(this, vec, dist);
                     }
                     break;
                 }
@@ -65,6 +65,7 @@ public partial class AIController : GenericController
     {
         public AIController Unit;
         public abstract void UnitAggroReaction(Collider col);
+        int idle_count = 0;
 
         public virtual void ResetHateList()
         {
@@ -75,29 +76,39 @@ public partial class AIController : GenericController
 
         public bool AffirmTarget(HealthDefence Target)
         {
+            bool result;
             /*Checks whether object still exists.Note in UpdateAggro(),the
            info is erased only if it is chosen/kept as the current target.
            In the function,the netId of the object to remove is 
            determined.*/
             if (!Target)
             {
+                idle_count++;
                 Unit.UpdateAggro();
-                return false;
+                result = false;
             }
             /*Also check if object is on the same team or has no HP left.
              In this case,remove their aggro from the list.*/
-            if (Target.gameObject.layer == Unit.ptr.gameObject.layer
+            else if (Target.gameObject.layer == Unit.ptr.gameObject.layer
                 || Target.HP <= 0)
             {
+                idle_count++;
                 Unit.RemoveAggro(Target.netId);
-                return false;
+                result = false;
             }
             else
             {
-                return true;
+                idle_count = 0;
+                result = true;
             }
+            /*Prevents idling if there is a desireable target not within the hatelist
+             * while the hatelist has no suitable targets.*/
+            if (idle_count >= Unit.HateList.Length)
+            {
+                ResetHateList();
+            }
+            return result;
         }
-
 
         protected virtual IEnumerator GenerateGradualThreat(HealthDefence target, NetworkInstanceId ID, int amount = 5)
         {
@@ -124,11 +135,11 @@ public partial class AIController : GenericController
                    Vector3.Distance(pos, target.transform.position)) - .75f
                < Unit.enemy_attack_detection.radius)
             {
-              
+
                 float dist = Math.Abs(
                     Vector3.Distance(pos, target.transform.position));
                 float new_amount = Unit.enemy_attack_detection.radius / dist * multiplier;
-               // Debug.Log((int)new_amount);
+                // Debug.Log((int)new_amount);
                 Unit.UpdateAggro((int)new_amount, target.netId, false);
                 yield return new WaitForSeconds(1);
             }
@@ -152,7 +163,7 @@ public partial class AIController : GenericController
         void UpdateSpawnAggro()
         {
             /*Sort from closest to farthest from unit*/
-            List<SpawnManager> s = SpawnManager.GetOpponentSpawns(Unit.transform.parent.gameObject.layer);
+            List<SpawnManager> s = SpawnManager.GetOpponentSpawns(Unit.ptr.gameObject.layer);
             s.SortByLeastToGreatDist(Unit.ptr.position);
             int n = s.Count;
             foreach (SpawnManager sp in s)
@@ -162,6 +173,7 @@ public partial class AIController : GenericController
                 if (sp)
                 {
                     Unit.UpdateAggro(n * 10, sp.netId, false);
+                    Debug.Log(n * 10);
                     n--;
                 }
             }
@@ -205,36 +217,24 @@ public partial class AIController : GenericController
     {
         public override void ResetHateList()
         {
-
             base.ResetHateList();
-            List<NetworkBehaviour> opponents = new List<NetworkBehaviour>();
+            List<GenericController> opponents = new List<GenericController>();
             foreach (AIController AI in PlayersAlive.Instance.Units)
             {
-                if (AI.gameObject.layer != Unit.gameObject.layer)
+                if (AI.ptr.gameObject.layer != Unit.ptr.gameObject.layer)
                 {
-                    opponents.Add(AI.ptr.gameObject.GetComponent<NetworkBehaviour>());
+                    opponents.Add(AI);
                 }
             }
-           /* foreach (uint ID in PlayersAlive.Instance.Players)
+
+            foreach (PlayerController player in PlayerController.players)
             {
-                GameObject obj = NetworkServer.FindLocalObject(
-                    new NetworkInstanceId(ID));
-                if (obj)
+                if (player && player.gameObject.layer != Unit.ptr.gameObject.layer)
                 {
-                    PlayerController player = obj.GetComponent<PlayerController>();
-                    if (player && obj.layer != Unit.gameObject.layer)
-                    {
-                        opponents.Add(player);
-                    }
-                }
-            }        */
-            foreach(PlayerController player in PlayerController.players)
-            {
-                if(player && player.gameObject.layer != Unit.gameObject.layer)
-                {
-                    opponents.Add(player); 
+                    opponents.Add(player);
                 }
             }
+
             opponents.SortByLeastToGreatDist(Unit.ptr.position);
             for (int i = 0; i < opponents.Count; i++)
             {
@@ -291,7 +291,10 @@ public partial class AIController : GenericController
              * spawn points*/
             for (int i = 0; i < Unit.HateList.Length; i++)
             {
-                Unit.HateList[i].value += 1000;
+                if (Unit.HateList[i] != NOT_SET)
+                {
+                    Unit.HateList[i].value += 1000;
+                }
             }
         }
 
@@ -335,36 +338,26 @@ public partial class AIController : GenericController
                 50));
         }
 
-        public Guard(AIController AI,float dist = -1) : base(AI)
+        public Guard(AIController AI, float dist = -1) : base(AI)
         {
             guard_point = Unit.ptr.position;
-            if(dist == -1)
-            {
-                guard_dist = AI.enemy_attack_detection.radius * .75f;
-            }
-            else
-            {
-                guard_dist = dist;
-            }
+            guard_dist = dist;
             Unit.StartCoroutine(LimitDistFromGuardPoint());
         }
 
-        public Guard(AIController AI,Vector3 pos,float dist = 0) : base(AI)
+        public Guard(AIController AI, Vector3 pos, float dist = 0) : base(AI)
         {
             guard_point = pos;
-            if (dist == -1)
-            {
-                guard_dist = AI.enemy_attack_detection.radius * .75f;
-            }
-            else
-            {
-                guard_dist = dist;
-            }
+            guard_dist = dist;
             Unit.StartCoroutine(LimitDistFromGuardPoint());
         }
 
         IEnumerator LimitDistFromGuardPoint()
         {
+            if (guard_dist == -1)
+            {
+                guard_dist = Unit.enemy_attack_detection.radius * .75f;
+            }
             while (Unit)
             {
                 yield return new WaitForFixedUpdate();

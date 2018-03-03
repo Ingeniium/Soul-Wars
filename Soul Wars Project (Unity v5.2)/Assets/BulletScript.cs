@@ -158,10 +158,10 @@ public class BulletScript : NetworkBehaviour
                 uint id = v.index.index;
                 return (id == netId.Value);
             });
-            if (coord.hazard_layers.Count == 0)
-            {
+           //if (coord.hazard_layers.Count == 0)
+          //  {
                 coord.status = Coordinate.Status.Safe;
-            }
+          //  }  
         }
         path_coords.Clear();
     }

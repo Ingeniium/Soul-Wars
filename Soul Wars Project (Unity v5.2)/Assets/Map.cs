@@ -7,7 +7,6 @@ public class Coordinate
     public uint x;
     public uint z;
     public float traverse_cost;
-    public float hazard_cost;
 
     private List<Coordinate> possible_coords = new List<Coordinate>();
     public Coordinate parent;
@@ -17,60 +16,42 @@ public class Coordinate
         z = _z;
     }
 
-     public enum Status
+    public enum Status
     {
         Safe = 0,
         Hazard = 1
     }
 
-    public List<int> hazard_layers = new List<int>();
+    public List<ValueGroup<ValueGroup<uint, int>, float>> hazard_layers = new List<ValueGroup<ValueGroup<uint, int>, float>>();
     public Status status = Status.Safe;
     public static bool operator ==(Coordinate lhs, Coordinate rhs)
     {
-        bool a = object.Equals(lhs, null);
-        bool b = object.Equals(rhs, null);
-        if (a && b)
+        if (Equals(lhs, null) || Equals(rhs, null))
         {
-            return true;
-        }
-        else if ((!a && b) || (a && !b))
-        {
-            return false;
+            return Equals(lhs, rhs);
         }
         else
         {
-            return (lhs.x == rhs.x && lhs.z == rhs.z);
+            return lhs.Equals(rhs);
         }
     }
 
     public static bool operator !=(Coordinate lhs, Coordinate rhs)
     {
-        bool a = object.Equals(lhs, null);
-        bool b = object.Equals(rhs, null);
-        if (a && b)
-        {
-            return false;
-        }
-        else if ((!a && b) || (a && !b))
-        {
-            return true;
-        }
-        else
-        {
-            return (lhs.x != rhs.x || lhs.z != rhs.z);
-        }
+        return !(lhs == rhs);
 
     }
 
     public override bool Equals(object o)
     {
-        if ((o as Coordinate) != this)
+        Coordinate rhs = o as Coordinate;
+        if(rhs == null)
         {
             return false;
         }
         else
         {
-            return true;
+            return rhs.x == x && rhs.z == z;
         }
     }
 
@@ -180,58 +161,64 @@ public class Coordinate
         return possible_coords;
     }
 
+    /*Gets the hazard cost of the coordinates.Hazard
+      cost is based on the damage of bullets occupying it
+      that aren't the same layer as the arg safe_layer*/
+    public float GetHazardCost(int safe_layer)
+    {
+        float hazard_cost = 0;
+        foreach(ValueGroup<ValueGroup<uint,int>,float> v in hazard_layers)
+        {
+            int layer = v.index.value;
+            if(layer != safe_layer)
+            {
+                hazard_cost += v.value;
+            }
+        }
+        return hazard_cost;
+    }
+
+    /*Returns whether there's any "occupying" bullets that aren't
+      of the safe layer arg,if there's any bullets "occupying" it
+      in the first place*/
     public bool isHazardous(int safe_layer)
     {
         return status == Status.Hazard &&
-        hazard_layers.Exists(delegate (int i)
+        hazard_layers.Exists(delegate (ValueGroup<ValueGroup<uint,int>,float> v)
         {
-            return (i != safe_layer);
+            int layer = v.index.value;
+            return (layer != safe_layer);
         });
     }
 
-    public float GetTotalCost(int safe_layer = 0,bool account_for_hazards = false,int iterations = 0)
+    /*Gets the total cost of the coord.Returned float is affected by whether the algorithm accounts for
+      the hazard cost of the bullet(with given safe layer arg).Iterations arg is meant to exit the algorithm
+      for whenever there's too much parents(caps at 100)*/
+    public float GetTotalCost(int safe_layer = 0,bool account_for_hazards = false,int iterations = 0,Coordinate input_coord = null)
     {
-        if (parent != null && iterations < 100)
+        float hazard_cost = 0;
+        float border_cost = 0;
+        if(account_for_hazards && isHazardous(safe_layer))
         {
-            iterations++;
-            if (account_for_hazards && isHazardous(safe_layer))
-            {
-                return parent.GetTotalCost(safe_layer,account_for_hazards, iterations) + traverse_cost + hazard_cost;
-            }
-            else
-            {
-                return parent.GetTotalCost(safe_layer,account_for_hazards,iterations) + traverse_cost;
-            }
+            hazard_cost = GetHazardCost(safe_layer);
+        }
+        if(Map.Instance.OnMapBorder(this))
+        {
+            border_cost = 1000;
+        }
+        if(input_coord != null)
+        {
+            return traverse_cost + border_cost + input_coord.GetTotalCost(safe_layer, account_for_hazards);
+        }
+        else if (parent != null && iterations < 100)
+        {
+            iterations++;         
+            return parent.GetTotalCost(safe_layer, account_for_hazards, iterations) + traverse_cost 
+                + border_cost + hazard_cost;                  
         }
         else
         {
-            if (account_for_hazards && isHazardous(safe_layer))
-            {
-                return traverse_cost + hazard_cost;
-            }
-            else
-            {
-                return traverse_cost;
-            }
-        }
-    }
-
-    public float GetTotalCost(Coordinate coord,int safe_layer = 0, bool account_for_hazards = false)
-    {
-        if (coord != null)
-        {
-            return traverse_cost + coord.GetTotalCost(safe_layer,account_for_hazards);
-        }
-        else
-        {
-            if (account_for_hazards && isHazardous(safe_layer))
-            {
-                return traverse_cost + hazard_cost;
-            }
-            else
-            {
-                return traverse_cost;
-            }
+            return traverse_cost + border_cost + hazard_cost;
         }
     }
 
@@ -251,6 +238,8 @@ public class Coordinate
             return 0;
         }
     }
+
+    
 
 
 }
@@ -335,6 +324,11 @@ public class Map : NetworkBehaviour
 
     }
 
+    public bool OnMapBorder(Coordinate coord)
+    {
+        return coord.x == num_rects || coord.z == num_rects
+            || coord.x == 0 || coord.z == 0;
+    }
 
     public Coordinate GetPos(Vector3 pos)
     {
@@ -373,6 +367,23 @@ public class Map : NetworkBehaviour
 
     public Coordinate GetPos(uint coord_x, uint coord_z)
     {
+        const uint NEGATIVE_OUTBOUND = 1000;
+        if (coord_x > NEGATIVE_OUTBOUND)
+        {
+            coord_x = 0;
+        }
+        else if (coord_x > num_rects)
+        {
+            coord_x = num_rects;
+        }
+        if (coord_z > NEGATIVE_OUTBOUND)
+        {
+            coord_z = 0;
+        }
+        else if (coord_z > num_rects)
+        {
+            coord_z = num_rects;
+        }
         ValueGroup<uint, uint> Key = new ValueGroup<uint, uint>(coord_x, coord_z);
         if (Coords.ContainsKey(Key))
         {

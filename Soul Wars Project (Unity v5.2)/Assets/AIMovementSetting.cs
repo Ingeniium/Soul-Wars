@@ -243,9 +243,9 @@ public partial class AIController : GenericController
                 start = queue.Dequeue();
                 if (start == end)
                 {
-                   /* Debug.Log(Time.realtimeSinceStartup - tstart + " seconds : " +
+                  /*  Debug.Log(Time.realtimeSinceStartup - tstart + " seconds : " +
                          queue.Count + " end routes considered : " +
-                         start.GetNumParents() + " parents."); */
+                         start.GetNumParents() + " parents.");              */
                     Path = start;
                     yield break;
                 }
@@ -264,7 +264,7 @@ public partial class AIController : GenericController
                         queue.Enqueue(coord, coord.GetTotalCost(safe_layer, can_dodge));
                         visited.Add(coord);
                     }
-                    else if (queue.Contains(coord) && coord.GetTotalCost(start, safe_layer, can_dodge) < queue.GetPriority(coord))
+                    else if (queue.Contains(coord) && coord.GetTotalCost(safe_layer, can_dodge,0,start) < queue.GetPriority(coord))
                     {
                         coord.parent = start;
                         queue.UpdatePriority(coord, coord.GetTotalCost(safe_layer, can_dodge));
