@@ -24,3 +24,7 @@ I have finished Blaster's third column of gun abilities. I have also started wor
 ---------
 You can now just download the zip file to play the game.Also, in order to build and successfully run the solution,the DLLs by the guy in
 https://forum.unity.com/threads/unet-hlapi-pro-taking-unet-to-the-next-level.425437/ are needed since they fixed networking bugs/quirks about the system which plagued me for months.
+
+3/3/2018
+---------
+I made changes to the AI such that they would idle less if there are targets on the field not yet on their hatelist.
