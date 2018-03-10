@@ -64,7 +64,7 @@ public abstract partial class Gun : Item {
                 {
                     next_lvl = next_lvl_exp[level];
                 }
-                RpcLevelupIndication();
+                RpcLevelupIndication(level);
                 points += 1;
             }
             else
@@ -106,18 +106,19 @@ public abstract partial class Gun : Item {
     public static List<String> buttons = new List<string>();
 
     [ClientRpc]
-    protected void RpcLevelupIndication()
+    protected void RpcLevelupIndication(int _level)//Level is passed as in case the syncvar doesn't update in time for the Rpccall
     {
         if (client_user && PlayerController.Client.netId == client_user.netId)
         {
             if (!level_up_indication)
             {
-                level_up_indication = Instantiate(client_user.cooldown_canvas, item_image_show.transform.position + new Vector3(-.25f, 0, 0), client_user.cooldown_canvas.transform.rotation) as Canvas;
+                level_up_indication = Instantiate(client_user.cooldown_canvas,Vector3.zero, client_user.cooldown_canvas.transform.rotation) as Canvas;
                 level_up_indication.GetComponentInChildren<Text>().text = "!";
                 level_up_indication.GetComponentInChildren<Text>().color = Color.green;
                 level_up_indication.transform.SetParent(item_image_show.transform);
+                level_up_indication.transform.localPosition = new Vector3(0, 0, -.25f);
             }
-            //TutorialHelper.Instance.LevelUpIndication(GetBaseName(), level);
+            TutorialHelper.Instance.LevelUpIndication(GetBaseName(), _level);
         }
     }
 
@@ -133,7 +134,7 @@ public abstract partial class Gun : Item {
       true (as to prevent adding it to the list of claimed abilities).*/
     public bool HasAbility(int index)
     {
-        return ClassGunMods(index) == null
+        return GetGunModAbility(index) == null
            || claimed_gun_ability.Contains(index);
     }
 
@@ -141,9 +142,9 @@ public abstract partial class Gun : Item {
      list of gun abilities.*/
     public void AddAbility(int index)
     {
-        Claimed_Gun_Mods += ClassGunMods(index);
+        Claimed_Gun_Mods += GetGunModAbility(index);
         claimed_gun_ability.Add(index);
-        SetGunNameAddons(index);
+        SetGunModAddon(index);
     }
 
     public void AddAbility(Gun_Abilities ability)
@@ -155,7 +156,7 @@ public abstract partial class Gun : Item {
 
     public bool HasReloaded(float delay = 0)
     {
-        return (Time.time > next_time + delay);       
+        return (Network.time > next_time + delay);       
     }
 
     [ClientRpc]
@@ -224,7 +225,7 @@ public abstract partial class Gun : Item {
         script.can_pierce = can_pierce;
         script.coord_radius = coord_radius;
         script.gun_reference = this;//For gaining exp 
-        next_time = Time.time + reload_time;
+        next_time = (float)Network.time + reload_time;
         if (Claimed_Gun_Mods != null)//Apply chosen gun_abilities to each bullet
         {
             int i = 0;
@@ -291,9 +292,7 @@ public abstract partial class Gun : Item {
         experience = _experience;
         foreach (int index in indeces)
         {
-            claimed_gun_ability.Add(index);
-            Claimed_Gun_Mods += ClassGunMods(index);
-            SetGunNameAddons(index);
+            AddAbility(index);
         }
         color = new Color32(52, 95, 221, 225);
         layer = 13;
@@ -457,12 +456,64 @@ public abstract partial class Gun : Item {
         }
         SetBaseStats();
     }
-    
 
-    public abstract Gun_Abilities ClassGunMods(int index);//For getting a derived class's Gun_ability delegates
-    protected abstract string ClassGunAbilityNames(int index);//For getting a derived class's Gun_ability string names 
-    protected abstract void SetGunNameAddons(int index);//For getting a derived class's prefixes/suffixes
-    protected abstract string GunAbilityDesc(int index);//For getting a derived class's descriptions
+    protected abstract GunMod GetGunMod(int index);
+
+    //For getting a derived class's Gun_ability delegates
+    public Gun_Abilities GetGunModAbility(int index)
+    {
+        GunMod mod = GetGunMod(index);
+        if (mod != null)
+        {
+            return mod.ability;
+        }
+        else
+        {
+            return null;
+        }
+    }
+
+    //For getting a derived class's Gun_ability string names 
+    public string GetGunModName(int index)
+    {
+        GunMod mod = GetGunMod(index);
+        if (mod != null)
+        {
+            return mod.description.Split(null)[0];
+        }
+        else
+        {
+            return null;
+        }
+    }
+
+    //For getting a derived class's descriptions
+    public string GetGunModDesc(int index)
+    {
+        GunMod mod = GetGunMod(index);
+        if (mod != null)
+        {
+            return mod.description;
+        }
+        else
+        {
+            return null;
+        }
+    }
+
+    //For setting a derived class's prefixes/suffixes
+    protected void SetGunModAddon(int index)
+    {
+        if (index < 4 || index > 12)
+        {
+            suffixes.Add(GetGunMod(index).addon);
+        }
+        else
+        {
+            prefixes.Add(GetGunMod(index).addon);
+        }
+    }
+   
    
     
     

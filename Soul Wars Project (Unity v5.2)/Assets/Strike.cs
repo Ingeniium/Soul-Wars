@@ -5,58 +5,55 @@ using System.Collections.Generic;
 
 public class Strike : Gun
 {
-    private readonly static string[] gun_ability_names = new string[12] 
+
+    protected override GunMod GetGunMod(int index)
     {
-        "Marksman", "Sniper", "Scout",
-        "Accelerate", "Camoflage", "Pressure",
-        "Momentum", "Barrier", "Thirst",
-        "Arcane Quiver", "Mythril Quiver", "Bloody Quiver"
-    };
-    private readonly static string[] gun_name_addons = new string[12] 
+        return strike_mods[index];
+    }
+
+    private readonly static GunMod[] strike_mods = new GunMod[12]
     {
-        "Marksmanship","Accuracy","Swiftness",
-        "Accelerating", "Hidden", "Pressuring",
-        "Mighty", "Adamant", "Perceptive",
-        "Arcane", "Mythril", "Bloody"
+        new GunMod(Marksman,
+            "Marksmanship",
+            "Marksman" + "\n Can grant up to" + "\n 30% crit chance based on" + "\n how little the bullet turns."),
+        new GunMod(Sniper,
+            "Accuracy",
+             "Sniper" + "\n Adds a seconds of" + "\n cooldown to the enemy's" + "\n current gun."),
+        new GunMod(Scout,
+            "Swiftness",
+            "Scout" + "\n Adds 3 points of speed" + "\n for 3 seconds" + "\n to the gun's owner each time" + "\n they hit a target."),
+
+        new GunMod(Accelerate,
+            "Accelerating",
+            "Accelerate" + "\n Gradually increases speed while" + "\n the bullet isn't homing on a target."),
+        new GunMod(Camouflage,
+            "Hidden",
+            "Camouflage" + "\n 30% chance to make bullets" + "\n less visible to enemies."),
+        new GunMod(Pressure,
+            "Pressuring",
+            "Pressure" + "\n Removes .25 seconds of remaining cooldown" + "\n upon hitting a target."),
+
+        new GunMod(Momentum,
+            "Mighty",
+            "Momentum" + "\n Increases damage as bullet" +"\n displacement increases."),
+        new GunMod(Barrier,
+            "Adamant",
+            "Barrier" + "\n Allows collisions and homing" +"\n between enemy and ally bullets."),
+        new GunMod(Thirst,
+            "Perceptive",
+            "Thirst" + "\n Gradually increases the " +"\n homing radius, homing speed, and" +"\n lasting time while the bullet" + "\n isn't homing on a target.") ,
+
+        new GunMod(ArcaneQuiver,
+            "Arcane",
+            "Arcane Quiver" + "\n 20% chance for a chosen" + "\n gun ability to reapply itself," +"\n doubling its effectiveness" + "\n each reapplication."),
+        new GunMod(MythrilQuiver,
+            "Mythril",
+            "Mythril Quiver" + "\n +10 Mezmerize power."),
+        new GunMod(BloodyQuiver,
+            "Bloody",
+            "Bloody Quiver" + "\n Restores a point of HP" + "\n upon hitting a target.")
     };
-    private readonly static string[] gun_ability_desc = new string[12]
-    {
-        "Marksman" + "\n Can grant up to" + "\n 30% crit chance based on" + "\n how little the bullet turns.",
-        "Sniper" + "\n Adds a seconds of" + "\n cooldown to the enemy's" + "\n current gun.",
-        "Scout" + "\n Adds 3 points of speed" + "\n for 3 seconds" + "\n to the gun's owner each time" + "\n they hit a target.",
-
-        "Accelerate" + "\n Gradually increases speed while" + "\n the bullet isn't homing on a target.",
-        "Camouflage" + "\n 30% chance to make bullets" + "\n less visible to enemies.",
-        "Pressure" + "\n Removes .25 seconds of remaining cooldown" + "\n upon hitting a target.",
-
-        "Momentum" + "\n Increases damage as bullet" +"\n displacement increases.",
-        "Barrier" + "\n Allows collisions and homing" +"\n between enemy and ally bullets.",
-        "Thirst" + "\n Gradually increases the " +"\n homing radius, homing speed, and" +"\n lasting time while the bullet" + "\n isn't homing on a target.",
-
-        "Arcane Quiver" + "\n 20% chance for a chosen" + "\n gun ability to reapply itself," +"\n doubling its effectiveness" + "\n each reapplication.",
-        "Mythril Quiver" + "\n +10 Mezmerize power.",
-        "Bloody Quiver" + "\n Restores a point of HP" + "\n upon hitting a target."
-    };
-    /*This class's pool of gun_abilities.Use of a static container of static methods requiring explicit this
-     pointers are used for onetime,pre-Awake() initialization of delegates*/
-    private static List<Gun_Abilities> Gun_Mods = new List<Gun_Abilities>()//This class's pool of gun_abilities
-    {
-        {Marksman},
-        {Sniper},
-        {Scout},
-
-        {Accelerate},
-        {Camouflage},
-        {Pressure},
-
-        {Momentum},
-        {Barrier},
-        {Thirst},
-
-        {ArcaneQuiver},
-        {MythrilQuiver},
-        {BloodyQuiver},
-    };
+  
    
     /*Ability that grants extra crit chance based on how far the bullet
      deviates from its "original" path.Less deviation means more crit,the 
@@ -100,22 +97,25 @@ public class Strike : Gun
         {
             yield return new WaitForFixedUpdate();
         }
-        if (script.legit_target == false || script.Target.type != HealthDefence.Type.Unit)//Check if target even is valid
+        if (script.legit_target == false || !(script.Target is UnitHealthDefence))//Check if target even is valid
         {
             script.coroutines_running--;
-            yield return null;
+            yield break;
         }
         else
         {
             script.Target.RpcUpdateAilments("\r\n <color=yellow>+ 1 sec cooldown on gun </color>", 1);
-            Gun targ = script.Target.Controller.main_gun;
-            if (targ.HasReloaded())
+            Gun targ = script.Target.GetComponentInChildren<GenericController>().main_gun;
+            if (targ)
             {
-                targ.next_time = Time.time + 1f;
-            }
-            else
-            {
-                targ.next_time += 1f;
+                if (targ.HasReloaded())
+                {
+                    targ.next_time = Time.time + 1f;
+                }
+                else
+                {
+                    targ.next_time += 1f;
+                }
             }
             script.coroutines_running--;
         }
@@ -180,10 +180,11 @@ public class Strike : Gun
     public static IEnumerator ArcaneQuiver(Gun gun, BulletScript script)
     {
         script.coroutines_running++;
+        Strike strike = gun as Strike;
         if (!script.Target)
         {
             int i = 0;
-            foreach (Gun_Abilities g in gun.Claimed_Gun_Mods.GetInvocationList())
+            foreach (Gun_Abilities g in strike.Claimed_Gun_Mods.GetInvocationList())
             {
                 if (i <= gun.level - gun.mez_threshold && rand.NextDouble() < .20)
                 {
@@ -203,9 +204,9 @@ public class Strike : Gun
         {
             script.gameObject.layer = gun.client_user.gameObject.layer;
         }
-        else
+        else if(gun.transform.parent)
         {
-            script.gameObject.layer = gun.GetComponentInParent<HealthDefence>().gameObject.layer;
+            script.gameObject.layer = gun.transform.parent.gameObject.layer;
         }
         script.coroutines_running--;
         yield return null;
@@ -264,6 +265,8 @@ public class Strike : Gun
         script.GetComponent<Rigidbody>().velocity = Vector3.zero;
         NetworkMethods.Instance.RpcSetEnabled(script.gameObject, "Collider", false);
         NetworkMethods.Instance.RpcSetEnabled(script.gameObject, "Renderer", false);
+        script.coroutines_running--;
+        script.can_bounce = true;
         if (gun.client_user && gun.client_user.speed < 27)
         {
             gun.client_user.speed += 3;
@@ -284,7 +287,7 @@ public class Strike : Gun
                 AI.shield_speed -= 4;
             }
         }
-        script.coroutines_running--;
+        script.can_bounce = false;
 
     }
 
@@ -322,34 +325,6 @@ public class Strike : Gun
         }
     }
 
-
-    protected override string ClassGunAbilityNames(int index)
-    {
-        return gun_ability_names[index];
-    }
-
-    protected override string GunAbilityDesc(int index)
-    {
-        return gun_ability_desc[index];
-    }
-
-    public override Gun_Abilities ClassGunMods(int index)
-    {
-        return Gun_Mods[index];
-    }
-
-    protected override void SetGunNameAddons(int index) 
-    {
-        if (index < 4 || index > 12)
-        {
-            suffixes.Add(gun_name_addons[index]);
-        }
-        else
-        {
-            prefixes.Add(gun_name_addons[index]);
-        }
-    }
-
     protected override string GunDesc()
     {
         return "Launches a powerful arrow.";
@@ -369,12 +344,13 @@ public class Strike : Gun
         color = SpawnManager.GetTeamColor(
             LayerMask.NameToLayer(_layer));
         range = 10f;
-        projectile_speed = 5;
+        projectile_speed = 7.5f;
         knockback_power = 5;
         crit_chance = .05;
         reload_time = 1f;
         home_speed = 2.5f;
-        home_radius = 3f;
+        home_radius = 2f;
+        coord_radius = 3f;
         homes = true;
         /*Resources.Load seems to only work for getting prefabs as only game objects.*/
         Bullet = Resources.Load("Bullet") as GameObject;

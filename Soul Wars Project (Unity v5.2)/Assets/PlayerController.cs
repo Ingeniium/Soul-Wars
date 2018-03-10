@@ -54,7 +54,7 @@ public class PlayerController : GenericController
     public Canvas player_interface;//Prefab of below
     public Canvas player_interface_show;//The Object that's responsible for displaying things like health and shield bars
 
-    
+
     override protected void Start()
     {
         /*The code that follows operates locally on ONE client.*/
@@ -90,7 +90,7 @@ public class PlayerController : GenericController
         }
         PlayersAlive.Instance.Players.Add(netId.Value);
     }
-    
+
 
     [Command]
     void CmdSyncChildTransforms()
@@ -138,14 +138,30 @@ public class PlayerController : GenericController
     [Command]
     void CmdAddPlayer()
     {
-        RpcAddPlayer();
+        players.RemoveNullM();
+        /*Id is passed so that players that arrived before the calling
+         * player may be added to the list*/
+        uint[] ids = new uint[players.Count];
+        for (int i = 0; i < players.Count; i++)
+        {
+            ids[i] = players[i].netId.Value;
+        }
+        RpcAddPlayer(ids);
     }
 
     [ClientRpc]
-    void RpcAddPlayer()
+    void RpcAddPlayer(uint[] ids)
     {
-        players.RemoveNullM();
+        players.Clear();
+        for (int i = 0; i < ids.Length; i++)
+        {
+           GameObject obj = ClientScene.FindLocalObject(
+                new NetworkInstanceId(ids[i]));
+            PlayerController p = obj.GetComponent<PlayerController>();
+            players.Add(p);
+        }
         players.Add(this);
+        Debug.Log(players.Count);
 
     }
 
@@ -198,7 +214,7 @@ public class PlayerController : GenericController
     [Command]
     void CmdGetOtherNameDisplays()
     {
-        RpcGetOtherNameDisplays();
+        RpcGetOtherNameDisplays();     
     }
 
     [ClientRpc]
@@ -208,10 +224,11 @@ public class PlayerController : GenericController
         {
             if (p && p.netId != Client.netId)
             {
-                p.player_name = _player_name;
+                p.player_name = p.player_name;
             }
         }
     }
+
 
     [Command]
     public void CmdApplyGunAbilities(GameObject obj, int index)
@@ -219,7 +236,7 @@ public class PlayerController : GenericController
         obj.GetComponent<Gun>().RpcApplyGunAbilities(index);
     }
 
-    
+
 
 
     IEnumerator SetShield()
@@ -261,18 +278,14 @@ public class PlayerController : GenericController
      * sent so the bullet's orientation is created 
      * with respect to the client's perspective.*/
     [Command]
-    void CmdShoot(Vector3 forward,Vector3 pos,Quaternion rot)
+    void CmdShoot(GameObject Gun, Vector3 forward, Vector3 pos, Quaternion rot)
     {
-        try
+        Gun gun = Gun.GetComponent<Gun>();
+        if (gun.HasReloaded())//This is checked again in case multiple cmds were sent before the firing
         {
-            if (main_gun.HasReloaded())
-            {
-                main_gun.Shoot(forward,pos,rot);
-            }
-        }
-        catch (System.NullReferenceException e)
-        {
-
+            main_gun = gun; //Sets main gun on server w/o Rpc overhead.
+            RpcEquipGun(Gun);
+            main_gun.Shoot(forward, pos, rot);
         }
     }
 
@@ -298,14 +311,18 @@ public class PlayerController : GenericController
         {
             return (g
             && (Input.inputString.Contains(g.button)
-            || (Input.GetMouseButton(0)
+            || (Input.GetMouseButtonDown(0)
             && g.button == "LMB")));
         });
         if (index != -1 && !blocking)
         {
-            CmdEquipGun(weapons[index].gameObject);
-            StartCoroutine(weapons[index].item_image_show.GetComponentInChildren<ItemImage>().Cooldown(weapons[index].reload_time));
-            CmdShoot(weapons[index].barrel_end.forward,weapons[index].barrel_end.position,weapons[index].barrel_end.rotation);
+            Gun gun = weapons[index];
+            if (gun.HasReloaded())
+            {
+                ItemImage image = gun.item_image_show.GetComponentInChildren<ItemImage>();
+                StartCoroutine(image.Cooldown(gun.reload_time));
+                CmdShoot(gun.gameObject, gun.barrel_end.forward, gun.barrel_end.position, gun.barrel_end.rotation);
+            }
         }
         else if (Input.GetMouseButtonDown(1) && !blocking)
         {
@@ -351,7 +368,7 @@ public class PlayerController : GenericController
     [ClientRpc]
     void RpcSyncRotation(Quaternion rot)
     {
-        if(Client.netId != netId)
+        if (Client.netId != netId)
         {
             transform.rotation = rot;
         }
@@ -367,7 +384,7 @@ public class PlayerController : GenericController
             Vector3 total_move = new Vector3(moveHorizontal, 0, -1 * moveVertical);
             rb.velocity = speed * total_move;
             //CmdSendVelocity(speed * total_move);
-           // CmdSyncRotation(transform.rotation);
+            // CmdSyncRotation(transform.rotation);
         }
     }
 

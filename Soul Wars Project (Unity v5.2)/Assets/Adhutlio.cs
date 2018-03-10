@@ -17,12 +17,12 @@ using UnityEngine.Networking;
         blaster.SetBaseStats(Layer);
             flurry.level = 3;
             blaster.level = 3;
-            flurry.AddAbility(blaster.ClassGunMods(5));
+            flurry.AddAbility(blaster.GetGunModAbility(5));
             flurry.AddAbility(4);
             flurry.AddAbility(7);
             blaster.AddAbility(5);
             blaster.AddAbility(9);
-            blaster.AddAbility(flurry.ClassGunMods(6));
+            blaster.AddAbility(flurry.GetGunModAbility(6));
             
         }
 

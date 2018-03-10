@@ -29,7 +29,19 @@ public class ItemImage : MonoBehaviour {
     private Canvas settings_canvas_show;
     private Text settings_text;
     private string[] settings = new string[5];
-    public bool on_cooldown = false;
+    private byte _cooldown_counter;
+    private byte cooldown_counter
+    {
+        get { return _cooldown_counter; }
+        set
+        {
+            if(value == Byte.MaxValue)
+            {
+                value = Byte.MinValue;
+            }
+            _cooldown_counter = value;
+        }
+    }
 
     void Start()
     {
@@ -39,8 +51,7 @@ public class ItemImage : MonoBehaviour {
     }
 
     public void AddSetting(string s, int index)
-    {
-        
+    {        
         settings[index] = s;
         settings_text.text = "";
         foreach (string t in settings)
@@ -51,51 +62,38 @@ public class ItemImage : MonoBehaviour {
 
     public void RemoveSetting(string s)
     {
-        int i = Array.FindIndex(settings, delegate (string str)
+        int index = Array.FindIndex(settings, delegate (string str)
          {
              return (str == s);
          });
-        if(i != -1)
+        if(index != -1)
         {
-            settings[i] = "";
-            settings_text.text = "";
-            foreach (string t in settings)
-            {
-                settings_text.text += t;
-            }
+            AddSetting("", index);
         }
     }
 
     public IEnumerator Cooldown(float time)
     {
-        on_cooldown = true;
-        int seconds = (int)time;
-        settings[2] = "<color=yellow>" + seconds.ToString() + "</color> ";
-        settings_text.text = "";
-        foreach (string t in settings)
-        {
-            settings_text.text += t;
-        }
-        yield return new WaitForSeconds(time - (float)seconds);
+        const int SETTING_INDEX = 2;
+        cooldown_counter += 1;
+        byte ORIGINAL_COUNTER = cooldown_counter;
+        int seconds = (int)time;  //This gets the time without the extra milliseconds
+        string setting = "<color=yellow>" + seconds.ToString() + "</color>";
+        AddSetting(setting, SETTING_INDEX);
+        /*Wait the length of the milliseconds first,so that
+        we only need to worry about decrementing seconds*/
+        yield return new WaitForSeconds(time - seconds);
         while (seconds > 0)
         {
+            setting = "<color=yellow>" + seconds.ToString() + "</color>";
+            AddSetting(setting, SETTING_INDEX);
             yield return new WaitForSeconds(1);
             seconds--;
-            settings[2] = "<color=yellow>" + seconds.ToString() + "</color> ";
-            settings_text.text = "";
-            foreach (string t in settings)
-            {
-                settings_text.text += t;
-            }
         }
-        settings[2] = "";
-        settings_text.text = "";
-        foreach (string t in settings)
+        if (cooldown_counter == ORIGINAL_COUNTER)
         {
-            settings_text.text += t;
+            RemoveSetting(setting);
         }
-        
-        on_cooldown = false;
     }
 
     public void OnPointerEnter()

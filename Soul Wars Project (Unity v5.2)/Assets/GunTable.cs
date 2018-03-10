@@ -62,7 +62,7 @@ public abstract partial class Gun : Item
             foreach (GunTableButton g in buttons)
             {
                 //Copy the names of the abilities to the strings of the buttons.
-                g.GetComponentInChildren<Text>().text = gun_for_consideration.ClassGunAbilityNames(g.index);
+                g.GetComponentInChildren<Text>().text = gun_for_consideration.GetGunModName(g.index);
                 /*For each row(composed of 3 buttons),if the level is too low,disable the 
                 next row of buttons,turning them grey.*/
                 if (g.index > 3 * gun_for_consideration.level - 1)
@@ -92,7 +92,7 @@ public abstract partial class Gun : Item
              for (int i = 0; i < buttons.Length - 1; i++)//Exclude "x" button
              {
                   int temp = i;
-                  buttons[temp].method = gun_for_consideration.ClassGunMods(temp);                 
+                  buttons[temp].method = gun_for_consideration.GetGunModAbility(temp);                 
              }
             
             if (gun_for_consideration.points == 0 && gun_for_consideration.level_up_indication)
@@ -109,9 +109,7 @@ public abstract partial class Gun : Item
     public void RpcApplyGunAbilities(int index)
     {
         points--;
-        Claimed_Gun_Mods += ClassGunMods(index);
-        SetGunNameAddons(index);
-        claimed_gun_ability.Add(index);
+        AddAbility(index);
     }
 
     protected class GunTableButton : MonoBehaviour
@@ -156,10 +154,10 @@ public abstract partial class Gun : Item
             desc_canvas_show = TextBox.Instance.CreateDescBox(
                 null,
                 transform.position + new Vector3(1.5f, 0, 1.75f),
-                GunTable.gun_for_consideration.GunAbilityDesc(index),
+                GunTable.gun_for_consideration.GetGunModDesc(index),
                 true);
             desc_canvas_show.transform.SetParent(gameObject.transform);
-            desc_canvas_show.GetComponentInChildren<Text>().text = GunTable.gun_for_consideration.GunAbilityDesc(index);
+            desc_canvas_show.GetComponentInChildren<Text>().text = GunTable.gun_for_consideration.GetGunModDesc(index);
         }
 
         void OnMouseExit()

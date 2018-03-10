@@ -209,7 +209,11 @@ public abstract class HealthDefence : NetworkBehaviour
     [ClientRpc]
     public void RpcDisplayHPChange(Color color, int num)
     {
-        health_change_show = Instantiate(health_change_canvas, gameObject.transform.position, Quaternion.Euler(90, 0, 0)) as GameObject;
+        if(health_change_show)
+        {
+            Destroy(health_change_show);//In case of times when there's multiple hp changes within a second
+        }
+        health_change_show = Instantiate(health_change_canvas, transform.position, Quaternion.Euler(90, 0, 0)) as GameObject;
         DisplayHPChange(color, num);
         Destroy(health_change_show, 1f);
     }
@@ -220,6 +224,11 @@ public abstract class HealthDefence : NetworkBehaviour
         {
             health_change_show.GetComponentInChildren<Text>().text = "-" + num;
             health_change_show.GetComponentInChildren<Text>().color = color;
+            HPbar bar = health_change_show.AddComponent<HPbar>();
+            bar.Object = gameObject;
+            const float OFFSET = 1.5f;
+            bar.offset = new Vector3(OFFSET,0,OFFSET);
+
         }
     }
 }

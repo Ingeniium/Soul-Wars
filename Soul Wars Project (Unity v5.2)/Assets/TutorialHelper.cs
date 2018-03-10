@@ -61,10 +61,9 @@ public class TutorialHelper : MonoBehaviour
             sentence += s + "\r\n";
         }
         TextBox.Instance.CreateExitDescBox(
-               null,
-               new Vector3(-225,0,200),
-               sentence,
-               false);
+               PlayerController.Client.player_interface_show.transform,
+               new Vector3(-325,-60,100),
+               sentence);
     }
 
 }

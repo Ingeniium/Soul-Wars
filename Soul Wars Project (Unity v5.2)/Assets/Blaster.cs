@@ -6,58 +6,54 @@ using UnityEngine.Networking;
 
 public class Blaster : Gun
 {
-    private readonly static string[] gun_ability_names = new string[12] 
+    protected override GunMod GetGunMod(int index)
     {
-        "Brigadier", "Gunslinger", "Destroyer",
-        "Sunder", "Curve", "Bounce",
-        "Quake", "Tremor", "StarFall",
-        "Meteor", "Comet", "Asteroid"
-    };                           
-    private readonly static string[] gun_name_addons = new string[12] 
+        return blaster_mods[index];
+    }
+
+    private readonly static GunMod[] blaster_mods = new GunMod[12]
     {
-        "Punishment", "The Force", "Destruction",
-        "Sundering", "Homing", "Rebounding",
-        "Robust", "Intense", "Astral",
-        "Meteor", "Comet", "Asteroid"
+         new GunMod(Brigadier,
+             "Punishment",
+             "Brigadier" + "\n Does 150% damage to" + "\n spawn points and shields."),
+         new GunMod(Gunslinger,
+             "The Force",
+             "Gunslinger" + "\n Causes a 2 second stun."),
+         new GunMod(Destroyer,
+             "Destruction",
+             "Destroyer" + "\n Does 30% more damage for" + "\n each status effect the target" + "\n currently suffers."),
+
+         new GunMod(Sunder,
+             "Sundering",
+             "Sunder" + "\n + 10 Sunder Power."),
+         new GunMod(Curve,
+             "Homing",
+             "Curve" + "\n Grants slight homing ability."),
+         new GunMod(Bounce,
+             "Rebounding",
+             "Bounce" + "\n Causes bullets to bounce on impact" + "\n and quadruples bullet lifetime."),
+
+         new GunMod(Quake,
+             "Robust",
+             "Quake" + "\n Does half damage to nearby targets." + "\n Damage from the quake cannot crit."),
+         new GunMod(Tremor,
+             "Intense",
+             "Tremor" + "\n Stuns nearby foes for 1 second."),
+         new GunMod(StarFall,
+             "Astral",
+             "StarFall" + "\n Drops a piercing bullet " + "\n wherever your mouse is when shooting" + "\n in addition to the bullet already fired."),
+
+         new GunMod(Meteor,
+             "Meteor",
+             "Meteor" + "\n Triples the size of your bullets."),
+         new GunMod(Comet,
+             "Comet",
+             "Comet" + "\n Triples the speed of your bullets."),
+         new GunMod(Asteroid,
+             "Asteroid",
+             "Asteroid" + "\n Causes your bullets to do max damage," + "\n but removes crit chance.")
     };
-    private readonly static string[] gun_ability_desc = new string[12]
-    {
-        "Brigadier" + "\n Does 150% damage to" + "\n spawn points and shields.",
-        "Gunslinger" + "\n Causes a 2 second stun.",
-        "Destroyer" + "\n Does 30% more damage for" + "\n each status effect the target" + "\n currently suffers.",
-
-        "Sunder" + "\n + 10 Sunder Power.",
-        "Curve" + "\n Grants slight homing ability.",
-        "Bounce" + "\n Causes bullets to bounce on impact" + "\n and quadruples bullet lifetime.",
-
-        "Quake" + "\n Does half damage to nearby targets." + "\n Damage from the quake cannot crit.",
-        "Tremor" + "\n Stuns nearby foes for 1 second.",
-        "StarFall" + "\n Drops a piercing bullet " + "\n wherever your mouse is when shooting" + "\n in addition to the bullet already fired." ,
-
-        "Meteor" + "\n Triples the size of your bullets.",
-        "Comet" + "\n Triples the speed of your bullets.",
-        "Asteroid" + "\n Causes your bullets to do max damage," + "\n but removes crit chance.",
-    };
-    /*This class's pool of gun_abilities.Use of a static container of static methods requi"Markring explicit this
-    pointers are used for onetime,pre-Awake() initialization of delegates*/
-    private static List<Gun_Abilities> Gun_Mods = new List<Gun_Abilities>()//This class's pool of gun_abilities
-    {
-        Brigadier,
-        Gunslinger,
-        Destroyer,
-
-        Sunder,
-        Curve,
-        Bounce,
-
-        Quake,
-        Tremor,
-        StarFall,
-
-        Meteor,
-        Comet,
-        Asteroid,
-    };
+   
 
     private static IEnumerator Asteroid(Gun gun,BulletScript script)
     {
@@ -84,7 +80,7 @@ public class Blaster : Gun
         else
         {
             AIController AI = gun.GetComponentInParent<AIController>();
-            if (AI.Target)
+            if (AI && AI.Target)
             {
                 Transform ttr = AI.Target.transform;
                 pos = new Vector3(ttr.position.x, ttr.position.y + 10f, ttr.position.z);
@@ -105,6 +101,7 @@ public class Blaster : Gun
         new_script.can_pierce = true;
         new_script.rb.velocity = Vector3.zero;
         new_script.rb.useGravity = true;
+        new_script.rb.constraints = RigidbodyConstraints.None;
         gun.mez_threshold -= 100;
         script.coroutines_running--;
         yield return null;
@@ -117,7 +114,7 @@ public class Blaster : Gun
         {
             yield return new WaitForEndOfFrame();
         }
-        if (script.Target.type != HealthDefence.Type.Unit)
+        if (!(script.Target is UnitHealthDefence))
         {
             /*Because of lack of implicit casting of rvalue integral types in C#,
              multiplying 1.5 in an acceptable manner would be useless(as the 
@@ -141,9 +138,11 @@ public class Blaster : Gun
         {
             yield return new WaitForEndOfFrame();
         }
-        if (script.Target.type == HealthDefence.Type.Unit)
+        UnitHealthDefence tgt = script.Target as UnitHealthDefence;
+        if(tgt)
         {
-            script.Target.DetermineStun(2);
+            const int STUN_TIME = 2;
+            tgt.DetermineStun(STUN_TIME);
         }
         script.coroutines_running--;
     }
@@ -191,8 +190,8 @@ public class Blaster : Gun
             LayerMask.GetMask(layer), QueryTriggerInteraction.Collide);
         foreach (Collider col in target_colliders)
         {
-            HealthDefence HP = col.GetComponent<HealthDefence>();
-            if (HP && script.Target.netId != HP.netId && HP.type == HealthDefence.Type.Unit)
+            UnitHealthDefence HP = col.GetComponent<UnitHealthDefence>();
+            if (HP && script.Target.netId != HP.netId)
             {
                 HP.DetermineStun(1);
             }
@@ -240,6 +239,7 @@ public class Blaster : Gun
         SphereCollider collider = script.gameObject.GetComponent<SphereCollider>();
         script.transform.position = new Vector3(script.transform.position.x, script.transform.position.y + 1.0f, script.transform.position.z);
         NetworkMethods.Instance.RpcSetScale(script.gameObject, new Vector3(2.4f, 2.4f, 2.4f));
+        script.coord_radius *= 3;
         script.coroutines_running--;
         yield return null;
     }
@@ -288,25 +288,29 @@ public class Blaster : Gun
             yield return new WaitForEndOfFrame();
         }
         float multiplier = 1;
-        if(script.Target.chilling)
-        {
-            multiplier += .3f;
-        }
         if (script.Target.burning)
-        {
-            multiplier += .3f;
-        }
-        if (script.Target.mezmerized)
-        {
-            multiplier += .3f;
-        }
-        if (script.Target.stunned)
         {
             multiplier += .3f;
         }
         if (script.Target.sundered)
         {
             multiplier += .3f;
+        }
+        UnitHealthDefence tgt = script.Target as UnitHealthDefence;
+        if (tgt)
+        {
+            if (tgt.chilling)
+            {
+                multiplier += .3f;
+            }
+            if (tgt.mezmerized)
+            {
+                multiplier += .3f;
+            }
+            if (tgt.stunned)
+            {
+                multiplier += .3f;
+            }
         }
         float upper = script.upper_bound_damage;
         float lower = script.lower_bound_damage;
@@ -315,34 +319,7 @@ public class Blaster : Gun
         script.upper_bound_damage = (int)upper;
         script.lower_bound_damage = (int)lower;
         script.coroutines_running--;
-    }
-    
-    protected override string GunAbilityDesc(int index)
-    {
-        return gun_ability_desc[index];
-    }
-
-    protected override string ClassGunAbilityNames(int index)
-    {
-        return gun_ability_names[index];
-    }
-
-    public override Gun_Abilities ClassGunMods(int index)
-    {
-        return Gun_Mods[index];
-    }
-
-    protected override void SetGunNameAddons(int index)
-    {
-        if (index < 4 || index > 12)
-        {
-            suffixes.Add(gun_name_addons[index]);
-        }
-        else
-        {
-            prefixes.Add(gun_name_addons[index]);
-        }
-    }
+    }   
 
     protected override string GunDesc()
     {
@@ -363,7 +340,7 @@ public class Blaster : Gun
         color = SpawnManager.GetTeamColor(
             LayerMask.NameToLayer(_layer));
         range = 20;
-        projectile_speed = 10;
+        projectile_speed = 15;
         knockback_power = 5;
         crit_chance = .10;
         reload_time = 4f;
@@ -372,6 +349,7 @@ public class Blaster : Gun
         homes = false;
         /*Resources.Load seems to only work for getting prefabs as only game objects.*/
         Bullet = Resources.Load("CanonBall") as GameObject;
+        coord_radius = 2f;
     }
 
     public override string GetImagePreviewString()

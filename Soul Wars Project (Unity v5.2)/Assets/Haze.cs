@@ -5,58 +5,48 @@ using System.Collections.Generic;
 
 public class Haze : Gun
 {
-    private readonly static string[] gun_ability_names = new string[12] 
+    protected override GunMod GetGunMod(int index)
     {
-        "Fog", "Conflagration", null,
-        "Resistance","Fume","Epidemic",
-        "Debilitate","Engulf",null,
-        "Infect","Cloud",null
-    };
-    private readonly static string[] gun_name_addons = new string[12] 
+        return haze_mods[index];
+    }
+
+    private readonly static GunMod[] haze_mods = new GunMod[12]
     {
-        "Fog", "Conflagration", null,
-        "Insulant", "Toxic","Contagious",
-        "Debilitating", "Ominous",null,
-        "Infectious", "Cloudy", null
-    };
-    private readonly static string[] gun_ability_desc = new string[12] 
-    {
-        "Fog" + "\n Adds +10 Chill strength to bullets.",
-        "Conflagration" + "\n Adds +10 Burn strength to bullets.",
+        new GunMod(Fog,
+            "Fog",
+            "Fog" + "\n Adds +10 Chill strength to bullets."),
+        new GunMod(Conflagration,
+            "Conflagration",
+            "Conflagration" + "\n Adds +10 Burn strength to bullets."),
         null,
 
-        "Resistance" + "\n Enemy bullets that pass thru" + "\n this bullet will have half power" + "\n to most status effects.",
-        "Fume" + "\n Adds one to two points of damage" + "\n to the bullet upon hitting" + "\n new targets.",
-        "Epidemic" + "\n Allows chance for status effects" + "\n of enemies to spread within bullet's radius.",
+        new GunMod(Resistance,
+            "Insulant",
+            "Resistance" + "\n Enemy bullets that pass thru" + "\n this bullet will have half power" + "\n to most status effects."),
+        new GunMod(Fume,
+            "Toxic",
+            "Fume" + "\n Adds one to two points of damage" + "\n to the bullet upon hitting" + "\n new targets."),
+        new GunMod(Epidemic,
+            "Contagious",
+            "Epidemic" + "\n Allows chance for status effects" + "\n of enemies to spread within bullet's radius."),
 
-        "Debilitate" + "\n Bullets ignore half target resistance" + "\n to most status effects.",
-        "Engulf" + "\n Causes bullets to stick to their first target.",
+        new GunMod(Debilitate,
+            "Debilitating",
+            "Debilitate" + "\n Bullets ignore half target resistance" + "\n to most status effects."),
+        new GunMod(Engulf,
+            "Ominous",
+            "Engulf" + "\n Causes bullets to stick to their first target."),
         null,
 
-        "Infect" + "\n Bullets from allies and yourself will" + "\n gain +5 standard status power" + "\n upon crossing bullets from this gun.",
-        "Cloud" + "\n Doubles the size of the bullets.",
+        new GunMod(Infect,
+            "Infectious",
+            "Infect" + "\n Bullets from allies and yourself will" + "\n gain +5 standard status power" + "\n upon crossing bullets from this gun."),
+        new GunMod(Cloud,
+            "Cloudy",
+            "Cloud" + "\n Doubles the size of the bullets."),
         null
     };
-    /*This class's pool of gun_abilities.Use of a static container of static methods requi"Markring explicit this
-     pointers are used for onetime,pre-Awake() initialization of delegates*/
-    private static List<Gun_Abilities> Gun_Mods = new List<Gun_Abilities>()//This class's pool of gun_abilities
-    {
-        Fog,
-        Conflagration,
-        null,
 
-        Resistance,
-        Fume,
-        Epidemic,
-
-        Debilitate,
-        Engulf,
-        null,
-
-        Infect,
-        Cloud,
-        null
-    };
 
     private static IEnumerator Fog(Gun gun, BulletScript script)
     {
@@ -75,64 +65,71 @@ public class Haze : Gun
     }
 
     private static IEnumerator Epidemic(Gun gun, BulletScript script)
-    { 
+    {
         bool chill = false;
         bool stun = false;
         bool burn = false;
         bool mez = false;
         bool sunder = false;
         const double num = .05;
-        while(script)
+        while (script)
         {
             while (!script.Target)
             {
                 yield return new WaitForEndOfFrame();
             }
-            if(chill)
+            if (burn)
             {
-                script.Target.StartCoroutine(script.Target.DetermineChill(num));
-            }
-            if(stun)
-            {
-                script.Target.DetermineStun(1);
-            }
-            if(burn)
-            {
-                int damage = script.lower_bound_damage 
+                int damage = script.lower_bound_damage
                     + (script.upper_bound_damage - script.lower_bound_damage) / 2
                     - script.Target.defence;
                 script.Target.StartCoroutine(script.Target.DetermineBurn(num, damage));
             }
-            if(mez)
+            if (sunder)
             {
-                script.Target.StartCoroutine(script.Target.DetermineMezmerize(num));
-            }
-            if(sunder)
-            {
-                int damage = script.lower_bound_damage 
+                int damage = script.lower_bound_damage
                     + (script.upper_bound_damage - script.lower_bound_damage) / 2
                     - script.Target.defence;
                 script.Target.StartCoroutine(script.Target.DetermineSunder(num, damage));
             }
-            if(script.Target.chilling)
+            UnitHealthDefence tgt = script.Target as UnitHealthDefence;
+            if (tgt)
             {
-                chill = true;
-            }
-            if(script.Target.stunned)
+                if (chill)
+                {
+                    tgt.StartCoroutine(tgt.DetermineChill(num));
+                }
+                if (stun)
+                {
+                    tgt.DetermineStun(1);
+                }
+                if (mez)
+                {
+                    tgt.StartCoroutine(tgt.DetermineMezmerize(num));
+                }
+            } 
+            if (script.Target.sundered)
             {
-                stun = true;
+                sunder = true;
             }
-            if(script.Target.burning)
+            if (script.Target.burning)
             {
                 burn = true;
             }
-            if(script.Target.mezmerized)
+            if (tgt)
             {
-                mez = true;
-            }
-            if(script.Target.sundered)
-            {
-                sunder = true;
+                if (tgt.chilling)
+                {
+                    chill = true;
+                }
+                if (tgt.mezmerized)
+                {
+                    mez = true;
+                }
+                if (tgt.stunned)
+                {
+                    stun = true;
+                }
             }
             yield return new WaitForEndOfFrame();
         }
@@ -153,12 +150,12 @@ public class Haze : Gun
         else
         {
             List<HealthDefence> prevTargs = new List<HealthDefence>();
-            while(script)
+            while (script)
             {
-                if(script.Target && !prevTargs.Exists(delegate(HealthDefence h)
-                {
-                    return (h.netId == script.Target.netId);
-                }))
+                if (script.Target && !prevTargs.Exists(delegate (HealthDefence h)
+                 {
+                     return (h.netId == script.Target.netId);
+                 }))
                 {
                     prevTargs.Add(script.Target);
                     script.upper_bound_damage += 2;
@@ -166,7 +163,7 @@ public class Haze : Gun
                 }
                 yield return new WaitForEndOfFrame();
             }
-            
+
         }
     }
 
@@ -209,29 +206,36 @@ public class Haze : Gun
         double mez = 0;
         double sunder = 0;
         script.coroutines_running--;
-        while(script)
+        while (script)
         {
-        
-        if(script.Target && !IDs.Contains(script.Target.netId.Value))
-        {
-            script.chill_strength -= chill;
-            script.chill_strength -= burn;
-            script.mezmerize_strength -= mez;
-            script.sunder_strength -= sunder;
 
-            chill = script.Target.chill_resistance /= 2;
-            burn = script.Target.burn_resistance /= 2;
-            mez = script.Target.mezmerize_resistance /= 2;
-            sunder = script.Target.sunder_resistance /= 2;
+            if (script.Target && !IDs.Contains(script.Target.netId.Value))
+            {
+                script.chill_strength -= chill;
+                script.chill_strength -= burn;
+                script.mezmerize_strength -= mez;
+                script.sunder_strength -= sunder;
 
-            script.chill_strength += chill;
-            script.chill_strength += burn;
-            script.mezmerize_strength += mez;
-            script.sunder_strength += sunder;
+                UnitHealthDefence tgt = script.Target as UnitHealthDefence;
 
-            IDs.Add(script.Target.netId.Value);
-        }
-        yield return new WaitForEndOfFrame();
+                burn = script.Target.burn_resistance /= 2;
+                sunder = tgt.sunder_resistance /= 2;
+                if (tgt)
+                {
+                    chill = tgt.chill_resistance /= 2;
+                    mez = tgt.mezmerize_resistance /= 2;
+                }
+              
+                script.chill_strength += burn;
+                script.sunder_strength += sunder;
+                if (tgt)
+                {
+                    script.chill_strength += chill;
+                    script.mezmerize_strength += mez;
+                }
+                IDs.Add(script.Target.netId.Value);
+            }
+            yield return new WaitForEndOfFrame();
         }
     }
 
@@ -298,36 +302,9 @@ public class Haze : Gun
         script.coroutines_running++;
         BoxCollider collider = script.gameObject.GetComponent<BoxCollider>();
         collider.size = new Vector3(collider.size.x, collider.size.y * .5f, collider.size.z);
-        NetworkMethods.Instance.RpcSetScale(script.gameObject,new Vector3(4,4,4));
+        NetworkMethods.Instance.RpcSetScale(script.gameObject, new Vector3(4, 4, 4));
         script.coroutines_running--;
         yield return null;
-    }
-
-    protected override string GunAbilityDesc(int index)
-    {
-        return gun_ability_desc[index];
-    }
-
-    protected override string ClassGunAbilityNames(int index)
-    {
-        return gun_ability_names[index];
-    }
-
-    public override Gun_Abilities ClassGunMods(int index)
-    {
-        return Gun_Mods[index];
-    }
-
-    protected override void SetGunNameAddons(int index)
-    {
-        if (index < 4 || index > 12)
-        {
-            suffixes.Add(gun_name_addons[index]);
-        }
-        else
-        {
-            prefixes.Add(gun_name_addons[index]);
-        }
     }
 
     protected override string GunDesc()
@@ -359,6 +336,7 @@ public class Haze : Gun
         can_pierce = true;
         /*Resources.Load seems to only work for getting prefabs as only game objects.*/
         Bullet = Resources.Load("Cloud") as GameObject;
+        coord_radius = 5f;
     }
 
     public override string GetImagePreviewString()
@@ -367,4 +345,3 @@ public class Haze : Gun
     }
 
 }
-   

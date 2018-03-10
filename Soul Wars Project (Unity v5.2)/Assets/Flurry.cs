@@ -7,70 +7,51 @@ using UnityEngine.Networking;
 public class Flurry : Gun
 {
     [SyncVar] public int num_bullets = 3;
-    private readonly static string[] gun_ability_names = new string[15] 
+
+    protected override GunMod GetGunMod(int index)
     {
-        "Hunter", "Archer", null,
-        "Debris", "Boomerang", null,
-        "Shadow", "Arrows", null,
-        "Randomizer", "Seeker", null,
-        null, "Diverge",null
-    }; 
-    private readonly static string[] gun_name_addons = new string[15]
+        return flurry_mods[index];
+    }
+
+    private readonly static GunMod[] flurry_mods = new GunMod[12]
     {
-        "Precision", "Archery", null,
-        "Perilous", "Psychic", null,
-        "Umbra", "Myriad", null,
-        "Random", "Potent", null,
-        null, "Divergent", null
+        new GunMod(Hunter,
+            "Precision",
+            "Hunter" + "\n Causes bullets that aren't" + "\n homing in on a target to" + "\n to reroute to another flurry " + "\n bullet's target."
+            ),
+        new GunMod(Archer,
+            "Archery",
+            "Archer" + "\n Bullets have a (50 + level)%" + "\n chance to be target piercing."),
+        null,
+
+        new GunMod(Debris,
+            "Perilous",
+            "Debris" + "\n Causes bullets to enlarge and" + "\n move and turn at half speed" + "\n after 1.5 seconds"),
+        new GunMod(Boomerang,
+            "Psychic",
+            "Boomerang" + "\n Causes bullets to pierce" + "\n its first target and" + "\n return to its firing position."),
+        null,
+
+        new GunMod(Shadow,
+            "Umbra",
+            "Shadow" + "\n Bullets have a 25% chance" + "\n to teleport behind target." ),
+        new GunMod(Arrows,
+            "Myriad",
+            "Arrows" + "\n +2 Arrows fired."),
+        null,
+
+        new GunMod(Randomizer,
+            "Random",
+            "Randomizer" + "\n Bullets disappear until either" + "\n a random amount of time passes" + "\n or a target enters homing range."), 
+        new GunMod(Seeker,
+            "Potent",
+            "Seeker" + "\n Each bullet gains a 20% speed" +"\n and homing radius boost each time" + "\n it homes in on a new target.") ,
+        new GunMod(Diverge,
+            "Divergent",
+            "Diverge" + "\n Each bullet has a 10% chance" + "\n to create 10 other weaker, non homing" + "\n bullets on target impact.")
     };
-    private readonly static string[] gun_ability_desc = new string[15] 
-    {
-        "Hunter" + "\n Causes bullets that aren't" + "\n homing in on a target to" + "\n to reroute to another flurry " + "\n bullet's target.",
-        "Archer" + "\n Bullets have a (50 + level)%" + "\n chance to be target piercing.",
-        null,
-
-        "Debris" + "\n Causes bullets to enlarge and" + "\n move and turn at half speed" + "\n after 1.5 seconds",
-        "Boomerang" + "\n Causes bullets to pierce" + "\n its first target and" + "\n return to its firing position.",
-        null,
-
-        "Shadow" + "\n Bullets have a 25% chance" + "\n to teleport behind target." ,
-        "Arrows" + "\n +2 Arrows fired.",
-        null,
-
-        "Randomizer" + "\n Bullets disappear until either" + "\n a random amount of time passes" + "\n or a target enters homing range." ,
-        "Seeker" + "\n Each bullet gains a 20% speed" +"\n and homing radius boost each time" + "\n it homes in on a new target.",
-        null,
-
-        null,
-        "Diverge" + "\n Each bullet has a 10% chance" + "\n to create 10 other non homing" + "\n bullets on target impact.",
-        null
-    };
-    /*This class's pool of gun_abilities.Use of a static container of static methods requiring explicit this
-     pointers are used for onetime,pre-Awake() initialization of delegates*/
-
-    private static List<Gun_Abilities> Gun_Mods = new List<Gun_Abilities>()//This class's pool of gun_abilities
-    {
-        Hunter,
-        Archer,
-        null,
-
-        Debris,
-        Boomerang,
-        null,
-
-        Shadow,
-        Arrows,
-        null,
-
-        Randomizer,
-        Seeker,
-        null,
-
-        null,
-        Diverge,
-        null
-    };
-
+    
+    
     private static IEnumerator Hunter(Gun gun, BulletScript script)
     {
         script.coroutines_running++;
@@ -331,33 +312,6 @@ public class Flurry : Gun
             NetworkServer.Spawn(bullet);
             ReadyWeaponForFire(ref bullet);
             RpcFire(bullet.transform.forward,bullet);
-        }
-    }
-
-    protected override string GunAbilityDesc(int index)
-    {
-        return gun_ability_desc[index];
-    }
-
-    protected override string ClassGunAbilityNames(int index)
-    {
-        return gun_ability_names[index];
-    }
-
-    public override Gun_Abilities ClassGunMods(int index)
-    {
-        return Gun_Mods[index];
-    }
-
-    protected override void SetGunNameAddons(int index)
-    {
-        if (index < 4 || index > 12)
-        {
-            suffixes.Add(gun_name_addons[index]);
-        }
-        else
-        {
-            prefixes.Add(gun_name_addons[index]);
         }
     }
 

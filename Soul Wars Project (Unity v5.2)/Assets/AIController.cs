@@ -50,7 +50,6 @@ public partial class AIController : GenericController
         base.Start();
         if (PlayerController.Client && PlayerController.Client.isServer)
         {
-          //  enemy_attack_detection = GetComponent<SphereCollider>();
             index = PlayersAlive.Instance.Units.Count;
             if (!EnemyInitialization.Instance.watch_only)
             {
